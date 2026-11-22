@@ -570,13 +570,13 @@
     var w = e.target.closest(".w");
     if(w){
       var rec = state.flatWords[Number(w.getAttribute("data-wi"))];
-      if(rec && typeof rec.start === "number"){ seekTo(rec.start); playAudio(); showBars(); manualScrollAt = 0; }
+      if(rec && typeof rec.start === "number"){ clearHighlight(); w.classList.add("now"); seekTo(rec.start); playAudio(); showBars(); manualScrollAt = 0; }
       return;
     }
     var ln = e.target.closest(".line");
     if(ln){
       var recL = state.flatLines[Number(ln.getAttribute("data-li"))];
-      if(recL && typeof recL.start === "number"){ seekTo(recL.start); playAudio(); showBars(); manualScrollAt = 0; }
+      if(recL && typeof recL.start === "number"){ clearHighlight(); ln.classList.add("current"); seekTo(recL.start); playAudio(); showBars(); manualScrollAt = 0; }
     }
   });
 
@@ -646,7 +646,6 @@
   function seekTo(t){
     if(!isFinite(t)) return;
     try{ audio.currentTime = Math.max(0, t); }catch(e){}
-    updateHighlight(true);
   }
   function resetProgress(){
     seekEl.value = 0; seekEl.style.setProperty("--fill","0%");
@@ -685,8 +684,8 @@
   audio.addEventListener("loadedmetadata", function(){
     tDur.textContent = fmt(audio.duration || state.duration || 0);
   });
-  audio.addEventListener("timeupdate", function(){ syncProgress(); updateHighlight(false); });
-  setInterval(function(){ if(!audio.paused) { syncProgress(); updateHighlight(false); } }, 300);
+  audio.addEventListener("timeupdate", function(){ syncProgress(); });
+  setInterval(function(){ if(!audio.paused) { syncProgress(); } }, 300);
 
   function syncProgress(){
     if(state.seeking) return;
@@ -697,7 +696,7 @@
     if(dur > 0) tDur.textContent = fmt(dur);
   }
 
-  /* ---------- highlighting + gentle auto-scroll ---------- */
+  /* ---------- clicked-only highlighting (no moving highlight in Reader — that is Checker-only) ---------- */
   function clearHighlight(){
     var prevW = contentEl.querySelector(".w.now"); if(prevW) prevW.classList.remove("now");
     var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
@@ -711,7 +710,7 @@
     }
     return ans;
   }
-  function updateHighlight(force){
+  function updateHighlight(force){ return; /* Reader: no moving word/line highlight */
     var t = audio.currentTime || 0;
     var words = state.flatWords, lines = state.flatLines;
     if(!words.length && !lines.length) return;
