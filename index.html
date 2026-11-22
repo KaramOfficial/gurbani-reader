@@ -296,6 +296,7 @@
     </div>
     <button class="fbtn small" id="fontDown" aria-label="Smaller text">A−</button>
     <button class="fbtn large" id="fontUp" aria-label="Larger text">A+</button>
+    <button class="fbtn" id="fsBtn" aria-label="Full screen" title="Full screen" style="font-size:17px;line-height:1">&#x26F6;</button>
     <button class="tbtn" id="libraryBtn" aria-haspopup="true" aria-expanded="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
       Library
@@ -875,6 +876,24 @@
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") keepAwake(); });
   keepAwake();
   document.addEventListener("click", keepAwake);
+
+  /* ---------- full screen mode ---------- */
+  var fsBtn = $("fsBtn");
+  function paintFsBtn(){
+    if(!fsBtn) return;
+    var on = !!document.fullscreenElement;
+    fsBtn.setAttribute("aria-label", on ? "Exit full screen" : "Full screen");
+    fsBtn.title = on ? "Exit full screen" : "Full screen";
+    fsBtn.style.opacity = on ? "0.65" : "1";
+  }
+  if(fsBtn){
+    if(!document.documentElement.requestFullscreen) fsBtn.style.display = "none";
+    fsBtn.addEventListener("click", function(){
+      if(document.fullscreenElement){ document.exitFullscreen().catch(function(){}); }
+      else { document.documentElement.requestFullscreen().catch(function(){}); }
+    });
+    document.addEventListener("fullscreenchange", paintFsBtn);
+  }
 
   /* ---------- start: reopen last opened page if saved ---------- */
   (function(){
