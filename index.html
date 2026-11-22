@@ -82,6 +82,10 @@
   .menu-spacer{flex:1}
   .tbtn.menu-wide{border:1px solid var(--hairline);background:var(--paper);min-height:38px;padding:7px 13px}
   .sheet .fbtn{background:var(--bg)}
+  .seg{display:flex;background:var(--bg);border:1px solid var(--hairline);border-radius:999px;padding:3px;gap:2px;flex:none}
+  .seg button{border:0;background:transparent;padding:6px 9px;border-radius:999px;font:600 12px/1 "Inter",sans-serif;color:var(--muted);cursor:pointer}
+  .seg button.active{background:var(--accent);color:#fff}
+  @media (prefers-color-scheme: dark){.seg button.active{color:#1c1406}}
   .menu-navrow{display:flex;align-items:center;gap:11px;width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--hairline);border-radius:14px;background:var(--bg);color:var(--ink);cursor:pointer;text-align:left}
   .menu-navrow svg{width:21px;height:21px;flex:none;color:var(--accent-strong)}
   .menu-navrow-text{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -358,11 +362,15 @@
     <h3>Reading</h3>
     <div class="menu-row">
       <div>
-        <span class="menu-label">Word highlight</span>
-        <p class="menu-note">Follows each word as the audio plays.</p>
+        <span class="menu-label">Follow-along highlight</span>
+        <p class="menu-note">Moves with the audio.</p>
       </div>
       <span class="menu-spacer"></span>
-      <label class="switch"><input type="checkbox" id="wordHlToggle" /><span class="track"></span></label>
+      <div class="seg" id="hlSeg" role="group" aria-label="Follow-along highlight">
+        <button data-hl="off" class="active">Off</button>
+        <button data-hl="sentence">Sentence</button>
+        <button data-hl="word">Word</button>
+      </div>
     </div>
     <button class="menu-navrow" id="libraryNav">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
@@ -1099,20 +1107,47 @@
     autoScrollOn = !autoScrollOn;
     try{ localStorage.setItem("gurbani-reader:autoscroll-v1", autoScrollOn ? "1" : "0"); }catch(e){}
     paintAutoScrollBtn();
-  var wordHlOn = false;
-  try{ wordHlOn = localStorage.getItem("gurbani-reader:wordhl-v1") === "1"; }catch(e){}
-  var wordHlToggle = $("wordHlToggle");
-  if(wordHlToggle){
-    wordHlToggle.checked = wordHlOn;
-    wordHlToggle.addEventListener("change", function(){
-      wordHlOn = wordHlToggle.checked;
-      try{ localStorage.setItem("gurbani-reader:wordhl-v1", wordHlOn ? "1" : "0"); }catch(e){}
-      if(!wordHlOn){ var pw = contentEl.querySelector(".w.now"); if(pw) pw.classList.remove("now"); state.curWord = -1; }
+  var hlMode = "off"; /* off | sentence | word — follow-along highlight, off by default */
+  try{ var hm = localStorage.getItem("gurbani-reader:hlmode-v1"); if(hm === "sentence" || hm === "word") hlMode = hm; }catch(e){}
+  var hlSeg = $("hlSeg");
+  function paintHlSeg(){ if(!hlSeg) return; hlSeg.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-hl") === hlMode); }); }
+  function clearFollow(){
+    var pw = contentEl.querySelector(".w.now"); if(pw) pw.classList.remove("now");
+    if(flashEl !== null){ /* keep a live catch-up flash; follow line clears only its own */
+      var pl = contentEl.querySelector(".line.current"); if(pl && pl !== flashEl) pl.classList.remove("current");
+    } else { var pl2 = contentEl.querySelector(".line.current"); if(pl2) pl2.classList.remove("current"); }
+    state.curWord = -1; state.curLine = -1;
+  }
+  if(hlSeg){
+    paintHlSeg();
+    hlSeg.addEventListener("click", function(e){
+      var b = e.target.closest("button"); if(!b) return;
+      hlMode = b.getAttribute("data-hl");
+      try{ localStorage.setItem("gurbani-reader:hlmode-v1", hlMode); }catch(e){}
+      clearFollow(); paintHlSeg();
     });
   }
-  /* word follow-along (only when the Word highlight setting is on) */
+  /* follow-along: sentence mode tracks the spoken line, word mode tracks the spoken word */
   function updateWordFollow(){
-    if(!wordHlOn || audio.paused) return;
+    if(hlMode === "off" || audio.paused) return;
+    if(hlMode === "sentence"){
+      var lines = state.flatLines;
+      if(!lines.length) return;
+      var curL = audio.currentTime || 0;
+      var loL = 0, hiL = lines.length - 1;
+      if(state.mode === "ang" && typeof state.angFirstLine[state.ang] === "number" && state.angLines[state.ang]){
+        loL = state.angFirstLine[state.ang];
+        hiL = Math.min(lines.length - 1, loL + state.angLines[state.ang].length - 1);
+      }
+      var li = -1, l2 = loL, r2 = hiL;
+      while(l2 <= r2){ var mid2 = (l2 + r2) >> 1; if(lines[mid2].start <= curL){ li = mid2; l2 = mid2 + 1; } else r2 = mid2 - 1; }
+      if(li < 0 || li === state.curLine) return;
+      var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
+      var lineEl2 = contentEl.querySelector('.line[data-li="' + li + '"]');
+      if(lineEl2 && curL <= lines[li].end + 0.45) lineEl2.classList.add("current");
+      state.curLine = li;
+      return;
+    }
     var words = state.flatWords;
     if(!words.length) return;
     var cur = audio.currentTime || 0;
@@ -1182,7 +1217,7 @@
   function clearExpiredHighlight(){
     var cur = audio.currentTime || 0;
     var w = contentEl.querySelector(".w.now");
-    if(w && !wordHlOn){ var rec = state.flatWords[Number(w.getAttribute("data-wi"))]; if(rec && cur > rec.end + 0.05) w.classList.remove("now"); }
+    if(w && hlMode !== "word"){ var rec = state.flatWords[Number(w.getAttribute("data-wi"))]; if(rec && cur > rec.end + 0.05) w.classList.remove("now"); }
     var l = contentEl.querySelector(".line.current");
     if(l){ var liN = Number(l.getAttribute("data-li")); var recL = state.flatLines[liN];
       if(state.mode === "ang" && state.lineAng[liN] && state.lineAng[liN] !== state.ang) l.classList.remove("current");
