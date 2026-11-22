@@ -684,8 +684,8 @@
   audio.addEventListener("loadedmetadata", function(){
     tDur.textContent = fmt(audio.duration || state.duration || 0);
   });
-  audio.addEventListener("timeupdate", function(){ syncProgress(); });
-  setInterval(function(){ if(!audio.paused) { syncProgress(); } }, 300);
+  audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
+  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); } }, 300);
 
   function syncProgress(){
     if(state.seeking) return;
@@ -701,6 +701,13 @@
     var prevW = contentEl.querySelector(".w.now"); if(prevW) prevW.classList.remove("now");
     var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
     state.curLine = -1; state.curWord = -1;
+  }
+  function clearExpiredHighlight(){
+    var cur = audio.currentTime || 0;
+    var w = contentEl.querySelector(".w.now");
+    if(w){ var rec = state.flatWords[Number(w.getAttribute("data-wi"))]; if(rec && cur > rec.end + 0.05) w.classList.remove("now"); }
+    var l = contentEl.querySelector(".line.current");
+    if(l){ var recL = state.flatLines[Number(l.getAttribute("data-li"))]; if(recL && cur > recL.end + 0.05) l.classList.remove("current"); }
   }
   function binSearch(arr, t){
     var lo = 0, hi = arr.length - 1, ans = -1;
