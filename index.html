@@ -473,6 +473,15 @@
   state.streamAngs = []; state.lineAng = {}; state.angLines = {};
   state.angFirstLine = {}; state.angFirstWord = {}; state.angHeight = {};
   state.angDur = {}; state.appending = false;
+  /* Bani chain stream (Nitnem 5, then Sukhmani Sahib) — mirrors the Ang stream */
+  var BANI_CHAIN = ["japji","jaap","tav","chaupai","anand","sukhmani"];
+  state.streamBanis = []; state.baniGroups = {}; state.baniFirstLine = {}; state.baniFirstWord = {};
+  state.baniLineCount = {}; state.baniDur = {}; state.baniHeight = {}; state.appendingBani = false;
+  function baniById(id){ return BANIS.find(function(b){ return b.id === id; }) || null; }
+  function chainNext(id){ var i = BANI_CHAIN.indexOf(id); return (i >= 0 && i < BANI_CHAIN.length - 1) ? BANI_CHAIN[i + 1] : null; }
+  function baniAudioUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".mp3"; }
+  function baniDataUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".json"; }
+  function preloadBaniAudio(id){ if(!id) return; var b = baniById(id); if(!b) return; var u = baniAudioUrl(b); if(preAudio.getAttribute("src") !== u){ preAudio.src = u; try{ preAudio.load(); }catch(e){} } }
 
   function savePlace(){
     try{
@@ -725,6 +734,7 @@
       clearHighlight(); w.classList.add("now");
       var wa = state.lineAng[rec.line];
       if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
+      else if(state.mode === "bani" && wa && wa !== state.id){ pendingSeek = rec.start; switchAudioToBani(wa, false); }
       else seekTo(rec.start);
       playAudio(); showBars(); manualScrollAt = 0;
     }
@@ -749,6 +759,7 @@
         clearHighlight(); ln.classList.add("current");
         var la = state.lineAng[Number(ln.getAttribute("data-li"))];
         if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = recL.start; switchAudioToAng(la, false); }
+        else if(state.mode === "bani" && la && la !== state.id){ pendingSeek = recL.start; switchAudioToBani(la, false); }
         else seekTo(recL.start);
         playAudio(); showBars(); manualScrollAt = 0;
       }
@@ -756,7 +767,7 @@
   });
 
   /* ---------- loading ---------- */
-  function loadBani(b){
+  function loadBani(b, autoplay){
     if(!b) return;
     var token = ++state.loadToken;
     state.mode = "bani"; state.id = b.id; state.ang = null;
@@ -770,9 +781,20 @@
       if(!groups.length) throw new Error("empty");
       state.duration = json.duration || 0;
       render(groups, {titlePa: json.bani_gurmukhi || b.pa, titleEn: b.en, location: json.location || ""});
-      audio.src = BASE + "/data/" + b.folder + "/" + b.file + ".mp3";
+      /* register this Bani as the first section of a possible chain stream */
+      state.streamBanis = [b.id]; state.baniGroups = {}; state.baniFirstLine = {}; state.baniFirstWord = {};
+      state.baniLineCount = {}; state.baniDur = {}; state.baniHeight = {};
+      state.baniGroups[b.id] = groups;
+      state.baniFirstLine[b.id] = 0; state.baniFirstWord[b.id] = 0;
+      state.baniLineCount[b.id] = state.flatLines.length; state.baniDur[b.id] = json.duration || 0;
+      state.lineAng = {}; state.flatLines.forEach(function(_, li){ state.lineAng[li] = b.id; });
+      var firstSec = contentEl.querySelector("section.section");
+      if(firstSec) firstSec.setAttribute("data-bani", b.id);
+      observeBaniTail(); preloadBaniAudio(chainNext(b.id));
+      audio.src = baniAudioUrl(b);
       audio.playbackRate = Number($("speed").value) || 1;
       audio.load(); resetProgress();
+      if(autoplay) playAudio();
     })
     .catch(function(){
       if(token !== state.loadToken) return;
@@ -978,7 +1000,134 @@
     var secs = contentEl.querySelectorAll("section[data-ang]");
     if(secs.length) tailObserver.observe(secs[secs.length - 1]);
   }
-  setInterval(function(){ pruneStream(); }, 1500);
+
+  /* ---------- Bani chain stream: Nitnem 5, then Sukhmani Sahib (same pattern as Angs) ---------- */
+  function sepBaniHTML(b){
+    return '<div class="ang-sep" id="bani-sep-' + b.id + '" role="separator" aria-label="' + esc(b.en) + '">' +
+      '<span class="ang-sep-rule l"></span>' +
+      '<span class="ang-sep-label"><b>' + esc(b.pa) + '</b> · ' + esc(b.en) + '</span>' +
+      '<span class="ang-sep-rule r"></span></div>';
+  }
+  function buildBaniInner(groups, id){
+    var html = "";
+    groups.forEach(function(g){
+      if(g.title) html += '<div class="section-head"><h2>' + esc(g.title) + '</h2></div>';
+      html += buildLinesInner(g.lines, id);
+    });
+    return html;
+  }
+  function buildBaniInnerAt(groups, id){
+    var html = "", li = state.baniFirstLine[id] || 0, wi = state.baniFirstWord[id] || 0;
+    groups.forEach(function(g){
+      if(g.title) html += '<div class="section-head"><h2>' + esc(g.title) + '</h2></div>';
+      state.angFirstLine[id] = li; state.angFirstWord[id] = wi;
+      html += buildLinesInnerAt(g.lines, id);
+      li += g.lines.length;
+      g.lines.forEach(function(l){ wi += (l.words || []).length; });
+    });
+    return html;
+  }
+  function scrollToBaniStart(id){
+    var el = document.getElementById("bani-sep-" + id) || contentEl.querySelector('section[data-bani="' + id + '"]');
+    if(!el) return;
+    autoScrolling = true;
+    el.scrollIntoView({behavior:"smooth", block:"start"});
+    setTimeout(function(){ autoScrolling = false; }, 700);
+  }
+  function switchAudioToBani(id, autoplay){
+    var b = baniById(id); if(!b) return;
+    state.id = id;
+    state.titlePa = b.pa; state.titleEn = b.en;
+    state.duration = state.baniDur[id] || 0;
+    brandSub.textContent = b.pa;
+    nowPlaying.innerHTML = esc(b.pa) + "<small>Tap a word to listen from there</small>";
+    audio.src = baniAudioUrl(b);
+    audio.playbackRate = Number($("speed").value) || 1;
+    audio.load(); resetProgress(); clearHighlight();
+    markActiveBani(); savePlace(); preloadBaniAudio(chainNext(id));
+    if(autoplay) playAudio();
+  }
+  function appendBani(id, opts){
+    opts = opts || {};
+    if(state.mode !== "bani" || state.appendingBani || !id) return;
+    var b = baniById(id); if(!b) return;
+    if(state.streamBanis.indexOf(id) >= 0){ if(opts.play){ switchAudioToBani(id, true); scrollToBaniStart(id); } return; }
+    state.appendingBani = true;
+    var token = state.loadToken;
+    fetch(baniDataUrl(b)).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(json){
+      state.appendingBani = false;
+      if(token !== state.loadToken || state.mode !== "bani") return;
+      var groups = normalize(json);
+      if(!groups.length){ if(opts.play) loadBani(b, true); return; }
+      state.baniGroups[id] = groups; state.baniDur[id] = json.duration || 0;
+      state.baniFirstLine[id] = state.flatLines.length;
+      state.baniFirstWord[id] = state.flatWords.length;
+      var html = sepBaniHTML(b) + '<section class="section stream-sec" data-bani="' + id + '">' + buildBaniInner(groups, id) + '</section>';
+      state.baniLineCount[id] = state.flatLines.length - state.baniFirstLine[id];
+      var nav = contentEl.querySelector(".end-nav");
+      if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
+      state.streamBanis.push(id);
+      observeBaniTail(); pruneBaniStream();
+      if(opts.play){ switchAudioToBani(id, true); scrollToBaniStart(id); }
+    })
+    .catch(function(){ state.appendingBani = false; if(opts.play) loadBani(b, true); });
+  }
+  function renderedBanis(){
+    return state.streamBanis.filter(function(id){ return !!contentEl.querySelector('section.stream-sec[data-bani="' + id + '"]'); });
+  }
+  function pruneBaniStream(){
+    if(state.mode !== "bani") return;
+    var rend = renderedBanis();
+    if(rend.length <= 2) return;
+    var audioIdx = state.streamBanis.indexOf(state.id);
+    rend.forEach(function(id){
+      var idx = state.streamBanis.indexOf(id);
+      if(Math.abs(idx - audioIdx) <= 1) return;
+      var sec = contentEl.querySelector('section.stream-sec[data-bani="' + id + '"]');
+      var sep = document.getElementById("bani-sep-" + id);
+      if(!sec) return;
+      var sr = sec.getBoundingClientRect();
+      var mid = window.innerHeight / 2;
+      if(sr.top <= mid && sr.bottom >= mid) return; /* reader is looking at it */
+      var h = sep ? (sr.bottom - sep.getBoundingClientRect().top) : (sr.height + 42);
+      state.baniHeight[id] = h;
+      var spacer = document.createElement("div");
+      spacer.className = "ang-spacer"; spacer.id = "bani-spacer-" + id;
+      spacer.setAttribute("data-bani", id); spacer.style.height = h + "px";
+      if(sep){ sep.replaceWith(spacer); } else { sec.replaceWith(spacer); }
+      if(sep && sec.parentNode) sec.remove();
+      baniSpacerObserver.observe(spacer);
+      rend = renderedBanis();
+    });
+  }
+  function rehydrateBaniSpacer(spacer){
+    var id = spacer.getAttribute("data-bani");
+    var groups = state.baniGroups[id];
+    var b = baniById(id);
+    if(!groups || !b){ baniSpacerObserver.unobserve(spacer); return; }
+    var wrap = document.createElement("div");
+    wrap.innerHTML = sepBaniHTML(b) + '<section class="section stream-sec" data-bani="' + id + '">' + buildBaniInnerAt(groups, id) + '</section>';
+    spacer.replaceWith.apply(spacer, Array.prototype.slice.call(wrap.childNodes));
+    observeBaniTail();
+  }
+  var baniSpacerObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting) rehydrateBaniSpacer(e.target); });
+  }, {rootMargin: "200% 0px 200% 0px"}) : {observe:function(){}, unobserve:function(){}, disconnect:function(){}};
+  var baniTailObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+    if(!entries.some(function(e){ return e.isIntersecting; })) return;
+    if(state.mode !== "bani" || !autoScrollOn || state.appendingBani) return;
+    var last = state.streamBanis[state.streamBanis.length - 1];
+    var nx = last ? chainNext(last) : null;
+    if(nx) appendBani(nx, {});
+  }, {rootMargin: "0px 0px 150% 0px"}) : {observe:function(){}, disconnect:function(){}};
+  function observeBaniTail(){
+    if(!baniTailObserver.observe) return;
+    baniTailObserver.disconnect();
+    var secs = contentEl.querySelectorAll("section[data-bani]");
+    if(secs.length) baniTailObserver.observe(secs[secs.length - 1]);
+  }
+  setInterval(function(){ pruneStream(); pruneBaniStream(); }, 1500);
 
   function loadAng(ang, autoplay){
     var token = ++state.loadToken;
@@ -1070,6 +1219,16 @@
       else { loadAng(next, true); }
       return;
     }
+    /* Bani chain: Nitnem 5, then Sukhmani Sahib — same continuous pattern */
+    if(state.mode === "bani" && state.id){
+      var nb = chainNext(state.id);
+      if(nb){
+        if(autoScrollOn){ appendBani(nb, {play:true}); }
+        else if(state.streamBanis.indexOf(nb) >= 0){ switchAudioToBani(nb, true); }
+        else { loadBani(baniById(nb), true); }
+        return;
+      }
+    }
     setPlayIcon(false); showBars(); clearHighlight();
   });
   audio.addEventListener("loadedmetadata", function(){
@@ -1143,6 +1302,10 @@
         loL = state.angFirstLine[state.ang];
         hiL = Math.min(lines.length - 1, loL + state.angLines[state.ang].length - 1);
       }
+      if(state.mode === "bani" && typeof state.baniFirstLine[state.id] === "number" && state.baniLineCount[state.id]){
+        loL = state.baniFirstLine[state.id];
+        hiL = Math.min(lines.length - 1, loL + state.baniLineCount[state.id] - 1);
+      }
       var li = -1, l2 = loL, r2 = hiL;
       while(l2 <= r2){ var mid2 = (l2 + r2) >> 1; if(lines[mid2].start <= curL){ li = mid2; l2 = mid2 + 1; } else r2 = mid2 - 1; }
       if(li < 0 || li === state.curLine) return;
@@ -1160,6 +1323,11 @@
       lo = state.angFirstWord[state.ang];
       hi = words.length - 1;
       for(var a in state.angFirstWord){ var fw = state.angFirstWord[a]; if(fw > lo && fw - 1 < hi) hi = fw - 1; }
+    }
+    if(state.mode === "bani" && typeof state.baniFirstWord[state.id] === "number"){
+      lo = state.baniFirstWord[state.id];
+      hi = words.length - 1;
+      for(var bk in state.baniFirstWord){ var bfw = state.baniFirstWord[bk]; if(bfw > lo && bfw - 1 < hi) hi = bfw - 1; }
     }
     var wi = -1, l = lo, r = hi;
     while(l <= r){ var mid = (l + r) >> 1; if(words[mid].start <= cur){ wi = mid; l = mid + 1; } else r = mid - 1; }
@@ -1184,6 +1352,10 @@
     if(state.mode === "ang" && typeof state.angFirstLine[state.ang] === "number" && state.angLines[state.ang]){
       lo = state.angFirstLine[state.ang];
       hi = Math.min(lines.length - 1, lo + state.angLines[state.ang].length - 1);
+    }
+    if(state.mode === "bani" && typeof state.baniFirstLine[state.id] === "number" && state.baniLineCount[state.id]){
+      lo = state.baniFirstLine[state.id];
+      hi = Math.min(lines.length - 1, lo + state.baniLineCount[state.id] - 1);
     }
     while(lo <= hi){ var mid = (lo + hi) >> 1; if(lines[mid].start <= cur){ li = mid; lo = mid + 1; } else hi = mid - 1; }
     if(li < 0) return;
