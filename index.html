@@ -81,6 +81,14 @@
   .menu-label{font-size:14.5px;font-weight:600;color:var(--ink-soft)}
   .menu-spacer{flex:1}
   .tbtn.menu-wide{border:1px solid var(--hairline);background:var(--paper);min-height:38px;padding:7px 13px}
+  .sheet .fbtn{background:var(--bg)}
+  .menu-note{font-size:12px;color:var(--muted);margin:3px 0 0;line-height:1.45;max-width:250px}
+  .switch{position:relative;display:inline-block;flex:none}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .switch .track{display:block;width:46px;height:27px;border-radius:999px;background:var(--hairline);transition:background .18s;position:relative}
+  .switch .track::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:var(--paper);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track::after{transform:translateX(19px)}
   .brand h1{font-size:15.5px;font-weight:700;margin:0;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .brand p{margin:1px 0 0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     font-family:"Noto Sans Gurmukhi",sans-serif}
@@ -287,9 +295,9 @@
     width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:50%;
   }
   .skip-btn:active{background:var(--accent-soft)}
-  .skip-btn.auto-btn{width:44px;height:44px;padding:0;border-radius:50%;display:grid;place-items:center;flex:none}
+  .skip-btn.auto-btn{width:44px;height:44px;padding:0;border-radius:50%;display:grid;place-items:center;flex:none;margin-left:auto}
   .auto-btn svg{width:20px;height:20px;flex:none}
-  .auto-btn.active{background:var(--accent-soft);color:var(--accent-strong);box-shadow:inset 0 0 0 1px var(--accent-soft)}
+  .auto-btn.active{background:transparent;color:var(--accent-strong);box-shadow:inset 0 0 0 1.5px var(--accent)}
   .skip-btn svg{width:23px;height:23px}
   .play-btn{
     width:47px;height:47px;flex:none;border-radius:50%;
@@ -299,7 +307,7 @@
   .play-btn:active{transform:scale(.95)}
   .play-btn svg{width:21px;height:21px}
   @media (prefers-color-scheme: dark){.play-btn{color:#1c1406}}
-  .speed-wrap{flex:none;display:flex;align-items:center}
+  .speed-wrap{flex:none;display:flex;align-items:center;margin-right:auto;height:38px;border:1px solid var(--hairline);border-radius:999px;padding:0 6px 0 8px}
   .speed-wrap select{
     border:0;background:transparent;border-radius:999px;
     padding:6px 2px;font-size:13.5px;font-weight:600;min-height:38px;max-width:66px;color:var(--ink-soft);
@@ -340,6 +348,15 @@
       <button class="fbtn small" id="fontDown" aria-label="Smaller text">A−</button>
       <button class="fbtn large" id="fontUp" aria-label="Larger text">A+</button>
     </div>
+    <h3>Reading</h3>
+    <div class="menu-row">
+      <div>
+        <span class="menu-label">Catch-up highlight</span>
+        <p class="menu-note">Flashes the current line when auto-scroll brings you back to it. Turns off once scrolling is in motion.</p>
+      </div>
+      <span class="menu-spacer"></span>
+      <label class="switch"><input type="checkbox" id="flashToggle" checked /><span class="track"></span></label>
+    </div>
     <h3>Library · Nitnem Banis</h3>
     <div class="bani-grid" id="baniGrid"></div>
     <h3>Sri Guru Granth Sahib Ji · Ang</h3>
@@ -347,7 +364,7 @@
       <input id="angInput" type="number" inputmode="numeric" min="1" max="1430" placeholder="Ang number · 1 – 1430" aria-label="Ang number" />
       <button class="ang-go" id="angGo">Read Ang</button>
     </div>
-    <p class="ang-hint">Sehaj Paath audio by Bhagat Jaswant Singh Ji plays along, word by word.</p>
+    <p class="ang-hint">Sehaj Paath audio by Bhagat Jaswant Singh Ji.</p>
   </div>
 </section>
 
@@ -497,6 +514,10 @@
   /* ---------- hide / show bars on scroll ---------- */
   var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false;
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
+  var flashEl = null;
+  var flashOn = true;
+  try{ if(localStorage.getItem("gurbani-reader:flash-v1") === "0") flashOn = false; }catch(e){}
+  function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } }
   var barsTimer = null;
   function scheduleAutoHide(){
     clearTimeout(barsTimer);
@@ -1057,6 +1078,15 @@
     autoScrollOn = !autoScrollOn;
     try{ localStorage.setItem("gurbani-reader:autoscroll-v1", autoScrollOn ? "1" : "0"); }catch(e){}
     paintAutoScrollBtn();
+  var flashToggle = $("flashToggle");
+  if(flashToggle){
+    flashToggle.checked = flashOn;
+    flashToggle.addEventListener("change", function(){
+      flashOn = flashToggle.checked;
+      try{ localStorage.setItem("gurbani-reader:flash-v1", flashOn ? "1" : "0"); }catch(e){}
+      if(!flashOn) clearFlash();
+    });
+  }
     if(autoScrollOn){ manualScrollAt = 0; autoScrollToCurrentLine(); }
   });
   paintAutoScrollBtn();
@@ -1086,12 +1116,16 @@
         document.documentElement.requestFullscreen().catch(function(){});
       }
     }
-    /* one-time flash: first arrival after refresh, and each return after scrolling away */
+    /* one-time flash: first arrival after refresh, and each return after scrolling away.
+       It is only a catch-up marker — it turns off as soon as auto-scroll is in motion. */
     if(flashArmed){
       flashArmed = false;
-      var prevC = contentEl.querySelector(".line.current");
-      if(prevC && prevC !== lineEl) prevC.classList.remove("current");
-      lineEl.classList.add("current");
+      if(flashOn){
+        var prevC = contentEl.querySelector(".line.current");
+        if(prevC && prevC !== lineEl) prevC.classList.remove("current");
+        lineEl.classList.add("current");
+        flashEl = lineEl;
+      }
     }
     var r = lineEl.getBoundingClientRect();
     /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
@@ -1099,8 +1133,8 @@
     if(Math.abs(r.top - targetY) > 46){
       autoScrolling = true;
       window.scrollBy({top: r.top - targetY, behavior:"smooth"});
-      setTimeout(function(){ autoScrolling = false; }, 650);
-    }
+      setTimeout(function(){ autoScrolling = false; clearFlash(); }, 700);
+    } else if(flashEl && flashEl !== lineEl){ clearFlash(); }
   }
   function clearExpiredHighlight(){
     var cur = audio.currentTime || 0;
