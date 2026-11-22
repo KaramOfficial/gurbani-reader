@@ -440,7 +440,7 @@
   /* ---------- hide / show bars on scroll ---------- */
   var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false;
   function showBars(){ document.body.classList.remove("bars-hidden"); }
-  function hideBars(){ if(!audio.paused || sheet.classList.contains("open")) return; document.body.classList.add("bars-hidden"); }
+  function hideBars(){ if(sheet.classList.contains("open")) return; document.body.classList.add("bars-hidden"); }
   window.addEventListener("scroll", function(){
     var y = window.scrollY;
     if(autoScrolling){ lastY = y; return; }
