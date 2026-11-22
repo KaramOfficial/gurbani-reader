@@ -553,7 +553,28 @@
         var li = state.flatLines.length;
         state.flatLines.push({start:line.start, end:line.end});
         html += '<p class="line" data-li="' + li + '">';
-        if(line.words && line.words.length){
+        if(line.words && line.words.length && line.text){
+          /* Render from line.text (Sehaj Paath, readgurbani-verified) so standalone
+             punctuation like dandi (। / ॥) is never dropped: tokens matching the
+             next aligned word become tappable, all other tokens render plain, in place. */
+          var wlist = line.words, wptr = 0, parts2 = [];
+          line.text.split(/\s+/).filter(Boolean).forEach(function(tok){
+            if(wptr < wlist.length && tok === wlist[wptr].word){
+              var w = wlist[wptr++];
+              state.flatWords.push({start:w.start, end:w.end, line:li});
+              parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(tok) + '</span>');
+            } else {
+              parts2.push(esc(tok));
+            }
+          });
+          /* safety: any aligned words not matched in text keep their tap target at the end */
+          while(wptr < wlist.length){
+            var w2 = wlist[wptr++];
+            state.flatWords.push({start:w2.start, end:w2.end, line:li});
+            parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w2.word) + '</span>');
+          }
+          html += parts2.join(" ");
+        } else if(line.words && line.words.length){
           var parts = [];
           line.words.forEach(function(w){
             state.flatWords.push({start:w.start, end:w.end, line:li});
