@@ -77,12 +77,12 @@
     flex:none;display:grid;place-items:center;width:37px;height:37px;border-radius:50%;
     background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--hairline);
   }
-  .menu-row{display:flex;align-items:center;gap:8px;padding:7px 2px}
+  .menu-row{display:flex;align-items:center;gap:8px;padding:4px 2px}
   .menu-label{font-size:14.5px;font-weight:600;color:var(--ink-soft)}
   .menu-spacer{flex:1}
   .tbtn.menu-wide{border:1px solid var(--hairline);background:var(--paper);min-height:38px;padding:7px 13px}
   .sheet .fbtn{background:var(--bg)}
-  .menu-navrow{display:flex;align-items:center;gap:11px;width:100%;margin-top:14px;padding:13px 12px;border:1px solid var(--hairline);border-radius:14px;background:var(--bg);color:var(--ink);cursor:pointer;text-align:left}
+  .menu-navrow{display:flex;align-items:center;gap:11px;width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--hairline);border-radius:14px;background:var(--bg);color:var(--ink);cursor:pointer;text-align:left}
   .menu-navrow svg{width:21px;height:21px;flex:none;color:var(--accent-strong)}
   .menu-navrow-text{flex:1;min-width:0;display:flex;flex-direction:column}
   .menu-navrow .menu-note{margin-top:1px}
@@ -128,7 +128,7 @@
     border-bottom:1px solid var(--hairline);
     border-radius:0 0 22px 22px;
     box-shadow:var(--shadow);
-    padding:calc(14px + env(safe-area-inset-top)) 18px 20px;
+    padding:calc(12px + env(safe-area-inset-top)) 18px 14px;
     max-height:88dvh;overflow-y:auto;
   }
   .sheet.open{transform:translateY(0)}
@@ -137,7 +137,7 @@
   .sheet-head h2{font-size:17px;margin:0;font-weight:700}
   .sheet h3{
     font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--muted);margin:20px 0 10px;
+    color:var(--muted);margin:13px 0 7px;
   }
   .bani-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   @media (max-width:430px){.bani-grid{grid-template-columns:1fr 1fr}}
@@ -359,7 +359,7 @@
     <div class="menu-row">
       <div>
         <span class="menu-label">Catch-up highlight</span>
-        <p class="menu-note">Flashes the current line when auto-scroll brings you back to it. Turns off once scrolling is in motion.</p>
+        <p class="menu-note">Flashes the line auto-scroll lands on.</p>
       </div>
       <span class="menu-spacer"></span>
       <label class="switch"><input type="checkbox" id="flashToggle" checked /><span class="track"></span></label>
