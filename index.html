@@ -395,6 +395,27 @@
     loadToken:0
   };
 
+  /* ---------- remember last opened page (localStorage, device-only) ---------- */
+  var LAST_KEY = "gurbani-reader:last-v1", pendingRestore = null, pendingSeek = 0;
+  function savePlace(){
+    try{
+      localStorage.setItem(LAST_KEY, JSON.stringify({
+        mode: state.mode, id: state.id, ang: state.ang,
+        y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: Date.now()
+      }));
+    }catch(e){}
+  }
+  function readPlace(){
+    try{ var v = JSON.parse(localStorage.getItem(LAST_KEY) || "null"); return v && typeof v === "object" ? v : null; }catch(e){ return null; }
+  }
+  var savePlaceTimer = null;
+  window.addEventListener("scroll", function(){
+    if(pendingRestore) return;
+    clearTimeout(savePlaceTimer); savePlaceTimer = setTimeout(savePlace, 350);
+  }, {passive:true});
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "hidden") savePlace(); });
+  window.addEventListener("pagehide", savePlace);
+
   /* ---------- font size ---------- */
   var FS = [20,22,24,26,29,32], fsIdx = 2;
   function applyFs(){
@@ -563,6 +584,11 @@
     brandSub.textContent = opts.titlePa;
     nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Tap a word to listen from there</small>";
     markActiveBani();
+    if(pendingRestore){
+      var pr = pendingRestore; pendingRestore = null;
+      pendingSeek = pr.t || 0;
+      if(pr.y > 0){ setTimeout(function(){ window.scrollTo(0, pr.y); }, 60); }
+    } else { savePlace(); }
   }
 
   /* word / line tap → seek + play */
@@ -683,6 +709,7 @@
   audio.addEventListener("ended", function(){ setPlayIcon(false); showBars(); clearHighlight(); });
   audio.addEventListener("loadedmetadata", function(){
     tDur.textContent = fmt(audio.duration || state.duration || 0);
+    if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
   });
   audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
   setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); } }, 300);
@@ -768,8 +795,16 @@
     else if(e.key === "Escape"){ closeSheet(); }
   });
 
-  /* ---------- start ---------- */
-  loadBani(BANIS[0]);
+  /* ---------- start: reopen last opened page if saved ---------- */
+  (function(){
+    var saved = readPlace();
+    if(saved && saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){
+      pendingRestore = saved; loadAng(saved.ang);
+    } else if(saved && saved.mode === "bani" && saved.id){
+      var b = null; BANIS.forEach(function(x){ if(x.id === saved.id) b = x; });
+      if(b){ pendingRestore = saved; loadBani(b); } else loadBani(BANIS[0]);
+    } else loadBani(BANIS[0]);
+  })();
 })();
 </script>
 </body>
