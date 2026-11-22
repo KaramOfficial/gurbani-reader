@@ -160,14 +160,14 @@
   .book-head .loc{font-size:12.5px;color:var(--muted);margin-top:5px}
   .rule{width:54px;height:2px;background:var(--accent);opacity:.55;border-radius:2px;margin:20px auto 4px}
   .section{margin-top:34px}
-  .ang-sep{display:flex;align-items:center;gap:16px;margin:60px 4px 4px;scroll-margin-top:78px}
-  .ang-sep-rule{flex:1;height:1px;opacity:.55}
+  .ang-sep{display:flex;align-items:center;gap:14px;margin:38px 4px 2px;scroll-margin-top:78px}
+  .ang-sep-rule{flex:1;height:1px;opacity:.4}
   .ang-sep-rule.l{background:linear-gradient(90deg,transparent,var(--accent))}
   .ang-sep-rule.r{background:linear-gradient(90deg,var(--accent),transparent)}
-  .ang-sep-core{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:0 4px}
-  .ang-sep-ik{font-family:"Noto Serif Gurmukhi",serif;color:var(--accent-strong);font-size:23px;line-height:1.1}
-  .ang-sep-pa{font-family:"Noto Serif Gurmukhi","Noto Sans Gurmukhi",serif;font-weight:700;font-size:22px;line-height:1.25;color:var(--ink)}
-  .ang-sep-en{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
+  .ang-sep-label{font-family:"Noto Sans Gurmukhi",sans-serif;font-size:14px;color:var(--muted);white-space:nowrap}
+  .ang-sep-label b{font-weight:600;color:var(--ink)}
+  .section.stream-sec{margin-top:8px}
+  .ang-spacer{width:100%}
   .section-head{
     display:flex;align-items:center;gap:14px;margin:0 0 6px;
   }
@@ -420,7 +420,8 @@
   /* ---------- remember last opened page (localStorage, device-only) ---------- */
   var LAST_KEY = "gurbani-reader:last-v1", pendingRestore = null, pendingSeek = 0;
   state.streamAngs = []; state.lineAng = {}; state.angLines = {};
-  state.angFirstLine = {}; state.angDur = {}; state.appending = false;
+  state.angFirstLine = {}; state.angFirstWord = {}; state.angHeight = {};
+  state.angDur = {}; state.appending = false;
 
   function savePlace(){
     try{
@@ -710,9 +711,7 @@
   function sepHTML(ang){
     return '<div class="ang-sep" id="ang-sep-' + ang + '" role="separator" aria-label="Ang ' + ang + '">' +
       '<span class="ang-sep-rule l"></span>' +
-      '<span class="ang-sep-core"><span class="ang-sep-ik">ੴ</span>' +
-      '<span class="ang-sep-pa">ਅੰਗ ' + paNum(ang) + '</span>' +
-      '<span class="ang-sep-en">Ang ' + ang + '</span></span>' +
+      '<span class="ang-sep-label"><b>ਅੰਗ ' + paNum(ang) + '</b> · Ang ' + ang + '</span>' +
       '<span class="ang-sep-rule r"></span></div>';
   }
   function buildLinesInner(lines, ang){
@@ -771,7 +770,7 @@
     audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
     audio.playbackRate = Number($("speed").value) || 1;
     audio.load(); resetProgress(); clearHighlight();
-    savePlace();
+    savePlace(); preloadAngAudio(ang + 1);
     if(autoplay) playAudio();
   }
   function appendAng(ang, opts){
@@ -790,21 +789,118 @@
       if(!data || !data.lines || !data.lines.length){ if(opts.play) loadAng(ang, true); return; }
       state.angLines[ang] = data.lines; state.angDur[ang] = data.duration || 0;
       state.angFirstLine[ang] = state.flatLines.length;
-      var html = sepHTML(ang) + '<section class="section" data-ang="' + ang + '">' + buildLinesInner(data.lines, ang) + '</section>';
+      state.angFirstWord[ang] = state.flatWords.length;
+      var html = sepHTML(ang) + '<section class="section stream-sec" data-ang="' + ang + '">' + buildLinesInner(data.lines, ang) + '</section>';
       var nav = contentEl.querySelector(".end-nav");
       if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
       state.streamAngs.push(ang);
+      observeTail(); pruneStream();
       if(opts.play){ switchAudioToAng(ang, true); scrollToAngStart(ang); }
     })
     .catch(function(){ state.appending = false; if(opts.play) loadAng(ang, true); });
   }
-  setInterval(function(){
+  /* Virtualized windowing (the standard pattern: react-window / TanStack Virtual /
+     RecyclerView): only the viewport window + overscan stays mounted. Far sections
+     are swapped for measured-height spacers (height cached per Ang, so total height
+     and scroll position never change), and IntersectionObserver sentinels with
+     rootMargin overscan trigger prefetch + rehydration. One fetch in flight,
+     deduped by Ang number; dropped sections rebuild from retained line data. */
+  var preAudio = new Audio(); preAudio.preload = "auto";
+  function angAudioUrl(ang){ var pd = String(ang); while(pd.length < 4) pd = "0" + pd; return "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + pd + ".mp3"; }
+  function preloadAngAudio(ang){ if(ang >= 1 && ang <= 1430 && preAudio.getAttribute("src") !== angAudioUrl(ang)){ preAudio.src = angAudioUrl(ang); try{ preAudio.load(); }catch(e){} } }
+  function buildLinesInnerAt(lines, ang){
+    var html = "", wi = state.angFirstWord[ang] || 0, baseLi = state.angFirstLine[ang] || 0;
+    lines.forEach(function(line, idx){
+      var li = baseLi + idx;
+      html += '<p class="line" data-li="' + li + '">';
+      if(line.words && line.words.length && line.text){
+        var wlist = line.words, wptr = 0, parts2 = [];
+        line.text.split(/\s+/).filter(Boolean).forEach(function(tok){
+          if(wptr < wlist.length && tok === wlist[wptr].word){
+            var w = wlist[wptr++];
+            var lc = tok.charAt(tok.length - 1), pc = "", disp = esc(tok);
+            if(lc === ";" || lc === "," || lc === "."){
+              pc = lc === ";" ? " large-pause" : (lc === "," ? " medium-pause" : " small-pause");
+              disp = esc(tok.slice(0,-1));
+            }
+            parts2.push('<span class="w' + pc + '" data-wi="' + (wi++) + '">' + disp + '</span>');
+          } else { parts2.push(esc(tok)); }
+        });
+        while(wptr < wlist.length){ var w2 = wlist[wptr++]; parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w2.word) + '</span>'); }
+        html += parts2.join(" ");
+      } else if(line.words && line.words.length){
+        var parts = [];
+        line.words.forEach(function(w){ parts.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w.word) + '</span>'); });
+        html += parts.join(" ");
+      } else { html += esc(line.text || ""); }
+      html += '</p>';
+    });
+    return html;
+  }
+  function renderedAngs(){
+    return state.streamAngs.filter(function(a){ return !!contentEl.querySelector('section[data-ang="' + a + '"]'); });
+  }
+  function viewportAng(){
+    var secs = contentEl.querySelectorAll("section[data-ang]"), mid = window.innerHeight / 2, best = null, bestD = 1e12;
+    secs.forEach(function(s){
+      var r = s.getBoundingClientRect();
+      var d = r.top > mid ? r.top - mid : (r.bottom < mid ? mid - r.bottom : 0);
+      if(d < bestD){ bestD = d; best = Number(s.getAttribute("data-ang")); }
+    });
+    return best;
+  }
+  function pruneStream(){
+    if(state.mode !== "ang") return;
+    var keep = {};
+    if(state.ang) keep[state.ang] = true;
+    var va = viewportAng(); if(va) keep[va] = true;
+    var rend = renderedAngs();
+    rend.forEach(function(a){
+      if(keep[a]) return;
+      var dist = Math.min.apply(null, Object.keys(keep).map(function(k){ return Math.abs(a - Number(k)); }));
+      if(dist <= 2 && rend.length <= 8) return;
+      var sec = contentEl.querySelector('section[data-ang="' + a + '"]');
+      var sep = document.getElementById("ang-sep-" + a);
+      if(!sec) return;
+      var sr = sec.getBoundingClientRect();
+      var h = sep ? (sr.bottom - sep.getBoundingClientRect().top) : (sr.height + 42);
+      state.angHeight[a] = h;
+      var spacer = document.createElement("div");
+      spacer.className = "ang-spacer"; spacer.id = "ang-spacer-" + a;
+      spacer.setAttribute("data-ang", a); spacer.style.height = h + "px";
+      if(sep){ sep.replaceWith(spacer); } else { sec.replaceWith(spacer); }
+      if(sep && sec.parentNode) sec.remove();
+      spacerObserver.observe(spacer);
+      rend = renderedAngs();
+    });
+  }
+  function rehydrateSpacer(spacer){
+    var a = Number(spacer.getAttribute("data-ang"));
+    var lines = state.angLines[a];
+    if(!lines){ spacerObserver.unobserve(spacer); return; }
+    var wrap = document.createElement("div");
+    wrap.innerHTML = (a === state.streamAngs[0] ? "" : sepHTML(a)) +
+      '<section class="section' + (a === state.streamAngs[0] ? "" : " stream-sec") + '" data-ang="' + a + '">' +
+      buildLinesInnerAt(lines, a) + '</section>';
+    spacer.replaceWith.apply(spacer, Array.prototype.slice.call(wrap.childNodes));
+    observeTail();
+  }
+  var spacerObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting) rehydrateSpacer(e.target); });
+  }, {rootMargin: "200% 0px 200% 0px"}) : {observe:function(){}, unobserve:function(){}, disconnect:function(){}};
+  var tailObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+    if(!entries.some(function(e){ return e.isIntersecting; })) return;
     if(state.mode !== "ang" || !autoScrollOn || state.appending) return;
     var last = state.streamAngs[state.streamAngs.length - 1];
-    if(!last || last >= 1430) return;
-    var remaining = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
-    if(remaining < window.innerHeight * 1.6) appendAng(last + 1, {});
-  }, 900);
+    if(last && last < 1430) appendAng(last + 1, {});
+  }, {rootMargin: "0px 0px 150% 0px"}) : {observe:function(){}, disconnect:function(){}};
+  function observeTail(){
+    if(!tailObserver.observe) return;
+    tailObserver.disconnect();
+    var secs = contentEl.querySelectorAll("section[data-ang]");
+    if(secs.length) tailObserver.observe(secs[secs.length - 1]);
+  }
+  setInterval(function(){ pruneStream(); }, 1500);
 
   function loadAng(ang, autoplay){
     var token = ++state.loadToken;
@@ -824,7 +920,11 @@
         titlePa: paTitle, titleEn: "Sri Guru Granth Sahib Ji · Ang " + ang, location:""
       });
       state.streamAngs = [ang]; state.lineAng = {}; state.angLines = {}; state.angFirstLine = {}; state.angDur = {};
-      state.angLines[ang] = data.lines; state.angFirstLine[ang] = 0; state.angDur[ang] = data.duration || 0;
+      state.angFirstWord = {}; state.angHeight = {};
+      state.angLines[ang] = data.lines; state.angFirstLine[ang] = 0; state.angFirstWord[ang] = 0; state.angDur[ang] = data.duration || 0;
+      var firstSec = contentEl.querySelector("section.section");
+      if(firstSec) firstSec.setAttribute("data-ang", ang);
+      observeTail(); preloadAngAudio(ang + 1);
       state.flatLines.forEach(function(_, li){ state.lineAng[li] = ang; });
       var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
       audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
