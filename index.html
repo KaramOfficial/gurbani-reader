@@ -682,7 +682,7 @@
     for(var i=0;i<CHUNKS.length;i++){ if(ang >= CHUNKS[i][0] && ang <= CHUNKS[i][1]) return CHUNKS[i]; }
     return CHUNKS[0];
   }
-  function loadAng(ang){
+  function loadAng(ang, autoplay){
     var token = ++state.loadToken;
     state.mode = "ang"; state.ang = ang; state.id = null;
     var paTitle = "ਅੰਗ " + ang;
@@ -703,6 +703,7 @@
       audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
       audio.playbackRate = Number($("speed").value) || 1;
       audio.load(); resetProgress();
+      if(autoplay) playAudio();
     })
     .catch(function(){
       if(token !== state.loadToken) return;
@@ -753,7 +754,11 @@
 
   audio.addEventListener("play", function(){ setPlayIcon(true); scheduleAutoHide(); });
   audio.addEventListener("pause", function(){ setPlayIcon(false); showBars(); });
-  audio.addEventListener("ended", function(){ setPlayIcon(false); showBars(); clearHighlight(); });
+  audio.addEventListener("ended", function(){
+    /* continuous Sehaj Paath: roll straight into the next Ang, playing */
+    if(state.mode === "ang" && state.ang && state.ang < 1430){ loadAng(state.ang + 1, true); return; }
+    setPlayIcon(false); showBars(); clearHighlight();
+  });
   audio.addEventListener("loadedmetadata", function(){
     tDur.textContent = fmt(audio.duration || state.duration || 0);
     if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
