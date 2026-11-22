@@ -210,6 +210,7 @@
   }
   .w:active{background:var(--accent-soft)}
   .w.now{background:var(--accent-soft);color:var(--accent-strong);box-shadow:0 0 0 3px var(--accent-soft)}
+  .w.lite{background:color-mix(in srgb, var(--accent) 15%, transparent);box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent)}
   @media (hover:hover){ .w:hover{background:var(--accent-soft)} }
 
   .end-nav{
@@ -665,17 +666,33 @@
     } else { savePlace(); }
   }
 
-  /* word / line tap → seek + play */
+  /* word tap: single = light highlight only · double = full highlight + play from word
+     (a single tap must never jump the audio — too sensitive) */
+  var pendingTap = null;
+  function liteWord(el){
+    var prevLite = contentEl.querySelector(".w.lite"); if(prevLite) prevLite.classList.remove("lite");
+    if(el) el.classList.add("lite");
+  }
+  function playFromWord(w){
+    var rec = state.flatWords[Number(w.getAttribute("data-wi"))];
+    if(rec && typeof rec.start === "number"){
+      clearHighlight(); w.classList.add("now");
+      var wa = state.lineAng[rec.line];
+      if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
+      else seekTo(rec.start);
+      playAudio(); showBars(); manualScrollAt = 0;
+    }
+  }
   contentEl.addEventListener("click", function(e){
     var w = e.target.closest(".w");
     if(w){
-      var rec = state.flatWords[Number(w.getAttribute("data-wi"))];
-      if(rec && typeof rec.start === "number"){
-        clearHighlight(); w.classList.add("now");
-        var wa = state.lineAng[rec.line];
-        if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
-        else seekTo(rec.start);
-        playAudio(); showBars(); manualScrollAt = 0;
+      if(pendingTap && pendingTap.el === w){
+        clearTimeout(pendingTap.timer); pendingTap = null;
+        playFromWord(w);
+      } else {
+        if(pendingTap){ clearTimeout(pendingTap.timer); liteWord(pendingTap.el); }
+        var pw = w;
+        pendingTap = { el: pw, timer: setTimeout(function(){ liteWord(pw); pendingTap = null; }, 300) };
       }
       return;
     }
@@ -1028,6 +1045,7 @@
   /* ---------- clicked-only highlighting (no moving highlight in Reader — that is Checker-only) ---------- */
   function clearHighlight(){
     var prevW = contentEl.querySelector(".w.now"); if(prevW) prevW.classList.remove("now");
+    var prevLite = contentEl.querySelector(".w.lite"); if(prevLite) prevLite.classList.remove("lite");
     var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
     state.curLine = -1; state.curWord = -1;
   }
