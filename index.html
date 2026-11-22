@@ -464,7 +464,13 @@
 
   /* ---------- hide / show bars on scroll ---------- */
   var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false;
-  function showBars(){ document.body.classList.remove("bars-hidden"); }
+  var barsTimer = null;
+  function scheduleAutoHide(){
+    clearTimeout(barsTimer);
+    if(audio.paused) return;
+    barsTimer = setTimeout(function(){ if(!audio.paused) hideBars(); }, 3000);
+  }
+  function showBars(){ document.body.classList.remove("bars-hidden"); scheduleAutoHide(); }
   function hideBars(){ if(sheet.classList.contains("open")) return; document.body.classList.add("bars-hidden"); }
   window.addEventListener("scroll", function(){
     var y = window.scrollY;
@@ -708,7 +714,7 @@
     state.seeking = false;
   });
 
-  audio.addEventListener("play", function(){ setPlayIcon(true); });
+  audio.addEventListener("play", function(){ setPlayIcon(true); scheduleAutoHide(); });
   audio.addEventListener("pause", function(){ setPlayIcon(false); showBars(); });
   audio.addEventListener("ended", function(){ setPlayIcon(false); showBars(); clearHighlight(); });
   audio.addEventListener("loadedmetadata", function(){
