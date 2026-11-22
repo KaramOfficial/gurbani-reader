@@ -972,11 +972,6 @@
 
   /* ---------- playback ---------- */
   function playAudio(){
-    /* pressing play takes the reader full screen automatically (a play tap is the
-       user gesture the Fullscreen API needs); leaving stays manual via Menu */
-    if(!document.fullscreenElement && document.documentElement.requestFullscreen){
-      document.documentElement.requestFullscreen().catch(function(){});
-    }
     var p = audio.play();
     if(p && p.catch) p.catch(function(){});
   }
@@ -1087,6 +1082,15 @@
     if(li < 0) return;
     var lineEl = contentEl.querySelector('.line[data-li="' + li + '"]');
     if(!lineEl) return;
+    /* once playback is flowing and auto-scroll is carrying the reading, go full screen
+       (attempted at arrival moments, close to the reader's play tap; failures are silent) */
+    if(!document.fullscreenElement && document.documentElement.requestFullscreen){
+      var nowFs = Date.now();
+      if(!autoScrollToCurrentLine._fsTry || nowFs - autoScrollToCurrentLine._fsTry > 10000){
+        autoScrollToCurrentLine._fsTry = nowFs;
+        document.documentElement.requestFullscreen().catch(function(){});
+      }
+    }
     /* one-time flash: first arrival after refresh, and each return after scrolling away */
     if(flashArmed){
       flashArmed = false;
