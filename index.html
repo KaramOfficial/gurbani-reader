@@ -82,6 +82,12 @@
   .menu-spacer{flex:1}
   .tbtn.menu-wide{border:1px solid var(--hairline);background:var(--paper);min-height:38px;padding:7px 13px}
   .sheet .fbtn{background:var(--bg)}
+  .menu-navrow{display:flex;align-items:center;gap:11px;width:100%;margin-top:14px;padding:13px 12px;border:1px solid var(--hairline);border-radius:14px;background:var(--bg);color:var(--ink);cursor:pointer;text-align:left}
+  .menu-navrow svg{width:21px;height:21px;flex:none;color:var(--accent-strong)}
+  .menu-navrow-text{flex:1;min-width:0;display:flex;flex-direction:column}
+  .menu-navrow .menu-note{margin-top:1px}
+  .menu-navrow-chev{font-size:22px;color:var(--muted);line-height:1}
+  .menu-back{border:0;background:transparent;color:var(--accent-strong);font:600 14px/1 "Inter",sans-serif;padding:6px 2px 2px;cursor:pointer}
   .menu-note{font-size:12px;color:var(--muted);margin:3px 0 0;line-height:1.45;max-width:250px}
   .switch{position:relative;display:inline-block;flex:none}
   .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
@@ -341,6 +347,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
       </button>
     </div>
+    <div id="menuMain">
     <h3>Display</h3>
     <div class="menu-row">
       <span class="menu-label">Text size</span>
@@ -357,7 +364,15 @@
       <span class="menu-spacer"></span>
       <label class="switch"><input type="checkbox" id="flashToggle" checked /><span class="track"></span></label>
     </div>
-    <h3>Library · Nitnem Banis</h3>
+    <button class="menu-navrow" id="libraryNav">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+      <span class="menu-navrow-text"><span class="menu-label">Library</span><span class="menu-note">Nitnem Banis · Sri Guru Granth Sahib Ji</span></span>
+      <span class="menu-navrow-chev" aria-hidden="true">›</span>
+    </button>
+    </div>
+    <div id="menuLibrary" hidden>
+    <button class="menu-back" id="libraryBack">‹ Menu</button>
+    <h3>Nitnem Banis</h3>
     <div class="bani-grid" id="baniGrid"></div>
     <h3>Sri Guru Granth Sahib Ji · Ang</h3>
     <div class="ang-row">
@@ -365,6 +380,7 @@
       <button class="ang-go" id="angGo">Read Ang</button>
     </div>
     <p class="ang-hint">Sehaj Paath audio by Bhagat Jaswant Singh Ji.</p>
+    </div>
   </div>
 </section>
 
@@ -498,9 +514,16 @@
       btns[i].classList.toggle("active", state.mode==="bani" && btns[i].getAttribute("data-bani")===state.id);
     }
   }
-  function openSheet(){ sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function openSheet(){ showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function showMenuPanel(which){
+    var main = $("menuMain"), lib = $("menuLibrary");
+    if(main) main.hidden = which !== "main";
+    if(lib) lib.hidden = which !== "library";
+  }
   function closeSheet(){ sheet.classList.remove("open"); scrim.classList.remove("open"); $("libraryBtn").setAttribute("aria-expanded","false"); }
   $("libraryBtn").addEventListener("click", function(){ sheet.classList.contains("open") ? closeSheet() : openSheet(); });
+  var libNav = $("libraryNav"); if(libNav) libNav.addEventListener("click", function(){ showMenuPanel("library"); });
+  var libBack = $("libraryBack"); if(libBack) libBack.addEventListener("click", function(){ showMenuPanel("main"); });
   $("sheetClose").addEventListener("click", closeSheet);
   scrim.addEventListener("click", closeSheet);
   $("angGo").addEventListener("click", goAng);
