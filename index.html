@@ -972,6 +972,11 @@
 
   /* ---------- playback ---------- */
   function playAudio(){
+    /* pressing play takes the reader full screen automatically (a play tap is the
+       user gesture the Fullscreen API needs); leaving stays manual via Menu */
+    if(!document.fullscreenElement && document.documentElement.requestFullscreen){
+      document.documentElement.requestFullscreen().catch(function(){});
+    }
     var p = audio.play();
     if(p && p.catch) p.catch(function(){});
   }
