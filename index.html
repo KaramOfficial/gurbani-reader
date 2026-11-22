@@ -806,9 +806,11 @@
     var lineEl = contentEl.querySelector('.line[data-li="' + li + '"]');
     if(!lineEl) return;
     var r = lineEl.getBoundingClientRect();
-    if(r.top < 130 || r.bottom > window.innerHeight - 190){
+    /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
+    var targetY = window.innerHeight * 0.35;
+    if(Math.abs(r.top - targetY) > 46){
       autoScrolling = true;
-      lineEl.scrollIntoView({block:"center", behavior:"smooth"});
+      window.scrollBy({top: r.top - targetY, behavior:"smooth"});
       setTimeout(function(){ autoScrolling = false; }, 650);
     }
   }
