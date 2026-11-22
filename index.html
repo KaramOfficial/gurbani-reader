@@ -545,8 +545,9 @@
   /* ---------- hide / show bars on scroll ---------- */
   var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false;
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
-  var flashEl = null;
-  function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } }
+  var flashEl = null, flashTimer = null;
+  function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } clearTimeout(flashTimer); }
+  function armFlashClear(ms){ clearTimeout(flashTimer); flashTimer = setTimeout(clearFlash, ms); }
   var barsTimer = null;
   function scheduleAutoHide(){
     clearTimeout(barsTimer);
@@ -1196,22 +1197,26 @@
         document.documentElement.requestFullscreen().catch(function(){});
       }
     }
+    var r = lineEl.getBoundingClientRect();
+    /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
+    var targetY = window.innerHeight * 0.35;
+    var needsScroll = Math.abs(r.top - targetY) > 46;
     /* one-time flash: first arrival after refresh, and each return after scrolling away.
-       It is only a catch-up marker — it turns off as soon as auto-scroll is in motion. */
+       It is only a catch-up marker — it must still be ON when the line lands, then it
+       turns off once auto-scroll is in motion again. (Timing it from the scroll start
+       killed it mid-glide on long returns, before the line was even on screen.) */
     if(flashArmed){
       flashArmed = false;
       var prevC = contentEl.querySelector(".line.current");
       if(prevC && prevC !== lineEl) prevC.classList.remove("current");
       lineEl.classList.add("current");
       flashEl = lineEl;
-    }
-    var r = lineEl.getBoundingClientRect();
-    /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
-    var targetY = window.innerHeight * 0.35;
-    if(Math.abs(r.top - targetY) > 46){
+      if(!needsScroll) armFlashClear(1600);
+    } else if(flashEl && flashEl !== lineEl && needsScroll){ clearFlash(); }
+    if(needsScroll){
       autoScrolling = true;
       window.scrollBy({top: r.top - targetY, behavior:"smooth"});
-      setTimeout(function(){ autoScrolling = false; clearFlash(); }, 700);
+      setTimeout(function(){ autoScrolling = false; if(flashEl) armFlashClear(900); }, 700);
     } else if(flashEl && flashEl !== lineEl){ clearFlash(); }
   }
   function clearExpiredHighlight(){
