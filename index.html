@@ -795,6 +795,20 @@
     else if(e.key === "Escape"){ closeSheet(); }
   });
 
+  /* ---------- keep screen awake (Wake Lock, while Reader is visible) ---------- */
+  var wakeLock = null;
+  function keepAwake(){
+    if(!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+    if(wakeLock) return;
+    navigator.wakeLock.request("screen").then(function(lock){
+      wakeLock = lock;
+      lock.addEventListener("release", function(){ wakeLock = null; });
+    }).catch(function(){});
+  }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") keepAwake(); });
+  keepAwake();
+  document.addEventListener("click", keepAwake);
+
   /* ---------- start: reopen last opened page if saved ---------- */
   (function(){
     var saved = readPlace();
