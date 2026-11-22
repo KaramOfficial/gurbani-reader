@@ -186,6 +186,15 @@
   .line + .line{margin-top:2px}
   .line.current{background:var(--line-hl)}
   .w{cursor:pointer;border-radius:6px;padding:1px 0;transition:background .18s,color .18s;-webkit-tap-highlight-color:transparent}
+  .w.large-pause{color:#A0728E}
+  .w.medium-pause{color:#C9A634}
+  .w.small-pause{color:#D18D5B}
+  .w .vis{font-weight:700}
+  @media (prefers-color-scheme: dark){
+    .w.large-pause{color:#C99DB6}
+    .w.medium-pause{color:#E0C56A}
+    .w.small-pause{color:#E5A87C}
+  }
   .w:active{background:var(--accent-soft)}
   .w.now{background:var(--accent-soft);color:var(--accent-strong);box-shadow:0 0 0 3px var(--accent-soft)}
   @media (hover:hover){ .w:hover{background:var(--accent-soft)} }
@@ -563,7 +572,11 @@
             if(wptr < wlist.length && tok === wlist[wptr].word){
               var w = wlist[wptr++];
               state.flatWords.push({start:w.start, end:w.end, line:li});
-              parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(tok) + '</span>');
+              var lc = tok.charAt(tok.length - 1), pc = "", disp = esc(tok);
+              if(lc === ";"){ pc = " large-pause"; disp = esc(tok.slice(0,-1)) + '<span class="vis">;</span>'; }
+              else if(lc === ","){ pc = " medium-pause"; disp = esc(tok.slice(0,-1)) + '<span class="vis">,</span>'; }
+              else if(lc === "."){ pc = " small-pause"; disp = esc(tok.slice(0,-1)) + '<span class="vis">.</span>'; }
+              parts2.push('<span class="w' + pc + '" data-wi="' + (wi++) + '">' + disp + '</span>');
             } else {
               parts2.push(esc(tok));
             }
