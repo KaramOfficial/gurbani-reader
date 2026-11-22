@@ -160,6 +160,14 @@
   .book-head .loc{font-size:12.5px;color:var(--muted);margin-top:5px}
   .rule{width:54px;height:2px;background:var(--accent);opacity:.55;border-radius:2px;margin:20px auto 4px}
   .section{margin-top:34px}
+  .ang-sep{display:flex;align-items:center;gap:16px;margin:60px 4px 4px;scroll-margin-top:78px}
+  .ang-sep-rule{flex:1;height:1px;opacity:.55}
+  .ang-sep-rule.l{background:linear-gradient(90deg,transparent,var(--accent))}
+  .ang-sep-rule.r{background:linear-gradient(90deg,var(--accent),transparent)}
+  .ang-sep-core{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:0 4px}
+  .ang-sep-ik{font-family:"Noto Serif Gurmukhi",serif;color:var(--accent-strong);font-size:23px;line-height:1.1}
+  .ang-sep-pa{font-family:"Noto Serif Gurmukhi","Noto Sans Gurmukhi",serif;font-weight:700;font-size:22px;line-height:1.25;color:var(--ink)}
+  .ang-sep-en{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
   .section-head{
     display:flex;align-items:center;gap:14px;margin:0 0 6px;
   }
@@ -411,6 +419,9 @@
 
   /* ---------- remember last opened page (localStorage, device-only) ---------- */
   var LAST_KEY = "gurbani-reader:last-v1", pendingRestore = null, pendingSeek = 0;
+  state.streamAngs = []; state.lineAng = {}; state.angLines = {};
+  state.angFirstLine = {}; state.angDur = {}; state.appending = false;
+
   function savePlace(){
     try{
       localStorage.setItem(LAST_KEY, JSON.stringify({
@@ -643,13 +654,25 @@
     var w = e.target.closest(".w");
     if(w){
       var rec = state.flatWords[Number(w.getAttribute("data-wi"))];
-      if(rec && typeof rec.start === "number"){ clearHighlight(); w.classList.add("now"); seekTo(rec.start); playAudio(); showBars(); manualScrollAt = 0; }
+      if(rec && typeof rec.start === "number"){
+        clearHighlight(); w.classList.add("now");
+        var wa = state.lineAng[rec.line];
+        if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
+        else seekTo(rec.start);
+        playAudio(); showBars(); manualScrollAt = 0;
+      }
       return;
     }
     var ln = e.target.closest(".line");
     if(ln){
       var recL = state.flatLines[Number(ln.getAttribute("data-li"))];
-      if(recL && typeof recL.start === "number"){ clearHighlight(); ln.classList.add("current"); seekTo(recL.start); playAudio(); showBars(); manualScrollAt = 0; }
+      if(recL && typeof recL.start === "number"){
+        clearHighlight(); ln.classList.add("current");
+        var la = state.lineAng[Number(ln.getAttribute("data-li"))];
+        if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = recL.start; switchAudioToAng(la, false); }
+        else seekTo(recL.start);
+        playAudio(); showBars(); manualScrollAt = 0;
+      }
     }
   });
 
@@ -682,6 +705,107 @@
     for(var i=0;i<CHUNKS.length;i++){ if(ang >= CHUNKS[i][0] && ang <= CHUNKS[i][1]) return CHUNKS[i]; }
     return CHUNKS[0];
   }
+  /* ---------- infinite Ang stream (only while auto-scroll is on) ---------- */
+  function paNum(n){ return String(n).split("").map(function(d){ return "੦੧੨੩੪੫੬੭੮੯"[Number(d)]; }).join(""); }
+  function sepHTML(ang){
+    return '<div class="ang-sep" id="ang-sep-' + ang + '" role="separator" aria-label="Ang ' + ang + '">' +
+      '<span class="ang-sep-rule l"></span>' +
+      '<span class="ang-sep-core"><span class="ang-sep-ik">ੴ</span>' +
+      '<span class="ang-sep-pa">ਅੰਗ ' + paNum(ang) + '</span>' +
+      '<span class="ang-sep-en">Ang ' + ang + '</span></span>' +
+      '<span class="ang-sep-rule r"></span></div>';
+  }
+  function buildLinesInner(lines, ang){
+    var html = "", wi = state.flatWords.length;
+    lines.forEach(function(line){
+      var li = state.flatLines.length;
+      state.flatLines.push({start:line.start, end:line.end});
+      state.lineAng[li] = ang;
+      html += '<p class="line" data-li="' + li + '">';
+      if(line.words && line.words.length && line.text){
+        var wlist = line.words, wptr = 0, parts2 = [];
+        line.text.split(/\s+/).filter(Boolean).forEach(function(tok){
+          if(wptr < wlist.length && tok === wlist[wptr].word){
+            var w = wlist[wptr++];
+            state.flatWords.push({start:w.start, end:w.end, line:li});
+            var lc = tok.charAt(tok.length - 1), pc = "", disp = esc(tok);
+            if(lc === ";" || lc === "," || lc === "."){
+              pc = lc === ";" ? " large-pause" : (lc === "," ? " medium-pause" : " small-pause");
+              disp = esc(tok.slice(0,-1));
+            }
+            parts2.push('<span class="w' + pc + '" data-wi="' + (wi++) + '">' + disp + '</span>');
+          } else { parts2.push(esc(tok)); }
+        });
+        while(wptr < wlist.length){
+          var w2 = wlist[wptr++];
+          state.flatWords.push({start:w2.start, end:w2.end, line:li});
+          parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w2.word) + '</span>');
+        }
+        html += parts2.join(" ");
+      } else if(line.words && line.words.length){
+        var parts = [];
+        line.words.forEach(function(w){
+          state.flatWords.push({start:w.start, end:w.end, line:li});
+          parts.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w.word) + '</span>');
+        });
+        html += parts.join(" ");
+      } else { html += esc(line.text || ""); }
+      html += '</p>';
+    });
+    return html;
+  }
+  function scrollToAngStart(ang){
+    var el = document.getElementById("ang-sep-" + ang);
+    if(!el) return;
+    autoScrolling = true;
+    el.scrollIntoView({behavior:"smooth", block:"start"});
+    setTimeout(function(){ autoScrolling = false; }, 700);
+  }
+  function switchAudioToAng(ang, autoplay){
+    state.ang = ang;
+    state.titlePa = "ਅੰਗ " + ang; state.titleEn = "Ang " + ang;
+    state.duration = state.angDur[ang] || 0;
+    brandSub.textContent = state.titlePa;
+    nowPlaying.innerHTML = esc(state.titlePa) + "<small>Tap a word to listen from there</small>";
+    var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
+    audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
+    audio.playbackRate = Number($("speed").value) || 1;
+    audio.load(); resetProgress(); clearHighlight();
+    savePlace();
+    if(autoplay) playAudio();
+  }
+  function appendAng(ang, opts){
+    opts = opts || {};
+    if(state.mode !== "ang" || state.appending || !ang || ang > 1430) return;
+    if(state.streamAngs.indexOf(ang) >= 0){ if(opts.play){ switchAudioToAng(ang, true); scrollToAngStart(ang); } return; }
+    state.appending = true;
+    var token = state.loadToken;
+    var c = chunkFor(ang);
+    var url = BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json";
+    fetch(url).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(json){
+      state.appending = false;
+      if(token !== state.loadToken || state.mode !== "ang") return;
+      var data = json.angs && json.angs[String(ang)];
+      if(!data || !data.lines || !data.lines.length){ if(opts.play) loadAng(ang, true); return; }
+      state.angLines[ang] = data.lines; state.angDur[ang] = data.duration || 0;
+      state.angFirstLine[ang] = state.flatLines.length;
+      var html = sepHTML(ang) + '<section class="section" data-ang="' + ang + '">' + buildLinesInner(data.lines, ang) + '</section>';
+      var nav = contentEl.querySelector(".end-nav");
+      if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
+      state.streamAngs.push(ang);
+      if(opts.play){ switchAudioToAng(ang, true); scrollToAngStart(ang); }
+    })
+    .catch(function(){ state.appending = false; if(opts.play) loadAng(ang, true); });
+  }
+  setInterval(function(){
+    if(state.mode !== "ang" || !autoScrollOn || state.appending) return;
+    var last = state.streamAngs[state.streamAngs.length - 1];
+    if(!last || last >= 1430) return;
+    var remaining = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+    if(remaining < window.innerHeight * 1.6) appendAng(last + 1, {});
+  }, 900);
+
   function loadAng(ang, autoplay){
     var token = ++state.loadToken;
     state.mode = "ang"; state.ang = ang; state.id = null;
@@ -699,6 +823,9 @@
       render([{title:"", lines:data.lines}], {
         titlePa: paTitle, titleEn: "Sri Guru Granth Sahib Ji · Ang " + ang, location:""
       });
+      state.streamAngs = [ang]; state.lineAng = {}; state.angLines = {}; state.angFirstLine = {}; state.angDur = {};
+      state.angLines[ang] = data.lines; state.angFirstLine[ang] = 0; state.angDur[ang] = data.duration || 0;
+      state.flatLines.forEach(function(_, li){ state.lineAng[li] = ang; });
       var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
       audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
       audio.playbackRate = Number($("speed").value) || 1;
@@ -755,8 +882,16 @@
   audio.addEventListener("play", function(){ setPlayIcon(true); scheduleAutoHide(); });
   audio.addEventListener("pause", function(){ setPlayIcon(false); showBars(); });
   audio.addEventListener("ended", function(){
-    /* continuous Sehaj Paath: roll straight into the next Ang, playing */
-    if(state.mode === "ang" && state.ang && state.ang < 1430){ loadAng(state.ang + 1, true); return; }
+    /* continuous Sehaj Paath: roll into the next Ang. With auto-scroll on, the next
+       Ang is already appended below (or appends now) — the stream never replaces.
+       With auto-scroll off, advance the previous way (page replaces). */
+    if(state.mode === "ang" && state.ang && state.ang < 1430){
+      var next = state.ang + 1;
+      if(autoScrollOn){ appendAng(next, {play:true}); }
+      else if(state.streamAngs.indexOf(next) >= 0){ switchAudioToAng(next, true); }
+      else { loadAng(next, true); }
+      return;
+    }
     setPlayIcon(false); showBars(); clearHighlight();
   });
   audio.addEventListener("loadedmetadata", function(){
@@ -806,6 +941,10 @@
     var lines = state.flatLines;
     if(!lines.length) return;
     var lo = 0, hi = lines.length - 1, li = -1;
+    if(state.mode === "ang" && typeof state.angFirstLine[state.ang] === "number" && state.angLines[state.ang]){
+      lo = state.angFirstLine[state.ang];
+      hi = Math.min(lines.length - 1, lo + state.angLines[state.ang].length - 1);
+    }
     while(lo <= hi){ var mid = (lo + hi) >> 1; if(lines[mid].start <= cur){ li = mid; lo = mid + 1; } else hi = mid - 1; }
     if(li < 0) return;
     var lineEl = contentEl.querySelector('.line[data-li="' + li + '"]');
@@ -824,7 +963,9 @@
     var w = contentEl.querySelector(".w.now");
     if(w){ var rec = state.flatWords[Number(w.getAttribute("data-wi"))]; if(rec && cur > rec.end + 0.05) w.classList.remove("now"); }
     var l = contentEl.querySelector(".line.current");
-    if(l){ var recL = state.flatLines[Number(l.getAttribute("data-li"))]; if(recL && cur > recL.end + 0.05) l.classList.remove("current"); }
+    if(l){ var liN = Number(l.getAttribute("data-li")); var recL = state.flatLines[liN];
+      if(state.mode === "ang" && state.lineAng[liN] && state.lineAng[liN] !== state.ang) l.classList.remove("current");
+      else if(recL && cur > recL.end + 0.05) l.classList.remove("current"); }
   }
   function binSearch(arr, t){
     var lo = 0, hi = arr.length - 1, ans = -1;
