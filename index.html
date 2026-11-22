@@ -712,7 +712,7 @@
     if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
   });
   audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
-  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); } }, 300);
+  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); } }, 300);
 
   function syncProgress(){
     if(state.seeking) return;
@@ -728,6 +728,25 @@
     var prevW = contentEl.querySelector(".w.now"); if(prevW) prevW.classList.remove("now");
     var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
     state.curLine = -1; state.curWord = -1;
+  }
+  /* ---------- auto-scroll based on audio ---------- */
+  function autoScrollToCurrentLine(){
+    if(audio.paused) return;
+    if(Date.now() - manualScrollAt < 5000) return;
+    var cur = audio.currentTime || 0;
+    var lines = state.flatLines;
+    if(!lines.length) return;
+    var lo = 0, hi = lines.length - 1, li = -1;
+    while(lo <= hi){ var mid = (lo + hi) >> 1; if(lines[mid].start <= cur){ li = mid; lo = mid + 1; } else hi = mid - 1; }
+    if(li < 0) return;
+    var lineEl = contentEl.querySelector('.line[data-li="' + li + '"]');
+    if(!lineEl) return;
+    var r = lineEl.getBoundingClientRect();
+    if(r.top < 130 || r.bottom > window.innerHeight - 190){
+      autoScrolling = true;
+      lineEl.scrollIntoView({block:"center", behavior:"smooth"});
+      setTimeout(function(){ autoScrolling = false; }, 650);
+    }
   }
   function clearExpiredHighlight(){
     var cur = audio.currentTime || 0;
