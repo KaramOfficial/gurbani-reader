@@ -1108,6 +1108,9 @@
     autoScrollOn = !autoScrollOn;
     try{ localStorage.setItem("gurbani-reader:autoscroll-v1", autoScrollOn ? "1" : "0"); }catch(e){}
     paintAutoScrollBtn();
+    if(autoScrollOn){ manualScrollAt = 0; autoScrollToCurrentLine(); }
+  });
+  paintAutoScrollBtn();
   var hlMode = "off"; /* off | sentence | word — follow-along highlight, off by default */
   try{ var hm = localStorage.getItem("gurbani-reader:hlmode-v1"); if(hm === "sentence" || hm === "word") hlMode = hm; }catch(e){}
   var hlSeg = $("hlSeg");
@@ -1168,9 +1171,7 @@
     }
     state.curWord = wi;
   }
-    if(autoScrollOn){ manualScrollAt = 0; autoScrollToCurrentLine(); }
-  });
-  paintAutoScrollBtn();
+
 
   /* ---------- auto-scroll based on audio ---------- */
   function autoScrollToCurrentLine(){
