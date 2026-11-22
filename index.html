@@ -358,11 +358,11 @@
     <h3>Reading</h3>
     <div class="menu-row">
       <div>
-        <span class="menu-label">Catch-up highlight</span>
-        <p class="menu-note">Flashes the line auto-scroll lands on.</p>
+        <span class="menu-label">Word highlight</span>
+        <p class="menu-note">Follows each word as the audio plays.</p>
       </div>
       <span class="menu-spacer"></span>
-      <label class="switch"><input type="checkbox" id="flashToggle" checked /><span class="track"></span></label>
+      <label class="switch"><input type="checkbox" id="wordHlToggle" /><span class="track"></span></label>
     </div>
     <button class="menu-navrow" id="libraryNav">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
@@ -538,8 +538,6 @@
   var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false;
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
   var flashEl = null;
-  var flashOn = true;
-  try{ if(localStorage.getItem("gurbani-reader:flash-v1") === "0") flashOn = false; }catch(e){}
   function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } }
   var barsTimer = null;
   function scheduleAutoHide(){
@@ -1070,7 +1068,7 @@
     if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
   });
   audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
-  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); } }, 300);
+  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); updateWordFollow(); } }, 300);
 
   function syncProgress(){
     if(state.seeking) return;
@@ -1101,14 +1099,38 @@
     autoScrollOn = !autoScrollOn;
     try{ localStorage.setItem("gurbani-reader:autoscroll-v1", autoScrollOn ? "1" : "0"); }catch(e){}
     paintAutoScrollBtn();
-  var flashToggle = $("flashToggle");
-  if(flashToggle){
-    flashToggle.checked = flashOn;
-    flashToggle.addEventListener("change", function(){
-      flashOn = flashToggle.checked;
-      try{ localStorage.setItem("gurbani-reader:flash-v1", flashOn ? "1" : "0"); }catch(e){}
-      if(!flashOn) clearFlash();
+  var wordHlOn = false;
+  try{ wordHlOn = localStorage.getItem("gurbani-reader:wordhl-v1") === "1"; }catch(e){}
+  var wordHlToggle = $("wordHlToggle");
+  if(wordHlToggle){
+    wordHlToggle.checked = wordHlOn;
+    wordHlToggle.addEventListener("change", function(){
+      wordHlOn = wordHlToggle.checked;
+      try{ localStorage.setItem("gurbani-reader:wordhl-v1", wordHlOn ? "1" : "0"); }catch(e){}
+      if(!wordHlOn){ var pw = contentEl.querySelector(".w.now"); if(pw) pw.classList.remove("now"); state.curWord = -1; }
     });
+  }
+  /* word follow-along (only when the Word highlight setting is on) */
+  function updateWordFollow(){
+    if(!wordHlOn || audio.paused) return;
+    var words = state.flatWords;
+    if(!words.length) return;
+    var cur = audio.currentTime || 0;
+    var lo = 0, hi = words.length - 1;
+    if(state.mode === "ang" && typeof state.angFirstWord[state.ang] === "number"){
+      lo = state.angFirstWord[state.ang];
+      hi = words.length - 1;
+      for(var a in state.angFirstWord){ var fw = state.angFirstWord[a]; if(fw > lo && fw - 1 < hi) hi = fw - 1; }
+    }
+    var wi = -1, l = lo, r = hi;
+    while(l <= r){ var mid = (l + r) >> 1; if(words[mid].start <= cur){ wi = mid; l = mid + 1; } else r = mid - 1; }
+    if(wi === state.curWord) return;
+    var prevW = contentEl.querySelector(".w.now"); if(prevW) prevW.classList.remove("now");
+    if(wi >= lo && wi <= hi && cur <= words[wi].end + 0.45){
+      var wEl = contentEl.querySelector('.w[data-wi="' + wi + '"]');
+      if(wEl) wEl.classList.add("now");
+    }
+    state.curWord = wi;
   }
     if(autoScrollOn){ manualScrollAt = 0; autoScrollToCurrentLine(); }
   });
@@ -1143,12 +1165,10 @@
        It is only a catch-up marker — it turns off as soon as auto-scroll is in motion. */
     if(flashArmed){
       flashArmed = false;
-      if(flashOn){
-        var prevC = contentEl.querySelector(".line.current");
-        if(prevC && prevC !== lineEl) prevC.classList.remove("current");
-        lineEl.classList.add("current");
-        flashEl = lineEl;
-      }
+      var prevC = contentEl.querySelector(".line.current");
+      if(prevC && prevC !== lineEl) prevC.classList.remove("current");
+      lineEl.classList.add("current");
+      flashEl = lineEl;
     }
     var r = lineEl.getBoundingClientRect();
     /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
@@ -1162,7 +1182,7 @@
   function clearExpiredHighlight(){
     var cur = audio.currentTime || 0;
     var w = contentEl.querySelector(".w.now");
-    if(w){ var rec = state.flatWords[Number(w.getAttribute("data-wi"))]; if(rec && cur > rec.end + 0.05) w.classList.remove("now"); }
+    if(w && !wordHlOn){ var rec = state.flatWords[Number(w.getAttribute("data-wi"))]; if(rec && cur > rec.end + 0.05) w.classList.remove("now"); }
     var l = contentEl.querySelector(".line.current");
     if(l){ var liN = Number(l.getAttribute("data-li")); var recL = state.flatLines[liN];
       if(state.mode === "ang" && state.lineAng[liN] && state.lineAng[liN] !== state.ang) l.classList.remove("current");
