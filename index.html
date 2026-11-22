@@ -573,9 +573,11 @@
               var w = wlist[wptr++];
               state.flatWords.push({start:w.start, end:w.end, line:li});
               var lc = tok.charAt(tok.length - 1), pc = "", disp = esc(tok);
-              if(lc === ";"){ pc = " large-pause"; disp = esc(tok.slice(0,-1)) + '<span class="vis">;</span>'; }
-              else if(lc === ","){ pc = " medium-pause"; disp = esc(tok.slice(0,-1)) + '<span class="vis">,</span>'; }
-              else if(lc === "."){ pc = " small-pause"; disp = esc(tok.slice(0,-1)) + '<span class="vis">.</span>'; }
+              /* readgurbani style: colour replaces the symbol — word coloured, ; , . not shown */
+              if(lc === ";" || lc === "," || lc === "."){
+                pc = lc === ";" ? " large-pause" : (lc === "," ? " medium-pause" : " small-pause");
+                disp = esc(tok.slice(0,-1));
+              }
               parts2.push('<span class="w' + pc + '" data-wi="' + (wi++) + '">' + disp + '</span>');
             } else {
               parts2.push(esc(tok));
