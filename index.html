@@ -228,6 +228,19 @@
     max-width:82vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .ang-island.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  /* ---------- recenter pill: appears when the audio's pankti is scrolled away ---------- */
+  .recenter{
+    position:fixed;bottom:150px;left:50%;z-index:45;
+    transform:translate(-50%,16px);opacity:0;pointer-events:none;
+    display:flex;align-items:center;gap:8px;
+    padding:10px 18px;border-radius:999px;background:var(--paper);
+    border:1px solid var(--hairline);box-shadow:var(--shadow);
+    font-family:"Noto Serif Gurmukhi",serif;font-size:15.5px;font-weight:600;color:var(--ink);
+    transition:opacity .28s,transform .32s cubic-bezier(.32,.72,.24,1);
+    white-space:nowrap;
+  }
+  .recenter.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .recenter .rc-arrow{color:var(--accent);font-weight:700;font-family:inherit}
   .ang-island.bump{animation:islandBump .18s ease}
   @keyframes islandBump{50%{transform:translate(-50%,0) scale(1.07)}}
   .sheet-close{width:38px;height:38px;border-radius:50%;border:1px solid var(--hairline);display:grid;place-items:center;background:var(--paper)}
@@ -416,6 +429,7 @@
 </header>
 
 <button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
+<button class="recenter" id="recenterBtn" aria-label="Back to the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>ਪੰਕਤੀ ਤੇ ਵਾਪਸ</span></button>
 
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" aria-label="Choose what to read">
@@ -732,6 +746,51 @@
     }
     return viewportBani();
   }
+  /* Recenter (Maps-style): while a pankti is the audio's focus, scrolling
+     away from it brings up a floating pill at the bottom; tapping it glides
+     back so that pankti sits in the main position again. */
+  function updateRecenter(){
+    var btn = $("recenterBtn"); if(!btn) return;
+    var show = false, up = false;
+    if(!autoScrolling && !audioSwitching && (state.mode === "ang" || state.mode === "bani") &&
+       !sheet.classList.contains("open") && $("angPop").hidden){
+      var found = currentLineEl();
+      if(found){
+        var r = found.el.getBoundingClientRect(), anchor = Math.round(window.innerHeight * 0.35);
+        /* in place = the pankti overlaps the anchor band (the same 46px
+           deadband the auto-scroll tracker parks it within) */
+        if(!(r.bottom > anchor - 46 && r.top < anchor + 46)){ show = true; up = r.bottom <= anchor; }
+      }
+    }
+    btn.classList.toggle("show", show);
+    if(show) $("rcArrow").textContent = up ? "↑" : "↓";
+  }
+  function glideToLine(el){
+    var startY = window.scrollY;
+    var target = Math.max(0, el.getBoundingClientRect().top + startY - Math.round(window.innerHeight * 0.35));
+    if(Math.abs(target - startY) < 4) return;
+    autoScrolling = true;
+    var t0 = performance.now(), dur = Math.min(650, Math.max(280, Math.abs(target - startY) * 0.35));
+    (function step(now){
+      var k = Math.min(1, (now - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      window.scrollTo(0, startY + (target - startY) * e);
+      if(k < 1) requestAnimationFrame(step); else holdAutoUntilSettled();
+    })(t0);
+  }
+  $("recenterBtn").addEventListener("click", function(){
+    var found = currentLineEl();
+    if(!found) return;
+    $("recenterBtn").classList.remove("show");
+    glideToLine(found.el);
+  });
+  /* keep the pill floating just above the player bar, whatever its height */
+  function placeRecenter(){
+    var pl = document.querySelector(".player"), btn = $("recenterBtn");
+    if(pl && btn) btn.style.bottom = (pl.offsetHeight + 10) + "px";
+  }
+  window.addEventListener("resize", placeRecenter);
+  placeRecenter();
+
   function trackView(){
     if(audioSwitching) return;
     if(sheet.classList.contains("open")) return;
@@ -754,6 +813,7 @@
       label = bb.pa;
     } else return;
     updatePager();
+    updateRecenter();
     /* the island is a browsing affordance: it appears for hand-driven
        scrolling, and once up it stays live until the changes stop —
        during auto-scroll the number above follows silently instead */
@@ -1687,6 +1747,7 @@
   setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); updateWordFollow(); maybePrefetch(); } }, 300);
 
   function syncProgress(){
+    updateRecenter();
     if(state.seeking) return;
     var dur = audio.duration || state.duration || 0;
     var cur = audio.currentTime || 0;
