@@ -552,7 +552,7 @@
   }
 
   /* ---------- hide / show bars on scroll ---------- */
-  var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false, audioSwitchAt = 0;
+  var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false, audioSwitchAt = 0, audioSwitching = false, lastGestureAt = 0;
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
   var flashEl = null, flashTimer = null;
   function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } clearTimeout(flashTimer); }
@@ -570,13 +570,18 @@
     if(autoScrolling){ lastY = y; return; }
     manualScrollAt = Date.now(); flashArmed = true;
     if(y > lastY + 7 && y > 140){ hideBars(); }
-    else if(y < lastY - 5 || y <= 60){ showBars(); }
+    else if(y < lastY - 5 || y <= 60){
+      /* during auto-play the bars come back only when the reader calls them —
+         a scroll event with no hand behind it (layout settle, a spacer swap)
+         must not pop them up on its own */
+      if(audio.paused || !autoScrollOn || Date.now() - lastGestureAt < 400) showBars();
+    }
     lastY = y;
   }, {passive:true});
-  window.addEventListener("touchmove", function(){ manualScrollAt = Date.now(); }, {passive:true});
-  window.addEventListener("touchstart", function(){ manualScrollAt = Date.now(); }, {passive:true});
-  window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp") manualScrollAt = Date.now(); });
-  window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); }, {passive:true});
+  window.addEventListener("touchmove", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); }, {passive:true});
+  window.addEventListener("touchstart", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); }, {passive:true});
+  window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp"){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); } });
+  window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); }, {passive:true});
   document.addEventListener("click", function(e){
     if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet")) return;
     showBars();
@@ -876,7 +881,8 @@
     holdAutoUntilSettled();
   }
   function switchAudioToAng(ang, autoplay){
-    audioSwitchAt = Date.now();
+    audioSwitching = true; audioSwitchAt = Date.now();
+    setTimeout(function(){ audioSwitching = false; }, 5000);
     state.ang = ang;
     state.titlePa = "ਅੰਗ " + ang; state.titleEn = "Ang " + ang;
     state.duration = state.angDur[ang] || 0;
@@ -1052,7 +1058,8 @@
   }
   function switchAudioToBani(id, autoplay){
     var b = baniById(id); if(!b) return;
-    audioSwitchAt = Date.now();
+    audioSwitching = true; audioSwitchAt = Date.now();
+    setTimeout(function(){ audioSwitching = false; }, 5000);
     state.id = id;
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
@@ -1223,9 +1230,18 @@
     state.seeking = false;
   });
 
-  audio.addEventListener("play", function(){ setPlayIcon(true); scheduleAutoHide(); trackKick(); });
-  audio.addEventListener("pause", function(){ setPlayIcon(false); if(Date.now() - audioSwitchAt < 1200) return; showBars(); });
+  audio.addEventListener("play", function(){ setPlayIcon(true); audioSwitching = false; scheduleAutoHide(); trackKick(); });
+  audio.addEventListener("pause", function(){
+    setPlayIcon(false);
+    /* a pause the browser fires because the audio is switching (natural end,
+       rollover, a tap into another Ang) is not the reader pausing — the bars
+       stay away; they only come up for a real pause */
+    var dur = audio.duration || state.duration || 0;
+    if(audioSwitching || audio.ended || (dur && (audio.currentTime || 0) >= dur - 0.35) || Date.now() - audioSwitchAt < 1200) return;
+    showBars();
+  });
   audio.addEventListener("ended", function(){
+    audioSwitching = true; audioSwitchAt = Date.now();
     /* continuous Sehaj Paath: roll into the next Ang. With auto-scroll on, the next
        Ang is already appended below (or appends now) — the stream never replaces.
        With auto-scroll off, advance the previous way (page replaces). */
