@@ -710,7 +710,7 @@
   window.addEventListener("pagehide", savePlace);
 
   /* ---------- font size ---------- */
-  var FS = [20,22,24,26,29,32], fsIdx = 2;
+  var FS = [20,22,24,26,29,32,36,40,44,48], fsIdx = 2;
   try{ var fsv = parseInt(localStorage.getItem("gurbani-reader:fontsize-v1"), 10); if(fsv >= 0 && fsv < FS.length) fsIdx = fsv; }catch(e){}
   function applyFs(){
     document.documentElement.style.setProperty("--reader-fs", FS[fsIdx] + "px");
