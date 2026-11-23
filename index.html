@@ -1139,6 +1139,10 @@
           if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
         };
         scrollToFocus(); /* land directly on the pankti, before the first paint */
+        /* a soft highlight on the landed pankti, so the eye catches where it
+           landed — the usual light wash, fading away on its own as usual */
+        var focusEl = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
+        if(focusEl) liteLine(focusEl);
         setTimeout(scrollToFocus, 450);
         setTimeout(scrollToFocus, 1200);
         if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ scrollToFocus(); });
