@@ -179,6 +179,57 @@
   }
   @media (prefers-color-scheme: dark){.ang-go{color:#1c1406}}
   .ang-hint{font-size:12.5px;color:var(--muted);margin:9px 0 0}
+  /* ---------- ang switcher popup + nitnem expander ---------- */
+  .pop-scrim{
+    position:fixed;inset:0;z-index:55;background:rgba(20,12,0,.42);
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  .pop-scrim.open{opacity:1;pointer-events:auto}
+  .ang-pop{
+    position:fixed;inset:0;z-index:56;display:grid;place-items:start center;
+    padding:calc(64px + env(safe-area-inset-top)) 14px 14px;pointer-events:none;
+  }
+  .ang-pop[hidden]{display:none}
+  .ang-pop-card{
+    pointer-events:auto;width:100%;max-width:430px;max-height:82dvh;overflow-y:auto;
+    background:var(--sheet-bg);border:1px solid var(--hairline);border-radius:20px;
+    box-shadow:var(--shadow);padding:15px 16px 13px;
+    opacity:0;transform:translateY(-8px) scale(.985);transition:opacity .22s,transform .22s cubic-bezier(.32,.72,.24,1);
+  }
+  .ang-pop.open .ang-pop-card{opacity:1;transform:none}
+  .ang-pop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+  .ang-pop-head h2{font-size:16.5px;margin:0;font-weight:700}
+  .ang-pop-cur{font-size:13px;color:var(--muted);margin:0 0 11px;font-family:"Noto Sans Gurmukhi",sans-serif}
+  .step-row{display:flex;gap:8px;margin-top:10px}
+  .step-btn{
+    flex:1;border:1px solid var(--hairline);background:var(--paper);min-height:38px;
+    border-radius:999px;font-weight:600;font-size:14px;color:var(--ink-soft);
+  }
+  .step-btn:active{background:var(--accent-soft)}
+  .nitnem{margin-top:10px;border-top:1px solid var(--hairline)}
+  .nitnem-head{
+    display:flex;align-items:center;gap:9px;width:100%;padding:12px 2px 10px;
+    text-align:left;min-height:44px;
+  }
+  .nitnem-title{font-family:"Noto Serif Gurmukhi",serif;font-size:16.5px;font-weight:600;color:var(--ink)}
+  .nitnem-note{font-size:12px;color:var(--muted)}
+  .nitnem-chev{margin-left:auto;font-size:13px;color:var(--muted);line-height:1;transition:transform .25s}
+  .nitnem-head.open .nitnem-chev{transform:rotate(180deg)}
+  .nitnem-head:active{background:var(--accent-soft)}
+  .nitnem-body{padding:2px 0 6px}
+  /* ---------- current-item island: drops in while browsing the stream ---------- */
+  .ang-island{
+    position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;z-index:45;
+    transform:translate(-50%,-20px);opacity:0;pointer-events:none;
+    padding:9px 20px;border-radius:999px;background:var(--paper);
+    border:1px solid var(--hairline);box-shadow:var(--shadow);
+    font-family:"Noto Serif Gurmukhi",serif;font-size:16.5px;font-weight:600;color:var(--ink);
+    transition:opacity .3s,transform .34s cubic-bezier(.32,.72,.24,1);
+    max-width:82vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .ang-island.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .ang-island.bump{animation:islandBump .18s ease}
+  @keyframes islandBump{50%{transform:translate(-50%,0) scale(1.07)}}
   .sheet-close{width:38px;height:38px;border-radius:50%;border:1px solid var(--hairline);display:grid;place-items:center;background:var(--paper)}
   .sheet-close svg{width:16px;height:16px}
 
@@ -362,11 +413,13 @@
   </div>
 </header>
 
+<button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
+
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" aria-label="Choose what to read">
   <div class="sheet-in">
     <div class="sheet-head">
-      <h2>Menu</h2>
+      <h2 id="sheetTitle">Menu</h2>
       <button class="sheet-close" id="sheetClose" aria-label="Close menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
       </button>
@@ -394,23 +447,64 @@
     </div>
     <button class="menu-navrow" id="libraryNav">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
-      <span class="menu-navrow-text"><span class="menu-label">Library</span><span class="menu-note">Nitnem Banis · Sri Guru Granth Sahib Ji</span></span>
+      <span class="menu-navrow-text"><span class="menu-label">Library</span><span class="menu-note">Sri Guru Granth Sahib Ji · Nitnem Banis</span></span>
       <span class="menu-navrow-chev" aria-hidden="true">›</span>
     </button>
     </div>
     <div id="menuLibrary" hidden>
     <button class="menu-back" id="libraryBack">‹ Menu</button>
-    <h3>Nitnem Banis</h3>
-    <div class="bani-grid" id="baniGrid"></div>
-    <h3>Sri Guru Granth Sahib Ji · Ang</h3>
+    <h3>Go to Ang</h3>
     <div class="ang-row">
       <input id="angInput" type="number" inputmode="numeric" min="1" max="1430" placeholder="Ang number · 1 – 1430" aria-label="Ang number" />
       <button class="ang-go" id="angGo">Read Ang</button>
     </div>
-    <p class="ang-hint">Sehaj Paath audio by Bhagat Jaswant Singh Ji.</p>
+    <div class="nitnem">
+      <button class="nitnem-head" data-nitnem-head aria-expanded="false">
+        <span class="nitnem-title">ਨਿਤਨੇਮ</span>
+        <span class="nitnem-note">Nitnem Banis · 8</span>
+        <span class="nitnem-chev" aria-hidden="true">▾</span>
+      </button>
+      <div class="nitnem-body" data-nitnem-body hidden>
+        <div class="bani-grid" id="baniGrid"></div>
+      </div>
+    </div>
+    <p class="ang-hint" style="margin-top:12px">Sehaj Paath audio by Bhagat Jaswant Singh Ji.</p>
     </div>
   </div>
 </section>
+
+<div class="pop-scrim" id="popScrim"></div>
+<div class="ang-pop" id="angPop" role="dialog" aria-modal="true" aria-label="Ang switcher" hidden>
+  <div class="ang-pop-card">
+    <div class="ang-pop-head">
+      <h2>Go to Ang</h2>
+      <button class="sheet-close" id="popClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
+    </div>
+    <p class="ang-pop-cur" id="popCur"></p>
+    <div class="ang-row">
+      <input id="popAngInput" type="number" inputmode="numeric" min="1" max="1430" placeholder="Ang number · 1 – 1430" aria-label="Ang number" />
+      <button class="ang-go" id="popAngGo">Read Ang</button>
+    </div>
+    <div class="step-row" id="popSteps">
+      <button class="step-btn" data-step="-50">−50</button>
+      <button class="step-btn" data-step="-10">−10</button>
+      <button class="step-btn" data-step="10">+10</button>
+      <button class="step-btn" data-step="50">+50</button>
+    </div>
+    <div class="nitnem">
+      <button class="nitnem-head" data-nitnem-head aria-expanded="false">
+        <span class="nitnem-title">ਨਿਤਨੇਮ</span>
+        <span class="nitnem-note">Nitnem Banis · 8</span>
+        <span class="nitnem-chev" aria-hidden="true">▾</span>
+      </button>
+      <div class="nitnem-body" data-nitnem-body hidden>
+        <div class="bani-grid" id="popBaniGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <main id="main">
   <div id="content">
@@ -535,31 +629,98 @@
 
   /* ---------- library sheet ---------- */
   var grid = $("baniGrid");
-  BANIS.forEach(function(b){
-    var btn = document.createElement("button");
-    btn.className = "bani-btn" + (b.id === state.id ? " active" : "");
-    btn.setAttribute("data-bani", b.id);
-    btn.innerHTML = '<span class="pa"></span><span class="en"></span>';
-    btn.querySelector(".pa").textContent = b.pa;
-    btn.querySelector(".en").textContent = b.en;
-    btn.addEventListener("click", function(){ closeSheet(); loadBani(b); });
-    grid.appendChild(btn);
-  });
+  function buildBaniGrid(container, onPick){
+    if(!container) return;
+    BANIS.forEach(function(b){
+      var btn = document.createElement("button");
+      btn.className = "bani-btn" + (b.id === state.id ? " active" : "");
+      btn.setAttribute("data-bani", b.id);
+      btn.innerHTML = '<span class="pa"></span><span class="en"></span>';
+      btn.querySelector(".pa").textContent = b.pa;
+      btn.querySelector(".en").textContent = b.en;
+      btn.addEventListener("click", function(){ onPick(); loadBani(b); });
+      container.appendChild(btn);
+    });
+  }
+  buildBaniGrid(grid, closeSheet);
+  buildBaniGrid($("popBaniGrid"), closeAngPop);
+  /* ---------- viewed-item tracking + the island ----------
+     While the reader browses the stream by hand, the pager centre and a
+     small floating island follow the item actually on screen (the audio
+     item in state does not move). The island drops in when the viewed
+     item changes, keeps updating through fast scrolling, and fades a
+     little after the changes stop; tapping it opens the switcher. */
+  var viewAng = null, viewBaniId = null, lastViewKey = null, islandTimer = null, popBaseAng = null;
+  function stateViewKey(){ return state.mode === "ang" ? "a" + state.ang : (state.mode === "bani" ? "b" + state.id : ""); }
+  function resetView(){ viewAng = null; viewBaniId = null; lastViewKey = stateViewKey(); islandHide(); }
+  function viewportBani(){
+    var secs = contentEl.querySelectorAll("section[data-bani]"), mid = window.innerHeight / 2, best = null, bestD = 1e12;
+    secs.forEach(function(s){
+      var r = s.getBoundingClientRect();
+      var d = r.top > mid ? r.top - mid : (r.bottom < mid ? mid - r.bottom : 0);
+      if(d < bestD){ bestD = d; best = s.getAttribute("data-bani"); }
+    });
+    return best;
+  }
+  function islandShow(label){
+    var isl = $("angIsland"); if(!isl) return;
+    if(isl.textContent !== label){
+      isl.textContent = label;
+      isl.classList.remove("bump"); void isl.offsetWidth; isl.classList.add("bump");
+    }
+    isl.classList.add("show");
+    clearTimeout(islandTimer);
+    islandTimer = setTimeout(islandHide, 1600);
+  }
+  function islandHide(){ var isl = $("angIsland"); if(isl) isl.classList.remove("show"); clearTimeout(islandTimer); }
+  $("angIsland").addEventListener("click", function(){ islandHide(); openAngPop(); });
+  var viewTick = false;
+  window.addEventListener("scroll", function(){
+    if(viewTick) return; viewTick = true;
+    requestAnimationFrame(function(){ viewTick = false; trackView(); });
+  }, {passive:true});
+  function trackView(){
+    if(autoScrolling || audioSwitching) return;
+    if(sheet.classList.contains("open")) return;
+    var pop = $("angPop"); if(pop && !pop.hidden) return;
+    var key, label;
+    if(state.mode === "ang"){
+      var va = viewportAng(); if(!va) return;
+      key = "a" + va;
+      if(lastViewKey === null){ lastViewKey = key; viewAng = va; return; }
+      if(key === lastViewKey) return;
+      lastViewKey = key; viewAng = va;
+      label = "ਅੰਗ " + paNum(va);
+    } else if(state.mode === "bani"){
+      var vb = viewportBani(); if(!vb) return;
+      key = "b" + vb;
+      if(lastViewKey === null){ lastViewKey = key; viewBaniId = vb; return; }
+      if(key === lastViewKey) return;
+      lastViewKey = key; viewBaniId = vb;
+      var bb = baniById(vb); if(!bb) return;
+      label = bb.pa;
+    } else return;
+    updatePager();
+    if(Date.now() - lastGestureAt < 4000) islandShow(label);
+  }
+
   /* top-bar pager: previous / next for whatever is open — Ang -/+ 1 in Ang
      mode, the neighbouring Bani in Bani mode; the centre label opens the
-     library for a direct jump. Labels and disabled ends follow state. */
+     switcher popup. The centre follows the item on screen while browsing. */
   function updatePager(){
     var prev = $("prevBtn"), next = $("nextBtn"), cur = $("pagerCur");
     if(!prev || !next || !cur) return;
     if(state.mode === "ang" && state.ang){
-      cur.textContent = "ਅੰਗ " + paNum(state.ang);
-      prev.disabled = state.ang <= 1;
-      next.disabled = state.ang >= 1430;
+      var da = viewAng || state.ang;
+      cur.textContent = "ਅੰਗ " + paNum(da);
+      prev.disabled = da <= 1;
+      next.disabled = da >= 1430;
       prev.setAttribute("aria-label", "Previous Ang");
       next.setAttribute("aria-label", "Next Ang");
     } else if(state.mode === "bani" && state.id){
-      var idx = BANIS.findIndex(function(b){ return b.id === state.id; });
-      var b = baniById(state.id);
+      var did = viewBaniId || state.id;
+      var idx = BANIS.findIndex(function(b){ return b.id === did; });
+      var b = baniById(did);
       cur.textContent = b ? b.pa : "";
       prev.disabled = idx <= 0;
       next.disabled = idx < 0 || idx >= BANIS.length - 1;
@@ -568,28 +729,29 @@
     }
   }
   $("prevBtn").addEventListener("click", function(){
-    if(state.mode === "ang" && state.ang > 1) loadAng(state.ang - 1);
+    if(state.mode === "ang"){ var pa = viewAng || state.ang; if(pa > 1) loadAng(pa - 1); }
     else if(state.mode === "bani"){
-      var i = BANIS.findIndex(function(b){ return b.id === state.id; });
+      var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
       if(i > 0) loadBani(BANIS[i - 1]);
     }
   });
   $("nextBtn").addEventListener("click", function(){
-    if(state.mode === "ang" && state.ang < 1430) loadAng(state.ang + 1);
+    if(state.mode === "ang"){ var na = viewAng || state.ang; if(na < 1430) loadAng(na + 1); }
     else if(state.mode === "bani"){
-      var i = BANIS.findIndex(function(b){ return b.id === state.id; });
+      var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
       if(i >= 0 && i < BANIS.length - 1) loadBani(BANIS[i + 1]);
     }
   });
-  $("pagerCur").addEventListener("click", function(){ openSheet(); showMenuPanel("library"); });
+  $("pagerCur").addEventListener("click", function(){ openAngPop(); });
   function markActiveBani(){
-    var btns = grid.querySelectorAll(".bani-btn");
+    var btns = document.querySelectorAll(".bani-btn");
     for(var i=0;i<btns.length;i++){
       btns[i].classList.toggle("active", state.mode==="bani" && btns[i].getAttribute("data-bani")===state.id);
     }
   }
-  function openSheet(){ showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function openSheet(){ islandHide(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
   function showMenuPanel(which){
+    var st = $("sheetTitle"); if(st) st.textContent = which === "library" ? "Library" : "Menu";
     var main = $("menuMain"), lib = $("menuLibrary");
     if(main) main.hidden = which !== "main";
     if(lib) lib.hidden = which !== "library";
@@ -607,6 +769,59 @@
     if(!v || v < 1 || v > 1430){ $("angInput").focus(); $("angInput").select(); return; }
     closeSheet(); loadAng(v);
   }
+
+  /* ---------- ang switcher popup + shared nitnem expander ---------- */
+  var angPop = $("angPop"), popScrim = $("popScrim");
+  var nitnemOpen = false;
+  try{ nitnemOpen = localStorage.getItem("gurbani-reader:nitnem-open") === "1"; }catch(e){}
+  function setNitnemOpen(open){
+    nitnemOpen = open;
+    try{ localStorage.setItem("gurbani-reader:nitnem-open", open ? "1" : "0"); }catch(e){}
+    var bodies = document.querySelectorAll("[data-nitnem-body]");
+    for(var i=0;i<bodies.length;i++) bodies[i].hidden = !open;
+    var heads = document.querySelectorAll("[data-nitnem-head]");
+    for(var j=0;j<heads.length;j++){ heads[j].classList.toggle("open", open); heads[j].setAttribute("aria-expanded", open ? "true" : "false"); }
+  }
+  var nheads = document.querySelectorAll("[data-nitnem-head]");
+  for(var n=0;n<nheads.length;n++) nheads[n].addEventListener("click", function(){ setNitnemOpen(!nitnemOpen); });
+  setNitnemOpen(nitnemOpen);
+  function openAngPop(){
+    if(sheet.classList.contains("open")) closeSheet();
+    islandHide();
+    var cur = $("popCur");
+    popBaseAng = state.mode === "ang" ? (viewAng || state.ang) : null;
+    if(state.mode === "ang" && state.ang) cur.textContent = "ਹੁਣ · ਅੰਗ " + paNum(popBaseAng);
+    else if(state.mode === "bani" && state.id){ var cb = baniById(viewBaniId || state.id); cur.textContent = cb ? "ਹੁਣ · " + cb.pa : ""; }
+    $("popSteps").style.display = state.mode === "ang" ? "" : "none";
+    $("popAngInput").value = "";
+    angPop.hidden = false;
+    popScrim.classList.add("open");
+    requestAnimationFrame(function(){ angPop.classList.add("open"); });
+    showBars();
+  }
+  function closeAngPop(){
+    if(angPop.hidden) return;
+    angPop.classList.remove("open");
+    popScrim.classList.remove("open");
+    setTimeout(function(){ if(!angPop.classList.contains("open")) angPop.hidden = true; }, 230);
+  }
+  $("popClose").addEventListener("click", closeAngPop);
+  popScrim.addEventListener("click", closeAngPop);
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeAngPop(); });
+  function goPopAng(){
+    var v = parseInt($("popAngInput").value, 10);
+    if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); return; }
+    closeAngPop(); loadAng(v);
+  }
+  $("popAngGo").addEventListener("click", goPopAng);
+  $("popAngInput").addEventListener("keydown", function(e){ if(e.key==="Enter") goPopAng(); });
+  var stepBtns = $("popSteps").querySelectorAll(".step-btn");
+  for(var s=0;s<stepBtns.length;s++) stepBtns[s].addEventListener("click", function(){
+    if(state.mode !== "ang" || !state.ang) return;
+    var base = popBaseAng || state.ang;
+    var v = Math.min(1430, Math.max(1, base + parseInt(this.getAttribute("data-step"), 10)));
+    if(v !== base){ closeAngPop(); loadAng(v); }
+  });
 
   /* ---------- hide / show bars on scroll ---------- */
   var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false, audioSwitchAt = 0, audioSwitching = false, lastGestureAt = 0;
@@ -776,7 +991,7 @@
     if(pa) pa.addEventListener("click", function(){ loadAng(state.ang-1); });
     if(na) na.addEventListener("click", function(){ loadAng(state.ang+1); });
 
-    brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; updatePager();
+    brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; resetView(); updatePager();
     nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Tap a word to listen from there</small>";
     markActiveBani();
     if(pendingRestore){
@@ -943,7 +1158,7 @@
     state.ang = ang;
     state.titlePa = "ਅੰਗ " + paNum(ang); state.titleEn = "Ang " + ang;
     state.duration = state.angDur[ang] || 0;
-    brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"; updatePager();
+    brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"; resetView(); updatePager();
     nowPlaying.innerHTML = esc(state.titlePa) + "<small>Tap a word to listen from there</small>";
     var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
     audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
@@ -1120,7 +1335,7 @@
     state.id = id;
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
-    brandSub.textContent = "ਨਿਤਨੇਮ"; updatePager();
+    brandSub.textContent = "ਨਿਤਨੇਮ"; resetView(); updatePager();
     nowPlaying.innerHTML = esc(b.pa) + "<small>Tap a word to listen from there</small>";
     audio.src = baniAudioUrl(b);
     audio.playbackRate = Number($("speed").value) || 1;
