@@ -552,7 +552,7 @@
   }
 
   /* ---------- hide / show bars on scroll ---------- */
-  var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false;
+  var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false, audioSwitchAt = 0;
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
   var flashEl = null, flashTimer = null;
   function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } clearTimeout(flashTimer); }
@@ -574,6 +574,9 @@
     lastY = y;
   }, {passive:true});
   window.addEventListener("touchmove", function(){ manualScrollAt = Date.now(); }, {passive:true});
+  window.addEventListener("touchstart", function(){ manualScrollAt = Date.now(); }, {passive:true});
+  window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp") manualScrollAt = Date.now(); });
+  window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); }, {passive:true});
   document.addEventListener("click", function(e){
     if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet")) return;
     showBars();
@@ -853,14 +856,27 @@
     });
     return html;
   }
+  /* release the autoScrolling flag only once the page has actually stopped
+     moving — a fixed timer lets the tail of a programmatic scroll be mistaken
+     for the reader's own scrolling (bars pop, auto-scroll pauses) */
+  function holdAutoUntilSettled(){
+    var last = window.scrollY, stable = 0, ticks = 0;
+    var iv = setInterval(function(){
+      ticks++;
+      var y = window.scrollY;
+      if(Math.abs(y - last) < 1){ stable++; } else { stable = 0; last = y; }
+      if(stable >= 2 || ticks > 30){ clearInterval(iv); autoScrolling = false; }
+    }, 100);
+  }
   function scrollToAngStart(ang){
     var el = document.getElementById("ang-sep-" + ang);
     if(!el) return;
     autoScrolling = true;
     el.scrollIntoView({behavior:"smooth", block:"start"});
-    setTimeout(function(){ autoScrolling = false; }, 700);
+    holdAutoUntilSettled();
   }
   function switchAudioToAng(ang, autoplay){
+    audioSwitchAt = Date.now();
     state.ang = ang;
     state.titlePa = "ਅੰਗ " + ang; state.titleEn = "Ang " + ang;
     state.duration = state.angDur[ang] || 0;
@@ -876,7 +892,7 @@
   function appendAng(ang, opts){
     opts = opts || {};
     if(state.mode !== "ang" || state.appending || !ang || ang > 1430) return;
-    if(state.streamAngs.indexOf(ang) >= 0){ if(opts.play){ switchAudioToAng(ang, true); scrollToAngStart(ang); } return; }
+    if(state.streamAngs.indexOf(ang) >= 0){ if(opts.play){ switchAudioToAng(ang, true); if(opts.rollover) trackKick(); else scrollToAngStart(ang); } return; }
     state.appending = true;
     var token = state.loadToken;
     var c = chunkFor(ang);
@@ -895,7 +911,7 @@
       if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
       state.streamAngs.push(ang);
       observeTail(); pruneStream();
-      if(opts.play){ switchAudioToAng(ang, true); scrollToAngStart(ang); }
+      if(opts.play){ switchAudioToAng(ang, true); if(opts.rollover) trackKick(); else scrollToAngStart(ang); }
     })
     .catch(function(){ state.appending = false; if(opts.play) loadAng(ang, true); });
   }
@@ -1032,10 +1048,11 @@
     if(!el) return;
     autoScrolling = true;
     el.scrollIntoView({behavior:"smooth", block:"start"});
-    setTimeout(function(){ autoScrolling = false; }, 700);
+    holdAutoUntilSettled();
   }
   function switchAudioToBani(id, autoplay){
     var b = baniById(id); if(!b) return;
+    audioSwitchAt = Date.now();
     state.id = id;
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
@@ -1051,7 +1068,7 @@
     opts = opts || {};
     if(state.mode !== "bani" || state.appendingBani || !id) return;
     var b = baniById(id); if(!b) return;
-    if(state.streamBanis.indexOf(id) >= 0){ if(opts.play){ switchAudioToBani(id, true); scrollToBaniStart(id); } return; }
+    if(state.streamBanis.indexOf(id) >= 0){ if(opts.play){ switchAudioToBani(id, true); if(opts.rollover) trackKick(); else scrollToBaniStart(id); } return; }
     state.appendingBani = true;
     var token = state.loadToken;
     fetch(baniDataUrl(b)).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
@@ -1069,7 +1086,7 @@
       if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
       state.streamBanis.push(id);
       observeBaniTail(); pruneBaniStream();
-      if(opts.play){ switchAudioToBani(id, true); scrollToBaniStart(id); }
+      if(opts.play){ switchAudioToBani(id, true); if(opts.rollover) trackKick(); else scrollToBaniStart(id); }
     })
     .catch(function(){ state.appendingBani = false; if(opts.play) loadBani(b, true); });
   }
@@ -1206,15 +1223,15 @@
     state.seeking = false;
   });
 
-  audio.addEventListener("play", function(){ setPlayIcon(true); scheduleAutoHide(); });
-  audio.addEventListener("pause", function(){ setPlayIcon(false); showBars(); });
+  audio.addEventListener("play", function(){ setPlayIcon(true); scheduleAutoHide(); trackKick(); });
+  audio.addEventListener("pause", function(){ setPlayIcon(false); if(Date.now() - audioSwitchAt < 1200) return; showBars(); });
   audio.addEventListener("ended", function(){
     /* continuous Sehaj Paath: roll into the next Ang. With auto-scroll on, the next
        Ang is already appended below (or appends now) — the stream never replaces.
        With auto-scroll off, advance the previous way (page replaces). */
     if(state.mode === "ang" && state.ang && state.ang < 1430){
       var next = state.ang + 1;
-      if(autoScrollOn){ appendAng(next, {play:true}); }
+      if(autoScrollOn){ appendAng(next, {play:true, rollover:true}); }
       else if(state.streamAngs.indexOf(next) >= 0){ switchAudioToAng(next, true); }
       else { loadAng(next, true); }
       return;
@@ -1223,7 +1240,7 @@
     if(state.mode === "bani" && state.id){
       var nb = chainNext(state.id);
       if(nb){
-        if(autoScrollOn){ appendBani(nb, {play:true}); }
+        if(autoScrollOn){ appendBani(nb, {play:true, rollover:true}); }
         else if(state.streamBanis.indexOf(nb) >= 0){ switchAudioToBani(nb, true); }
         else { loadBani(baniById(nb), true); }
         return;
@@ -1236,7 +1253,30 @@
     if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
   });
   audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
-  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); updateWordFollow(); } }, 300);
+  /* Cache what comes next while there is still time: when playback gets within
+     ~45 seconds of the end, the next Ang's audio and text chunk (or the next
+     Bani's audio) start loading, so the switch plays like one connected stream
+     instead of arriving at the boundary cold. */
+  function prefetchChunk(ang){
+    var c = chunkFor(ang);
+    var url = BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json";
+    if(prefetchChunk._url === url) return;
+    prefetchChunk._url = url;
+    fetch(url).then(function(r){ if(r && r.ok) return r.text(); }).catch(function(){});
+  }
+  function maybePrefetch(){
+    var dur = audio.duration || state.duration || 0;
+    var cur = audio.currentTime || 0;
+    if(!dur || dur - cur > 45) return;
+    if(state.mode === "ang" && state.ang && state.ang < 1430){
+      preloadAngAudio(state.ang + 1);
+      prefetchChunk(state.ang + 1);
+    } else if(state.mode === "bani" && state.id){
+      var nb = chainNext(state.id);
+      if(nb) preloadBaniAudio(nb);
+    }
+  }
+  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); updateWordFollow(); maybePrefetch(); } }, 300);
 
   function syncProgress(){
     if(state.seeking) return;
@@ -1342,12 +1382,13 @@
 
 
   /* ---------- auto-scroll based on audio ---------- */
-  function autoScrollToCurrentLine(){
-    if(!autoScrollOn || audio.paused) return;
-    if(Date.now() - manualScrollAt < 5000) return;
+  /* The current line, from the word timestamps: the line whose start (its first
+     word's time) has been reached in the audio. Shared by the follow director
+     and the tracker. */
+  function currentLineEl(){
     var cur = audio.currentTime || 0;
     var lines = state.flatLines;
-    if(!lines.length) return;
+    if(!lines.length) return null;
     var lo = 0, hi = lines.length - 1, li = -1;
     if(state.mode === "ang" && typeof state.angFirstLine[state.ang] === "number" && state.angLines[state.ang]){
       lo = state.angFirstLine[state.ang];
@@ -1358,9 +1399,54 @@
       hi = Math.min(lines.length - 1, lo + state.baniLineCount[state.id] - 1);
     }
     while(lo <= hi){ var mid = (lo + hi) >> 1; if(lines[mid].start <= cur){ li = mid; lo = mid + 1; } else hi = mid - 1; }
-    if(li < 0) return;
-    var lineEl = contentEl.querySelector('.line[data-li="' + li + '"]');
-    if(!lineEl) return;
+    if(li < 0) return null;
+    var el = contentEl.querySelector('.line[data-li="' + li + '"]');
+    return el ? {el: el, li: li} : null;
+  }
+  /* Continuous follow tracker: while the audio plays with auto-scroll on, a
+     requestAnimationFrame loop eases the page so the spoken line rests at the
+     anchor (~35% from the top). It writes window.scrollTo directly — no native
+     smooth-scroll animations to overlap, fight, or outlive their flag — with a
+     distance-proportional step: a fast glide when catching up from far away,
+     gentle near the anchor, and the 46px calm deadband kept. Because the writes
+     are instant, the autoScrolling flag covers them exactly, so the bars never
+     mistake the Reader's own motion for the reader's hand. */
+  var trackRAF = 0, trackMoving = false, trackLastTs = 0;
+  function trackStep(ts){
+    trackRAF = 0;
+    if(!autoScrollOn || audio.paused){ trackMoving = false; autoScrolling = false; trackLastTs = 0; return; }
+    trackRAF = requestAnimationFrame(trackStep);
+    var dt = trackLastTs ? Math.min(0.05, Math.max(0.001, (ts - trackLastTs) / 1000)) : 0.016;
+    trackLastTs = ts;
+    if(Date.now() - manualScrollAt < 5000){ trackMoving = false; autoScrolling = false; return; }
+    var found = currentLineEl();
+    if(!found){ trackMoving = false; autoScrolling = false; return; }
+    var r = found.el.getBoundingClientRect();
+    var delta = r.top - window.innerHeight * 0.35;
+    /* hysteresis: wake when the line drifts past the 46px calm band, then glide
+       all the way to the anchor (settle at 6px) instead of stopping at the band's
+       edge — no freeze-then-lunge, and the damping is time-normalised so the
+       glide feels the same on 60Hz and 120Hz screens */
+    if(!trackMoving && Math.abs(delta) <= 46){ autoScrolling = false; return; }
+    if(Math.abs(delta) <= 6){
+      trackMoving = false; autoScrolling = false;
+      if(flashEl) armFlashClear(900);
+      return;
+    }
+    if(flashEl && flashEl !== found.el) clearFlash();
+    var step = delta * (1 - Math.exp(-(Math.abs(delta) > 400 ? 13 : 6.5) * dt));
+    if(step > 130) step = 130; else if(step < -130) step = -130;
+    if(Math.abs(step) < 0.4) step = delta > 0 ? 0.4 : -0.4;
+    autoScrolling = true; trackMoving = true;
+    window.scrollTo(0, window.scrollY + step);
+  }
+  function trackKick(){ if(!trackRAF) trackRAF = requestAnimationFrame(trackStep); }
+  function autoScrollToCurrentLine(){
+    if(!autoScrollOn || audio.paused) return;
+    if(Date.now() - manualScrollAt < 5000) return;
+    var found = currentLineEl();
+    if(!found) return;
+    var lineEl = found.el;
     /* once playback is flowing and auto-scroll is carrying the reading, go full screen
        (attempted at arrival moments, close to the reader's play tap; failures are silent) */
     if(!document.fullscreenElement && document.documentElement.requestFullscreen){
@@ -1386,11 +1472,8 @@
       flashEl = lineEl;
       if(!needsScroll) armFlashClear(1600);
     } else if(flashEl && flashEl !== lineEl && needsScroll){ clearFlash(); }
-    if(needsScroll){
-      autoScrolling = true;
-      window.scrollBy({top: r.top - targetY, behavior:"smooth"});
-      setTimeout(function(){ autoScrolling = false; if(flashEl) armFlashClear(900); }, 700);
-    } else if(flashEl && flashEl !== lineEl){ clearFlash(); }
+    if(needsScroll){ trackKick(); }
+    else if(flashEl && flashEl !== lineEl){ clearFlash(); }
   }
   function clearExpiredHighlight(){
     var cur = audio.currentTime || 0;
@@ -1506,7 +1589,13 @@
       var qa = parseInt(qs.get("ang"), 10);
       if(qa >= 1 && qa <= 1430) linkAng = qa;
     }catch(e){}
-    if(linkAng){ loadAng(linkAng); return; }
+    if(linkAng){
+      /* the link wins for this landing only: strip it from the address bar, so a
+         later refresh reopens the saved place (wherever the reader has since
+         navigated to) instead of re-applying the link's Ang forever */
+      try{ var u = new URL(window.location.href); u.searchParams.delete("ang"); history.replaceState(null, "", u.href); }catch(e){}
+      loadAng(linkAng); return;
+    }
     var saved = readPlace();
     if(saved && saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){
       pendingRestore = saved; loadAng(saved.ang);
