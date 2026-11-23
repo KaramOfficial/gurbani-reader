@@ -74,13 +74,12 @@
   .brand{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 auto;overflow:hidden}
   .pager{
     max-width:760px;margin:0 auto;display:flex;align-items:center;gap:8px;
-    padding:6px 12px 9px;border-top:1px solid var(--hairline);
+    padding:2px 12px 5px;border-top:1px solid var(--hairline);
   }
-  .pager-btn{display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--hairline);background:var(--paper);min-height:40px;min-width:104px;padding:6px 12px}
-  .pager-btn svg{width:15px;height:15px;flex:none}
-  .pager-btn .pager-n{font-family:"Noto Sans Gurmukhi",sans-serif;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
-  .pager-btn:disabled{opacity:.5;cursor:default}
-  .pager-btn:disabled:active{background:var(--paper);transform:none}
+  .pager-btn{display:grid;place-items:center;width:38px;height:38px;min-height:38px;padding:0;border:0;background:transparent;border-radius:50%;color:var(--ink-soft)}
+  .pager-btn svg{width:19px;height:19px;flex:none}
+  .pager-btn:disabled{opacity:.3;cursor:default}
+  .pager-btn:disabled:active{background:transparent;transform:none}
   .pager-cur{
     flex:1;min-width:0;text-align:center;min-height:34px;
     font-family:"Noto Serif Gurmukhi",serif;font-size:15.5px;font-weight:600;color:var(--ink);
@@ -88,7 +87,6 @@
   }
   .pager-cur:active{background:var(--accent-soft)}
   .pager-cur::after{content:"\25BE";font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:10px;color:var(--muted);margin-left:7px;vertical-align:2px}
-  @media (prefers-color-scheme: dark){.pager-btn{border-color:rgba(238,224,196,.30)}}
   .brand .ik{
     font-family:"Noto Serif Gurmukhi",serif;font-size:19px;line-height:1;color:var(--accent-strong);
     flex:none;display:grid;place-items:center;width:37px;height:37px;border-radius:50%;
@@ -187,7 +185,7 @@
   /* ---------- reading column ---------- */
   main{
     max-width:700px;margin:0 auto;
-    padding:calc(140px + env(safe-area-inset-top)) 22px 210px;
+    padding:calc(128px + env(safe-area-inset-top)) 22px 210px;
   }
   @media (min-width:760px){ main{padding-left:34px;padding-right:34px} }
   .book-head{text-align:center;padding:34px 0 10px}
@@ -200,7 +198,7 @@
   .book-head .loc{font-size:12.5px;color:var(--muted);margin-top:5px}
   .rule{width:54px;height:2px;background:var(--accent);opacity:.55;border-radius:2px;margin:20px auto 4px}
   .section{margin-top:34px}
-  .ang-sep{display:flex;align-items:center;gap:14px;margin:38px 4px 2px;scroll-margin-top:132px}
+  .ang-sep{display:flex;align-items:center;gap:14px;margin:38px 4px 2px;scroll-margin-top:120px}
   .ang-sep-rule{flex:1;height:1px;opacity:.4}
   .ang-sep-rule.l{background:linear-gradient(90deg,transparent,var(--accent))}
   .ang-sep-rule.r{background:linear-gradient(90deg,var(--accent),transparent)}
@@ -358,9 +356,9 @@
     </button>
   </div>
   <div class="pager" id="pager">
-    <button class="tbtn pager-btn" id="prevBtn" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span class="pager-n"></span></button>
+    <button class="tbtn pager-btn" id="prevBtn" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
     <button class="pager-cur" id="pagerCur" aria-label="Choose an Ang or a Bani"></button>
-    <button class="tbtn pager-btn" id="nextBtn" aria-label="Next"><span class="pager-n"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
+    <button class="tbtn pager-btn" id="nextBtn" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
   </div>
 </header>
 
@@ -553,11 +551,8 @@
   function updatePager(){
     var prev = $("prevBtn"), next = $("nextBtn"), cur = $("pagerCur");
     if(!prev || !next || !cur) return;
-    var pn = prev.querySelector(".pager-n"), nn = next.querySelector(".pager-n");
     if(state.mode === "ang" && state.ang){
       cur.textContent = "ਅੰਗ " + paNum(state.ang);
-      pn.textContent = state.ang > 1 ? "ਅੰਗ " + paNum(state.ang - 1) : "";
-      nn.textContent = state.ang < 1430 ? "ਅੰਗ " + paNum(state.ang + 1) : "";
       prev.disabled = state.ang <= 1;
       next.disabled = state.ang >= 1430;
       prev.setAttribute("aria-label", "Previous Ang");
@@ -566,8 +561,6 @@
       var idx = BANIS.findIndex(function(b){ return b.id === state.id; });
       var b = baniById(state.id);
       cur.textContent = b ? b.pa : "";
-      pn.textContent = idx > 0 ? BANIS[idx - 1].pa : "";
-      nn.textContent = idx >= 0 && idx < BANIS.length - 1 ? BANIS[idx + 1].pa : "";
       prev.disabled = idx <= 0;
       next.disabled = idx < 0 || idx >= BANIS.length - 1;
       prev.setAttribute("aria-label", "Previous Bani");
