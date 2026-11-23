@@ -597,11 +597,29 @@
   function baniDataUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".json"; }
   function preloadBaniAudio(id){ if(!id) return; var b = baniById(id); if(!b) return; var u = baniAudioUrl(b); if(preAudio.getAttribute("src") !== u){ preAudio.src = u; try{ preAudio.load(); }catch(e){} } }
 
+  /* the sentence in focus: the follow-along line when one is active,
+     otherwise the line sitting at the reading anchor right now */
+  function focusedLine(){
+    var li = -1;
+    if(state.curLine >= 0 && state.flatLines[state.curLine]) li = state.curLine;
+    else {
+      var el = document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(window.innerHeight * 0.35));
+      var ln = el && el.closest ? el.closest(".line") : null;
+      if(ln) li = Number(ln.getAttribute("data-li"));
+    }
+    if(li < 0 || !state.flatLines[li]) return null;
+    var item = state.lineAng[li];
+    if(item == null) return null;
+    var first = state.mode === "ang" ? state.angFirstLine[item] : state.baniFirstLine[item];
+    if(typeof first !== "number") return null;
+    return { item: item, idx: li - first, start: state.flatLines[li].start };
+  }
   function savePlace(){
     try{
       localStorage.setItem(LAST_KEY, JSON.stringify({
         mode: state.mode, id: state.id, ang: state.ang,
-        y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: Date.now()
+        y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: Date.now(),
+        fl: focusedLine()
       }));
     }catch(e){}
   }
@@ -618,10 +636,12 @@
 
   /* ---------- font size ---------- */
   var FS = [20,22,24,26,29,32], fsIdx = 2;
+  try{ var fsv = parseInt(localStorage.getItem("gurbani-reader:fontsize-v1"), 10); if(fsv >= 0 && fsv < FS.length) fsIdx = fsv; }catch(e){}
   function applyFs(){
     document.documentElement.style.setProperty("--reader-fs", FS[fsIdx] + "px");
     $("fontDown").disabled = fsIdx <= 0;
     $("fontUp").disabled = fsIdx >= FS.length - 1;
+    try{ localStorage.setItem("gurbani-reader:fontsize-v1", String(fsIdx)); }catch(e){}
   }
   $("fontDown").addEventListener("click", function(){ if(fsIdx>0){ fsIdx--; applyFs(); } });
   $("fontUp").addEventListener("click", function(){ if(fsIdx<FS.length-1){ fsIdx++; applyFs(); } });
@@ -1026,8 +1046,24 @@
     markActiveBani();
     if(pendingRestore){
       var pr = pendingRestore; pendingRestore = null;
-      pendingSeek = pr.t || 0;
-      if(pr.y > 0){ setTimeout(function(){ window.scrollTo(0, pr.y); }, 60); }
+      if(pr.fl && typeof pr.fl.start === "number"){
+        pendingSeek = pr.fl.start;
+        /* a restore always lands on a fresh load, where the restored item is
+           the first section and its lines start at index 0 — the first-line
+           maps are only filled in after render(), so fall back to 0 */
+        var base = state.mode === "ang" ? state.angFirstLine[pr.fl.item] : state.baniFirstLine[pr.fl.item];
+        if(typeof base !== "number") base = 0;
+        var targetLi = base + pr.fl.idx;
+        var scrollToFocus = function(){
+          var el = contentEl.querySelector('.line[data-li="' + targetLi + '"]');
+          if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
+        };
+        setTimeout(scrollToFocus, 60);
+        setTimeout(scrollToFocus, 450);
+      } else {
+        pendingSeek = pr.t || 0;
+        if(pr.y > 0){ setTimeout(function(){ window.scrollTo(0, pr.y); }, 60); }
+      }
     } else { savePlace(); }
   }
 
@@ -1061,7 +1097,7 @@
       if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = recL.start; switchAudioToAng(la, false); }
       else if(state.mode === "bani" && la && la !== state.id){ pendingSeek = recL.start; switchAudioToBani(la, false); }
       else seekTo(recL.start);
-      playAudio(); showBars(); manualScrollAt = 0;
+      playAudio(); showBars(); manualScrollAt = 0; savePlace();
     }
   }
   function playFromWord(w){
@@ -1072,7 +1108,7 @@
       if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
       else if(state.mode === "bani" && wa && wa !== state.id){ pendingSeek = rec.start; switchAudioToBani(wa, false); }
       else seekTo(rec.start);
-      playAudio(); showBars(); manualScrollAt = 0;
+      playAudio(); showBars(); manualScrollAt = 0; savePlace();
     }
   }
   contentEl.addEventListener("click", function(e){
@@ -1544,7 +1580,8 @@
   });
   $("back5").addEventListener("click", function(){ seekTo((audio.currentTime||0) - 5); });
   $("fwd5").addEventListener("click", function(){ seekTo((audio.currentTime||0) + 5); });
-  $("speed").addEventListener("change", function(){ audio.playbackRate = Number(this.value) || 1; });
+  try{ var spv = localStorage.getItem("gurbani-reader:speed-v1"); if(spv && $("speed").querySelector('option[value="' + spv + '"]')) $("speed").value = spv; }catch(e){}
+  $("speed").addEventListener("change", function(){ audio.playbackRate = Number(this.value) || 1; try{ localStorage.setItem("gurbani-reader:speed-v1", this.value); }catch(e){} });
 
   seekEl.addEventListener("input", function(){
     state.seeking = true;
@@ -1944,7 +1981,14 @@
       loadAng(linkAng); return;
     }
     var saved = readPlace();
-    if(saved && saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){
+    if(saved && saved.mode === "ang" && saved.fl && saved.fl.item >= 1 && saved.fl.item <= 1430){
+      pendingRestore = saved; loadAng(saved.fl.item);
+    } else if(saved && saved.mode === "bani" && saved.fl && saved.fl.item){
+      var fb = null; BANIS.forEach(function(x){ if(x.id === saved.fl.item) fb = x; });
+      if(fb){ pendingRestore = saved; loadBani(fb); }
+      else if(saved.id){ var b0 = null; BANIS.forEach(function(x){ if(x.id === saved.id) b0 = x; }); if(b0){ pendingRestore = saved; loadBani(b0); } else loadBani(BANIS[0]); }
+      else loadBani(BANIS[0]);
+    } else if(saved && saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){
       pendingRestore = saved; loadAng(saved.ang);
     } else if(saved && saved.mode === "bani" && saved.id){
       var b = null; BANIS.forEach(function(x){ if(x.id === saved.id) b = x; });
