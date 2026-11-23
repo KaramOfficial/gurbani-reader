@@ -1174,7 +1174,7 @@
       if(firstSec) firstSec.setAttribute("data-bani", b.id);
       observeBaniTail(); preloadBaniAudio(chainNext(b.id));
       audio.src = baniAudioUrl(b);
-      audio.playbackRate = Number($("speed").value) || 1;
+      applySpeed();
       audio.load(); resetProgress();
       if(autoplay) playAudio();
     })
@@ -1264,7 +1264,7 @@
     nowPlaying.innerHTML = esc(state.titlePa) + "<small>Tap a word to listen from there</small>";
     var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
     audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
-    audio.playbackRate = Number($("speed").value) || 1;
+    applySpeed();
     audio.load(); resetProgress(); clearHighlight();
     savePlace(); preloadAngAudio(ang + 1);
     if(autoplay) playAudio();
@@ -1440,7 +1440,7 @@
     brandSub.textContent = "ਨਿਤਨੇਮ"; resetView(); updatePager();
     nowPlaying.innerHTML = esc(b.pa) + "<small>Tap a word to listen from there</small>";
     audio.src = baniAudioUrl(b);
-    audio.playbackRate = Number($("speed").value) || 1;
+    applySpeed();
     audio.load(); resetProgress(); clearHighlight();
     markActiveBani(); savePlace(); preloadBaniAudio(chainNext(id));
     if(autoplay) playAudio();
@@ -1553,7 +1553,7 @@
       state.flatLines.forEach(function(_, li){ state.lineAng[li] = ang; });
       var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
       audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
-      audio.playbackRate = Number($("speed").value) || 1;
+      applySpeed();
       audio.load(); resetProgress();
       if(autoplay) playAudio();
     })
@@ -1590,7 +1590,9 @@
   $("back5").addEventListener("click", function(){ seekTo((audio.currentTime||0) - 5); });
   $("fwd5").addEventListener("click", function(){ seekTo((audio.currentTime||0) + 5); });
   try{ var spv = localStorage.getItem("gurbani-reader:speed-v1"); if(spv && $("speed").querySelector('option[value="' + spv + '"]')) $("speed").value = spv; }catch(e){}
-  $("speed").addEventListener("change", function(){ audio.playbackRate = Number(this.value) || 1; try{ localStorage.setItem("gurbani-reader:speed-v1", this.value); }catch(e){} });
+  var speedRate = Number($("speed").value) || 1;
+  function applySpeed(){ try{ audio.playbackRate = speedRate; }catch(e){} }
+  $("speed").addEventListener("change", function(){ speedRate = Number(this.value) || 1; applySpeed(); try{ localStorage.setItem("gurbani-reader:speed-v1", this.value); }catch(e){} });
 
   seekEl.addEventListener("input", function(){
     state.seeking = true;
@@ -1639,7 +1641,9 @@
     }
     setPlayIcon(false); showBars(); clearHighlight();
   });
+  audio.addEventListener("play", function(){ applySpeed(); });
   audio.addEventListener("loadedmetadata", function(){
+    applySpeed();
     tDur.textContent = fmt(audio.duration || state.duration || 0);
     if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
   });
