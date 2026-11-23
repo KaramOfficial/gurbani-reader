@@ -1497,8 +1497,16 @@
     document.addEventListener("fullscreenchange", paintFsBtn);
   }
 
-  /* ---------- start: reopen last opened page if saved ---------- */
+  /* ---------- start: ?ang=N deep link (e.g. from Pankti Voice Search) wins
+     over the saved place; then reopen last opened page if saved ---------- */
   (function(){
+    var linkAng = null;
+    try{
+      var qs = new URLSearchParams(window.location.search);
+      var qa = parseInt(qs.get("ang"), 10);
+      if(qa >= 1 && qa <= 1430) linkAng = qa;
+    }catch(e){}
+    if(linkAng){ loadAng(linkAng); return; }
     var saved = readPlace();
     if(saved && saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){
       pendingRestore = saved; loadAng(saved.ang);
