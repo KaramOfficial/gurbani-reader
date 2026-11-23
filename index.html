@@ -584,6 +584,7 @@
 
   /* ---------- remember last opened page (localStorage, device-only) ---------- */
   var LAST_KEY = "gurbani-reader:last-v1", pendingRestore = null, pendingSeek = 0;
+  try{ if("scrollRestoration" in history) history.scrollRestoration = "manual"; }catch(e){}
   state.streamAngs = []; state.lineAng = {}; state.angLines = {};
   state.angFirstLine = {}; state.angFirstWord = {}; state.angHeight = {};
   state.angDur = {}; state.appending = false;
@@ -601,12 +602,18 @@
      otherwise the line sitting at the reading anchor right now */
   function focusedLine(){
     var li = -1;
-    if(state.curLine >= 0 && state.flatLines[state.curLine]) li = state.curLine;
-    else {
-      var el = document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(window.innerHeight * 0.35));
-      var ln = el && el.closest ? el.closest(".line") : null;
-      if(ln) li = Number(ln.getAttribute("data-li"));
-    }
+    var anchorLi = -1;
+    var el = document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(window.innerHeight * 0.35));
+    var ln = el && el.closest ? el.closest(".line") : null;
+    if(ln) anchorLi = Number(ln.getAttribute("data-li"));
+    /* the pankti in the main position is the saved one: that is the line at
+       the anchor whenever the reader is browsing (paused, or scrolled away
+       by hand); only while playback is actively following does the spoken
+       line rule — and then it sits at the anchor anyway */
+    var following = !audio.paused && autoScrollOn && (Date.now() - manualScrollAt >= 5000);
+    if(following && state.curLine >= 0 && state.flatLines[state.curLine]) li = state.curLine;
+    else if(anchorLi >= 0 && state.flatLines[anchorLi]) li = anchorLi;
+    else if(state.curLine >= 0 && state.flatLines[state.curLine]) li = state.curLine;
     if(li < 0 || !state.flatLines[li]) return null;
     var item = state.lineAng[li];
     if(item == null) return null;
@@ -1060,6 +1067,8 @@
         };
         setTimeout(scrollToFocus, 60);
         setTimeout(scrollToFocus, 450);
+        setTimeout(scrollToFocus, 1200);
+        if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ scrollToFocus(); });
       } else {
         pendingSeek = pr.t || 0;
         if(pr.y > 0){ setTimeout(function(){ window.scrollTo(0, pr.y); }, 60); }
