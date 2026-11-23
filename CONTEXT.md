@@ -171,14 +171,17 @@ this derivation.
 |---|---|
 | `gurbani-reader:last-v1` | The saved place (below) |
 | `gurbani-reader:fontsize-v1` | Font size index |
+| `gurbani-reader:focus-v1` | The global last focus (§9) |
 | `gurbani-reader:speed-v1` | Playback speed |
 | `gurbani-reader:hlmode-v1` | Follow-along mode: off / sentence / word |
 | `gurbani-reader:autoscroll-v1` | Auto-scroll on/off |
 | `gurbani-reader:nitnem-open` | Nitnem section expanded in switcher/Library |
 
-Font sizes: `[20, 22, 24, 26, 29, 32]px`, default index 2 (24px). Font
-size and speed were originally **never saved** (reset every visit) — the
-owner caught this; every user-facing setting must persist.
+Font sizes: `[20, 22, 24, 26, 29, 32, 36, 40, 44, 48]px`, default
+index 2 (24px). New sizes are only ever **appended** — a saved index
+must keep its meaning. Font size and speed were originally **never
+saved** (reset every visit) — the owner caught this; every
+user-facing setting must persist.
 
 **The saved place** is written on scroll (debounced), on page hide, on
 item switches, and on tap-to-play. Shape:
@@ -204,9 +207,11 @@ the line at the 35% anchor, is the one saved, not a stale spoken line).
    open-at-the-top-then-jump. Later settle passes (≈450ms, ≈1200ms, and
    when webfonts finish) correct for layout shift, and the browser's own
    scroll restoration is disabled so it cannot fight the placement.
-6. **Landing highlight:** the landed pankti gets the app's soft "lite"
-   wash (§9 tap model) so the eye catches where it landed; it fades away
-   on its own, as that wash always does.
+6. **The focus mark:** the landed pankti is marked with the app's soft
+   "lite" wash (§9 tap model) — but HELD, not faded: it stays for as
+   long as the app sits idle at that focus, so anyone picking the
+   phone up sees "this was the one". It clears the moment reading
+   actually starts: a hand-scroll gesture, a play, or a new tap.
 
 ## 9. UI elements & interaction rules
 
@@ -255,16 +260,32 @@ auto-scroll the pager's centre follows silently instead (the number
 still updates as a separator passes the main section). Tapping the
 island opens the switcher from the viewed item.
 
+**The global last focus.** One record (`gurbani-reader:focus-v1`:
+`{ mode, item, idx, start, t }`) holds THE last focus pankti, and it
+follows the **audio**: written during playback, sealed on pause, and
+set directly by tap-to-play. Browsing and navigation loads **never**
+move it — clicking away to another Ang and back used to lose the
+place entirely (fresh load, audio at 0); now the focus survives
+refreshes, click-aways and scrolls alike. Per-item places were
+considered and deliberately skipped — one global focus, always there.
+
 **Recenter pill.** Label **"Recenter"** (English), with a ↑/↓ arrow
-pointing toward the pankti. It floats at the bottom, just above the
-player bar (its offset is measured from the player's actual height).
-Google-Maps rules, per §6: it appears **only while the manual hold
-lasts** and the audio's pankti is outside the anchor band — never during
-auto-scroll's own operation (an earlier version re-evaluated off the
-audio clock and popped up at every line change; that sensitivity bug is
-why the hold gate exists). Tapping it glides the page back so the
-pankti sits at the anchor, releases the hold, and hands the page back
-to auto-scroll. The audio is untouched throughout.
+pointing toward the pankti (the arrow hides when the focus is in
+another item). It floats at the bottom, just above the player bar
+(its offset is measured from the player's actual height). It belongs
+to the global last focus: it appears whenever that pankti is **not in
+the main position** — scrolled away by hand (the manual hold of §6),
+its stream section pruned away, or the reader sitting on another item
+entirely — **except** while auto-scroll is actively following the
+focus (the tracker owns the position then; an earlier clock-keyed
+version popped up at every line change). It is evaluated on scroll,
+on the audio clock, and **at every render** (the view tracker alone
+only fires on viewed-item changes and once left it stale after a
+navigation load). Tapping it: if the pankti is rendered, glide back
+so it sits at the anchor, release the hold, and **mark it** on
+arrival; otherwise reopen its item through the restore machinery
+(§8), landing on the exact pankti with the audio parked there, and
+the landing marks it.
 
 **Tap model — one model everywhere.** For words *and* whole sentences:
 - **Single tap = touch feedback only:** a soft accent wash ("lite",
@@ -347,6 +368,10 @@ as the changelog. The arc, by theme:
   reworked onto the manual-hold model so it can never pop up during
   auto-scroll, with manual scroll suspending auto-scroll until return
   or recenter.
+- **Global focus (Nov 23):** the global last focus record (follows the
+  audio, survives refresh/click-away/scroll) with Recenter reworked
+  around it — including the cross-item return — and the held focus
+  mark on landings; text sizes extended to 48px.
 
 ## 12. Rebuild checklist (any platform)
 
