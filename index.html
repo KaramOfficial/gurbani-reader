@@ -611,15 +611,16 @@
        by hand); only while playback is actively following does the spoken
        line rule — and then it sits at the anchor anyway */
     var following = !audio.paused && autoScrollOn && (Date.now() - manualScrollAt >= 5000);
-    if(following && state.curLine >= 0 && state.flatLines[state.curLine]) li = state.curLine;
+    var fromAudio = false;
+    if(following && state.curLine >= 0 && state.flatLines[state.curLine]){ li = state.curLine; fromAudio = true; }
     else if(anchorLi >= 0 && state.flatLines[anchorLi]) li = anchorLi;
-    else if(state.curLine >= 0 && state.flatLines[state.curLine]) li = state.curLine;
+    else if(state.curLine >= 0 && state.flatLines[state.curLine]){ li = state.curLine; fromAudio = true; }
     if(li < 0 || !state.flatLines[li]) return null;
     var item = state.lineAng[li];
     if(item == null) return null;
     var first = state.mode === "ang" ? state.angFirstLine[item] : state.baniFirstLine[item];
     if(typeof first !== "number") return null;
-    return { item: item, idx: li - first, start: state.flatLines[li].start };
+    return { item: item, idx: li - first, start: state.flatLines[li].start, src: fromAudio ? "audio" : "view" };
   }
   function savePlace(){
     try{
@@ -1053,19 +1054,31 @@
     markActiveBani();
     if(pendingRestore){
       var pr = pendingRestore; pendingRestore = null;
-      if(pr.fl && typeof pr.fl.start === "number"){
-        pendingSeek = pr.fl.start;
+      var viewFocus = !!(pr.fl && pr.fl.src === "view");
+      pendingSeek = viewFocus ? pr.fl.start : (pr.t > 0 ? pr.t : (pr.fl ? pr.fl.start : 0));
+      var focusLi = -1;
+      /* the current pankti, worked out from the remembered audio position
+         against the line timestamps — the line auto-scroll had in focus */
+      if(!viewFocus && pr.t > 0){
+        for(var fi = 0; fi < state.flatLines.length; fi++){
+          if(pr.t >= state.flatLines[fi].start && pr.t < state.flatLines[fi].end){ focusLi = fi; break; }
+        }
+        if(focusLi < 0 && state.flatLines.length && pr.t >= state.flatLines[state.flatLines.length - 1].start) focusLi = state.flatLines.length - 1;
+      }
+      if(focusLi < 0 && pr.fl){
         /* a restore always lands on a fresh load, where the restored item is
            the first section and its lines start at index 0 — the first-line
            maps are only filled in after render(), so fall back to 0 */
         var base = state.mode === "ang" ? state.angFirstLine[pr.fl.item] : state.baniFirstLine[pr.fl.item];
         if(typeof base !== "number") base = 0;
-        var targetLi = base + pr.fl.idx;
+        if(base + pr.fl.idx < state.flatLines.length) focusLi = base + pr.fl.idx;
+      }
+      if(focusLi >= 0){
         var scrollToFocus = function(){
-          var el = contentEl.querySelector('.line[data-li="' + targetLi + '"]');
+          var el = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
           if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
         };
-        setTimeout(scrollToFocus, 60);
+        scrollToFocus(); /* land directly on the pankti, before the first paint */
         setTimeout(scrollToFocus, 450);
         setTimeout(scrollToFocus, 1200);
         if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ scrollToFocus(); });
@@ -1994,9 +2007,9 @@
       loadAng(linkAng); return;
     }
     var saved = readPlace();
-    if(saved && saved.mode === "ang" && saved.fl && saved.fl.item >= 1 && saved.fl.item <= 1430){
+    if(saved && saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){
       pendingRestore = saved; loadAng(saved.fl.item);
-    } else if(saved && saved.mode === "bani" && saved.fl && saved.fl.item){
+    } else if(saved && saved.mode === "bani" && saved.fl && saved.fl.src === "view" && saved.fl.item){
       var fb = null; BANIS.forEach(function(x){ if(x.id === saved.fl.item) fb = x; });
       if(fb){ pendingRestore = saved; loadBani(fb); }
       else if(saved.id){ var b0 = null; BANIS.forEach(function(x){ if(x.id === saved.id) b0 = x; }); if(b0){ pendingRestore = saved; loadBani(b0); } else loadBani(BANIS[0]); }
