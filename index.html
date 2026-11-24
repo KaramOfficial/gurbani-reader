@@ -1241,7 +1241,8 @@
   }
   function glideToLine(el, onDone){
     var startY = window.scrollY;
-    var target = Math.max(0, anchorTopOf(el) + startY - Math.round(window.innerHeight * 0.35));
+    zoneRefresh();   /* land the pankti's first word at the focus section's top */
+    var target = Math.max(0, anchorTopOf(el) + startY - zoneA);
     if(Math.abs(target - startY) < 4){ if(onDone) onDone(); return; }
     autoScrolling = true;
     var t0 = performance.now(), dur = Math.min(650, Math.max(280, Math.abs(target - startY) * 0.35));
@@ -1431,7 +1432,8 @@
         var found = currentLineEl();
         if(found){
           autoScrolling = true;
-          window.scrollTo(0, Math.max(0, anchorTopOf(found.el) + window.scrollY - Math.round(window.innerHeight * 0.35)));
+          zoneRefresh();
+          window.scrollTo(0, Math.max(0, anchorTopOf(found.el) + window.scrollY - zoneA));
           setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60);
         }
         trackKick();
@@ -2040,7 +2042,7 @@
           if(useY){ window.scrollTo(0, pr.y); }
           else {
             var el = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
-            if(el) window.scrollTo(0, Math.max(0, anchorTopOf(el) + window.scrollY - Math.round(window.innerHeight * 0.35)));
+            if(el){ zoneRefresh(); window.scrollTo(0, Math.max(0, anchorTopOf(el) + window.scrollY - zoneA)); }
           }
           /* the pill's verdict must be re-taken at the LANDED position —
              its render-time call ran before the landing scroll, and the
@@ -3236,30 +3238,54 @@
      gentle near the anchor, and the 46px calm deadband kept. Because the writes
      are instant, the autoScrolling flag covers them exactly, so the bars never
      mistake the Reader's own motion for the reader's hand. */
-  /* ---------- focus zone (word-exit auto-scroll) ----------
-     The tracker no longer keys on line change. A focus zone sits around
-     the 35% anchor, sized from the measured line height: the spoken WORD
-     travels inside it freely, and only when the word leaves the zone does
-     the page glide — landing the word's top back on the anchor. A word's
-     row fragment is always one line tall, so the model holds at any font
-     size: even when a pankti wraps to 5-6 rows and its sentence wash
-     paints far below the zone, the scroll never waits for the pankti,
-     and no spoken word sinks below the screen. One model for line mode
-     and paragraph mode, every orientation. */
-  var zoneA = 0, zoneT = 0, zoneB = 0, zoneKey = "";
+  /* ---------- the focus section + tracker ----------
+     The tracker keys on the spoken WORD, never on line change (a pankti
+     can wrap to 5-6 rows at large fonts while the section holds 2-3 —
+     the sentence wash still paints the full pankti, but the scroll
+     never waits for it). The page rests while the spoken word AND the
+     word after it are both inside the focus section; the glide is
+     ANTICIPATORY — it begins when the spoken word is the last word in
+     the section, landing that word at the section's top so the words
+     that follow flow in beneath it and are already in view when their
+     turn comes. A word's row fragment is always one line tall, so the
+     model holds at any font size, in line mode and paragraph mode,
+     in every orientation. */
+  /* THE FOCUS SECTION (owner's model, Nov 24): a fixed band of the
+     SCREEN — not of the text — sitting in the upper-centre of the
+     viewport. Its height is a whole number of text lines (2, 3 or 4),
+     auto-determined from the measured line height (which carries the
+     font size), the viewport's size and shape, and the layout mode:
+     short landscape screens and large desktops size it differently
+     from a portrait phone. The section is anchored to the screen;
+     LINES are anchored to the section — playback glides the page so
+     the spoken word sits at the section's top and the words that
+     follow fill it. The reader's eyes never leave the section.
+     Recomputed on the fly whenever width, height, font or layout
+     changes, so a rotation re-derives it for the new orientation and
+     the resize handler re-anchors the spoken word into it. */
+  var zoneA = 0, zoneT = 0, zoneB = 0, zoneKey = "", zoneLines = 3;
   function computeZone(){
-    var H = window.innerHeight, lh = 0;
-    var sample = contentEl.querySelector(".line");
+    var W = window.innerWidth, H = window.innerHeight, lh = 0;
+    var sample = contentEl.querySelector(".line:not(.mool):not(.hdr)") || contentEl.querySelector(".line");
     if(sample){ var cs = window.getComputedStyle(sample); lh = parseFloat(cs.lineHeight) || 0; }
     if(!lh) lh = FS[fsIdx] * 2.05;
-    zoneA = Math.round(H * 0.35);
-    zoneT = zoneA - Math.max(0.5 * lh, 0.04 * H);
-    zoneB = Math.min(zoneA + Math.max(2 * lh, 0.16 * H), H - 72);
-    if(zoneB < zoneA + 1.2 * lh) zoneB = zoneA + 1.2 * lh;
+    var shortLand = H < 500, desktop = W >= 1024 && H >= 700;
+    var topFrac = shortLand ? 0.18 : (desktop ? 0.24 : 0.26);
+    var budgetFrac = shortLand ? 0.46 : (desktop ? 0.36 : 0.34);
+    var n = Math.floor((H * budgetFrac) / lh);
+    zoneLines = Math.max(2, Math.min(4, n));
+    zoneT = Math.round(H * topFrac);
+    zoneA = zoneT;   /* the landing: the spoken word's top comes to rest at the section's top */
+    zoneB = Math.min(zoneT + zoneLines * lh, H - 120);
+    if(zoneB < zoneT + 1.2 * lh) zoneB = zoneT + 1.2 * lh;
   }
   function zoneRefresh(){
-    var key = window.innerHeight + "|" + FS[fsIdx] + "|" + (paraOn ? "p" : "l");
+    var key = window.innerWidth + "x" + window.innerHeight + "|" + FS[fsIdx] + "|" + (paraOn ? "p" : "l");
     if(key !== zoneKey){ zoneKey = key; computeZone(); }
+  }
+  function wordElByIndex(wi){
+    if(wi < 0 || wi >= state.flatWords.length) return null;
+    return contentEl.querySelector('.w[data-wi="' + wi + '"]');
   }
   var trackWi = -1, trackWordEl = null;
   function currentWordEl(){
@@ -3303,11 +3329,22 @@
     var wEl = currentWordEl();
     var r = wordRect(wEl), wordMode = !!r;
     if(!wordMode) r = found.el.getBoundingClientRect();   /* word not in the DOM this frame — legacy line behaviour until it is */
-    /* rest test: while the spoken word is inside the focus zone the page
-       is still, however many words go by; the zone IS the deadband now,
-       font-relative instead of a fixed 46px guess */
+    /* rest test: the page is still while the spoken word is inside the
+       focus section AND the word after it is inside too. The moment the
+       spoken word is the LAST word in the section, the glide begins —
+       the next word is brought into the section before it is spoken,
+       instead of the page reacting after a word has already left */
     if(!trackMoving){
-      var rest = wordMode ? (r.top >= zoneT && r.bottom <= zoneB) : (Math.abs(r.top - zoneA) <= 46);
+      var rest;
+      if(wordMode){
+        var inside = r.top >= zoneT - 2 && r.bottom <= zoneB + 2;
+        var lastInside = false;
+        if(inside){
+          var nr = wordRect(wordElByIndex(trackWi + 1));
+          if(nr) lastInside = !(nr.top >= zoneT - 2 && nr.bottom <= zoneB + 2);
+        }
+        rest = inside && !lastInside;
+      } else rest = Math.abs(r.top - zoneA) <= 46;
       if(rest){ autoScrolling = false; return; }
     }
     var delta = r.top - zoneA;
