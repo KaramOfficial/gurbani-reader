@@ -355,6 +355,7 @@
   }
   .recenter.show{transform:none;opacity:1;pointer-events:auto}
   .recenter .pg-ico{color:var(--accent);flex:none;display:flex}
+  .recenter.fp-ico{width:42px;height:42px;padding:0;justify-content:center;border-radius:50%;flex:none}
   .qc-font{font-family:"Noto Serif Gurmukhi",serif;font-size:15px;font-weight:600;color:var(--ink-soft)}
   .quick .orb:disabled{opacity:.38}
   .recenter .rc-arrow{color:var(--accent);font-weight:700;font-family:inherit}
@@ -620,7 +621,7 @@
 </header>
 
 <button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
-<div class="float-pair" id="floatPair"><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter paath-go" id="paathBtn" aria-label="Go to your Sehaj Paath"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span><span id="paathBtnName">Sehaj Paath</span></button></div>
+<div class="float-pair" id="floatPair"><button class="recenter fp-ico" id="paathBtn" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button></div>
 <div class="pv-toast" id="pvToast" role="status">Normal speed preview · 1×</div>
 <div class="quick" id="quickCtl">
   <button class="orb" id="qcPlay" aria-label="Pause"><svg id="qcPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="qcPauseIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
@@ -753,6 +754,18 @@
   </div>
 </section>
 
+<div class="ang-pop" id="paathPop" role="dialog" aria-modal="true" aria-label="Sehaj Paaths" hidden>
+  <div class="ang-pop-card">
+    <div class="ang-pop-head">
+      <h2 id="paathPopTitle">Sehaj Paath</h2>
+      <button class="sheet-close" id="paathPopClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
+    </div>
+    <p class="ang-pop-cur" id="paathPopCur"></p>
+    <div id="paathPopList"></div>
+  </div>
+</div>
 <div class="pop-scrim" id="popScrim"></div>
 <div class="ang-pop" id="angPop" role="dialog" aria-modal="true" aria-label="Ang switcher" hidden>
   <div class="ang-pop-card">
@@ -934,7 +947,18 @@
   var DETOUR_KEY = "gurbani-reader:detour-v1";
   function readDetourStore(){ try{ var v = JSON.parse(localStorage.getItem(DETOUR_KEY) || "null"); return v && typeof v === "object" ? v : null; }catch(e){ return null; } }
   function writeDetourStore(s){ try{ if(s) localStorage.setItem(DETOUR_KEY, JSON.stringify(s)); else localStorage.removeItem(DETOUR_KEY); }catch(e){} }
-  function exitDetour(){ detour = null; detourGlf = null; writeDetourStore(null); }
+  function exitDetour(){ detour = null; detourGlf = null; }   /* the slot itself stays: it is free reading's home, resumed when the reader comes back to it */
+  /* The reader is always in one of two worlds: inside a Sehaj Paath
+     (its place + focus ARE the app's place + focus), or in FREE reading
+     — the Default mode: just reading Gurbani, not part of any Paath.
+     Free reading is the detour machinery generalised — its own
+     persisted place + focus in the detour slot — so neither world ever
+     disturbs the other. A Pankti Voice Search link lands in free
+     reading; so does a fresh install; so does choosing Default in the
+     Paath popup. mode-v1 remembers which world the reader left in. */
+  var MODE_KEY = "gurbani-reader:mode-v1";
+  function modeIsFree(){ try{ return localStorage.getItem(MODE_KEY) === "free"; }catch(e){ return false; } }
+  function setMode(kind){ try{ localStorage.setItem(MODE_KEY, kind); }catch(e){} }
   var detourGlf = null;
   /* the focus Recenter answers to: inside a detour that is the
      detour's own focus — seeded from the link pankti and afterwards
@@ -945,15 +969,6 @@
   function effFocus(){
     if(!detour) return glf;
     return detourGlf || null;
-  }
-  /* the last active Sehaj Paath is ordinary, always-live app state
-     (paaths-v1's current) — the detour never snapshots it; wherever
-     the state points when the reader asks to go back is the target */
-  function paathTargetName(){
-    var target = paathData.current;
-    if(target == null) return paathData.defName || "Default";
-    var rec = paathById(target);
-    return rec ? rec.name : (paathData.defName || "Default");
   }
   function savePlace(force){
     /* transient layouts lie: during a load (state already names the new
@@ -1210,17 +1225,14 @@
       }
     }
     btn.classList.toggle("show", show);
-    /* detour only: the way back to the Sehaj Paath floats beside
-       Recenter — shown whenever Recenter is, and also when there is
-       no detour focus to recenter to yet, so the exit never hides */
-    var pb = $("paathBtn");
-    if(pb){
-      var pshow = !!detour && (show || !fg) && !autoScrolling && !audioSwitching &&
-        (state.mode === "ang" || state.mode === "bani") &&
-        !sheet.classList.contains("open") && $("angPop").hidden;
-      pb.classList.toggle("show", pshow);
-      if(pshow){ var nm = paathTargetName(), ne = $("paathBtnName"); if(ne && ne.textContent !== nm) ne.textContent = nm; }
-    }
+    /* the Paath switcher + set-to-pankti icons float beside Recenter —
+       inside a Paath and in free reading alike: shown whenever Recenter
+       is, and also when there is no focus to recenter to yet */
+    var fbShow = (show || !fg) && !autoScrolling && !audioSwitching &&
+      (state.mode === "ang" || state.mode === "bani") &&
+      !sheet.classList.contains("open") && $("angPop").hidden && $("paathPop").hidden;
+    var pb = $("paathBtn"); if(pb) pb.classList.toggle("show", fbShow);
+    var sb2 = $("saveBtn"); if(sb2) sb2.classList.toggle("show", fbShow);
     if(show) hideOrb(); /* the two floating affordances never share the screen */
     if(show){
       $("rcArrow").textContent = arrow ? (up ? "↑" : "↓") : "";
@@ -1260,13 +1272,139 @@
     if(fg.mode === "ang") loadAng(fg.item);
     else { var b = baniById(fg.item); if(b) loadBani(b); }
   });
-  /* the detour's exit: go to the Sehaj Paath that was active when the
-     visit began (remembered in the detour slot) — switchPaath takes
-     the snapshot-free exit and restores that Paath's saved place */
-  $("paathBtn").addEventListener("click", function(){
-    if(!detour) return;
-    $("paathBtn").classList.remove("show");
-    switchPaath(paathData.current);   /* the last active Paath, read from live state */
+  /* the floating icons beside Recenter: the book opens the Paath popup
+     (go to any Paath, or back to Default free reading); the bookmark
+     opens the same popup in assign mode (make the pankti you are on
+     the chosen Paath's place — without leaving where you are) */
+  var paathPopMode = "go";
+  var assignRec = null;   /* the pankti captured when the assign popup opens — once the popup covers the anchor, the view can no longer be sampled */
+  function openPaathPop(mode){
+    paathPopMode = mode;
+    if(mode === "assign") assignRec = currentFocusRec();
+    if(sheet.classList.contains("open")) closeSheet();
+    closeAngPop();
+    buildPaathPop();
+    var pp = $("paathPop");
+    pp.hidden = false;
+    popScrim.classList.add("open");
+    requestAnimationFrame(function(){ pp.classList.add("open"); });
+  }
+  function closePaathPop(){
+    var pp = $("paathPop");
+    if(!pp || pp.hidden) return;
+    pp.classList.remove("open");
+    if(angPop.hidden) popScrim.classList.remove("open");
+    setTimeout(function(){ if(!pp.classList.contains("open")) pp.hidden = true; }, 230);
+  }
+  function buildPaathPop(){
+    var assign = paathPopMode === "assign";
+    $("paathPopTitle").textContent = assign ? "Set a Paath to this pankti" : "Sehaj Paath";
+    var curRec = !detour ? paathById(paathData.current) : null;
+    $("paathPopCur").textContent = assign
+      ? "You stay right here — the chosen Paath will resume at the pankti you are on."
+      : (detour ? "You are in Default — just reading, not in a Paath."
+                : "Current · " + (curRec ? curRec.name : (paathData.defName || "Default")));
+    var html = "";
+    var row = function(key, name, sub, pv, isCur){
+      html += '<div class="paath-row' + (isCur ? " current" : "") + '" data-pop-row="' + key + '">';
+      html += '<span class="paath-dot" aria-hidden="true"></span>';
+      html += '<span class="paath-text"><span class="paath-name">' + esc(name) + '</span>' +
+        (sub ? '<span class="paath-sub">' + esc(sub) + '</span>' : '') +
+        (pv ? '<span class="paath-pv">' + esc(pv) + '</span>' : '') + '</span>';
+      html += '</div>';
+    };
+    if(!assign) row("free", "Default", "Just reading · not a Paath", null, !!detour);
+    var ids = [null].concat(paathData.list.map(function(x){ return x.id; }));
+    ids.forEach(function(id){
+      var name = id ? paathById(id).name : (paathData.defName || "Default");
+      row(id || "default", name, paathPlaceLabel(id), paathPreview(id), !assign && !detour && paathData.current === id);
+    });
+    $("paathPopList").innerHTML = html;
+  }
+  /* leave the Paath world for Default free reading: the Paath's place +
+     focus are snapshotted untouched (the switchPaath trick in reverse),
+     then free reading resumes from its own slot — or starts at Ang 1 */
+  function enterFree(){
+    closeSheet(); closeAngPop(); closePaathPop();
+    if(detour) return;
+    try{ savePlace(); }catch(e){}
+    writeCtx(paathData.current, { place: readPlace(), glf: glf });
+    detour = { resumed: true };
+    var ds = readDetourStore();
+    detourGlf = ds && ds.glf ? ds.glf : (ds && ds.place && ds.place.fl ? { mode: ds.place.mode, item: ds.place.fl.item, idx: ds.place.fl.idx, start: ds.place.fl.start, t: ds.place.t || 0, ts: Date.now(), pv: null } : null);
+    setMode("free");
+    restoreFromPlace(ds && ds.place);
+    updateRecenter();
+  }
+  var toastTimer = null;
+  function toastMsg(msg){
+    var t = $("pvToast"); if(!t) return;
+    t.textContent = msg; t.classList.add("show");
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2400);
+  }
+  /* the pankti the reader is "on": the focus if there is one (it follows
+     the audio / tap-to-play), else the pankti at the anchor */
+  function currentFocusRec(){
+    var f = effFocus();
+    if(f && f.item != null && typeof f.idx === "number") return { mode: f.mode, item: f.item, idx: f.idx, start: f.start, t: f.t || 0 };
+    var fl = focusedLine();
+    if(fl && fl.item != null && typeof fl.idx === "number") return { mode: state.mode, item: fl.item, idx: fl.idx, start: fl.start, t: 0 };
+    /* focusedLine samples the anchor by hit-testing, which the popup
+       itself blocks — fall back to scanning line rects for the anchor */
+    var anchor = Math.round(window.innerHeight * 0.35);
+    var els = document.querySelectorAll(".line");
+    for(var i=0;i<els.length;i++){
+      var r = els[i].getBoundingClientRect();
+      if(r.bottom > anchor){
+        var li = Number(els[i].getAttribute("data-li"));
+        if(state.flatLines[li]){
+          var item = state.lineAng[li];
+          var first = state.mode === "ang" ? state.angFirstLine[item] : state.baniFirstLine[item];
+          if(item != null && typeof first === "number") return { mode: state.mode, item: item, idx: li - first, start: state.flatLines[li].start, t: 0 };
+        }
+        break;
+      }
+    }
+    return null;
+  }
+  /* make the current pankti the chosen Paath's place + focus, in place:
+     its snapshot is rewritten so the next time it opens, it resumes
+     right here. The reader never moves. */
+  function assignFocusToPaath(id){
+    var f = assignRec || currentFocusRec();
+    assignRec = null;
+    if(!f){ toastMsg("Open a pankti first, then set it"); return; }
+    var pv = null;
+    try{ pv = previewText(lineTextAt(f.item, f.idx)); }catch(e){}
+    var frec = { mode: f.mode, item: f.item, idx: f.idx, start: f.start, t: f.t, ts: Date.now(), pv: pv };
+    var place = { mode: f.mode, id: f.mode === "bani" ? f.item : null, ang: f.mode === "ang" ? f.item : null,
+      y: 0, t: f.t, ts: Date.now(), fl: { item: f.item, idx: f.idx, start: f.start, src: "view" } };
+    var rec = id ? paathById(id) : null;
+    var name = rec ? rec.name : (paathData.defName || "Default");
+    if(!detour && paathData.current === id){
+      glf = frec; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
+      try{ localStorage.setItem(LAST_KEY, JSON.stringify(place)); }catch(e){}
+    } else {
+      var snap = readCtx(id) || {};
+      snap.glf = frec; snap.place = place; writeCtx(id, snap);
+    }
+    buildPaathLists();
+    closePaathPop();
+    toastMsg(name + " · set to this pankti");
+  }
+  $("paathBtn").addEventListener("click", function(){ openPaathPop("go"); });
+  $("saveBtn").addEventListener("click", function(){ openPaathPop("assign"); });
+  $("paathPopClose").addEventListener("click", closePaathPop);
+  $("paathPopList").addEventListener("click", function(e){
+    var r = e.target.closest("[data-pop-row]"); if(!r) return;
+    var key = r.getAttribute("data-pop-row");
+    if(paathPopMode === "assign"){ assignFocusToPaath(key === "default" ? null : key); return; }
+    closePaathPop();
+    if(key === "free"){ enterFree(); return; }
+    var id = key === "default" ? null : key;
+    if(!detour && paathData.current === id) return;   /* already there */
+    switchPaath(id);
   });
   /* keep the pill floating just above the player bar, whatever its height */
   function placeRecenter(){
@@ -1532,16 +1670,16 @@
     else loadAng(1);
   }
   function switchPaath(id){
-    closeSheet(); closeAngPop();
+    closeSheet(); closeAngPop(); closePaathPop();
     if(id === paathData.current){
       /* already the current Paath — but if a detour is live, picking it
          is the reader asking to go back: exit and restore its place */
-      if(detour){ exitDetour(); restoreFromPlace(readPlace()); updateRecenter(); }
+      if(detour){ exitDetour(); setMode("paath"); restoreFromPlace(readPlace()); updateRecenter(); }
       return;
     }
     try{ savePlace(); }catch(e){}
     writeCtx(paathData.current, { place: readPlace(), glf: glf });
-    paathData.current = id; savePaathData();
+    paathData.current = id; savePaathData(); setMode("paath");
     var snap = readCtx(id);
     if(snap && snap.place){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(snap.place)); }catch(e){} }
     else { try{ localStorage.removeItem(LAST_KEY); }catch(e){} }
@@ -1601,6 +1739,7 @@
   setPaathsOpen(paathsOpen);
   buildPaathLists();
   function openAngPop(){
+    closePaathPop();
     if(sheet.classList.contains("open")) closeSheet();
     islandHide();
     var cur = $("popCur");
@@ -1623,7 +1762,8 @@
   }
   $("popClose").addEventListener("click", closeAngPop);
   popScrim.addEventListener("click", closeAngPop);
-  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeAngPop(); });
+  popScrim.addEventListener("click", closePaathPop);
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape"){ closeAngPop(); closePaathPop(); } });
   function goPopAng(){
     var v = parseInt($("popAngInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); return; }
@@ -1691,7 +1831,7 @@
   window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp"){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); } });
   window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); }, {passive:true});
   document.addEventListener("click", function(e){
-    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#paathBtn") || e.target.closest("#angPop") || e.target.closest(".ang-island")) return;
+    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#paathBtn") || e.target.closest("#saveBtn") || e.target.closest("#angPop") || e.target.closest("#paathPop") || e.target.closest(".ang-island")) return;
     /* the third tap of a preview triple-tap belongs to the preview */
     if(pvClickMark && e.timeStamp === pvClickMark){ pvClickMark = 0; return; }
     /* immersive playback (audio playing, auto-scroll on, bars hidden):
@@ -3348,6 +3488,7 @@
            visit; the saved place/focus and every Sehaj Paath snapshot
            stay untouched until the reader goes back to his Paath */
         detour = { ang: linkAng, idx: linkLine };
+        setMode("free");
         detourGlf = { mode: "ang", item: linkAng, idx: linkLine, start: null, t: 0, ts: Date.now(), pv: null };
         writeDetourStore({ place: { mode: "ang", id: null, ang: linkAng, y: 0, t: 0, ts: Date.now(),
           fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: detourGlf });
@@ -3356,10 +3497,11 @@
       }
       loadAng(linkAng); return;
     }
-    /* a stored detour resumes where the visit left off — ahead of the
-       Sehaj Paath's saved place, which waits untouched underneath */
+    /* free reading resumes where it left off when it is the remembered
+       world — ahead of the Sehaj Paath's saved place, which waits
+       untouched underneath */
     var dstore = readDetourStore();
-    if(dstore && dstore.place){ detour = { resumed: true }; detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null); pendingRestore = null; var saved = dstore.place;
+    if(dstore && dstore.place && modeIsFree()){ detour = { resumed: true }; detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null); pendingRestore = null; var saved = dstore.place;
       if(saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){ pendingRestore = saved; loadAng(saved.fl.item); }
       else if(saved.mode === "bani" && saved.fl && saved.fl.src === "view" && saved.fl.item){ var dfb = null; BANIS.forEach(function(x){ if(x.id === saved.fl.item) dfb = x; }); if(dfb){ pendingRestore = saved; loadBani(dfb); } else loadBani(BANIS[0]); }
       else if(saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){ pendingRestore = saved; loadAng(saved.ang); }
@@ -3380,7 +3522,12 @@
     } else if(saved && saved.mode === "bani" && saved.id){
       var b = null; BANIS.forEach(function(x){ if(x.id === saved.id) b = x; });
       if(b){ pendingRestore = saved; loadBani(b); } else loadBani(BANIS[0]);
-    } else loadBani(BANIS[0]);
+    } else {
+      /* a brand-new landing (no saved place anywhere) starts in Default
+         free reading — not inside any Sehaj Paath */
+      if(!saved && !readDetourStore()){ detour = { resumed: true }; detourGlf = null; setMode("free"); }
+      loadBani(BANIS[0]);
+    }
   })();
 
   /* ---------- Google sign-in + cloud sync ----------
