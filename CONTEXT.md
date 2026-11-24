@@ -155,13 +155,13 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
 
 ## 6. Auto-scroll — the tracker
 
-- A `requestAnimationFrame` tracker keys on the **spoken word**, never
-  on line change (a pankti can span 5–6 rows at large fonts; the
-  sentence highlight still paints the **full pankti**, but the scroll
-  never waits for it). It serves the **focus section**: a fixed band
-  of the *screen* — not of the text — in the upper-centre of the
-  viewport. The section is anchored to the screen; lines are anchored
-  to the section.
+- A `requestAnimationFrame` tracker drives the camera under **Model
+  C — sentence-first, row-safety second** — one model for every font,
+  layout and highlight mode (the camera grammar never changes with
+  the highlight granularity). It serves the **focus section**: a
+  fixed band of the *screen* — not of the text — in the upper-centre
+  of the viewport. The section is anchored to the screen; lines are
+  anchored to the section.
   - **Size — a whole number of lines, auto-determined.** From the
     measured line height (which carries the font size) and a height
     budget that depends on the viewport's shape: portrait phone 34%
@@ -174,14 +174,38 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
     height (portrait), 18% (short landscape), 24% (desktop); bottom
     capped at height − 120px (clear of the player), floored at
     top + 1.2 line-heights.
-  - **Motion — anticipatory.** The page is **still** while the spoken
-    word *and the word after it* are both inside the section. The
-    moment the spoken word is the **last word in the section**, the
-    tracker glides (time-normalised easing, 130px/frame cap, settle
-    ~6px), landing that word's top at the section's top — so the next
-    words flow in beneath it and are already in view when their turn
-    comes. The reader's eyes never leave the section, and no spoken
-    word sinks toward the bottom of the screen waiting to be rescued.
+  - **Motion — three glides, in strict priority.** All glides use
+    the same time-normalised easing (130px/frame cap, settle ~6px)
+    toward a fixed absolute target; at most one glide runs at a time.
+    - **G1, the sentence glide.** When the spoken pankti changes, the
+      page glides once, landing the new pankti's first row at the
+      section's top — in the same frame as the sentence-highlight
+      change. Whenever a pankti fits inside the section this is the
+      ONLY motion: the page is still for the whole pankti, exactly
+      the pre-redesign behaviour the reader called smooth and in
+      sync. In paragraph layout, if the new pankti's entry row is
+      shared with the previous pankti, G1 is cancelled for that
+      pankti (a shared row cannot be isolated) and only G2 may move.
+    - **G2, the safety glide.** Within a pankti, only when the spoken
+      word's own row has actually reached the section's bottom edge
+      does the page move — the minimum shift that makes that row the
+      section's last row (one row height for uniform rows). At most
+      once per (pankti, row), never while a glide is running, never
+      evaluated on a pankti-change onset. This is the whole of the
+      large-font provision: a 5–6-row pankti gets its G1 plus one-row
+      safety shifts, instead of top-resets mid-sentence. (A word left
+      fully above the section by a backward seek within the pankti is
+      landed at the section top by the same rule's recovery branch.)
+    - **G0, the reset.** On an item load/switch the current pankti is
+      accounted for without a sentence glide; a spoken row outside
+      the section is landed at the section top. Seeks ride G1/G2.
+    - The camera never looks ahead to the next word and never resets
+      position mid-pankti — the two faults of the word-anticipatory
+      model this replaced (it fired while the spoken word was still
+      comfortably inside, because the *next* word was outside, and
+      landed the spoken word at the section top: two ~2-row jumps
+      inside one long pankti while the sentence highlight had not
+      changed).
     Recenter, the restore landing and the rotation re-anchor all land
     their pankti's first word at the same section top.
   - If the spoken word's element is not in the DOM (spacer-swapped

@@ -3310,53 +3310,121 @@
     return (rs && rs.length) ? rs[0] : el.getBoundingClientRect();
   }
   var trackRAF = 0, trackMoving = false, trackLastTs = 0;
+  /* The camera (Model C — sentence-first, row-safety second; ONE model
+     for every font, layout and highlight mode):
+       G1 sentence glide — when the spoken pankti changes, glide once,
+         landing the new pankti's first row at the section top, in the
+         same frame as the highlight change. This is the only motion
+         whenever the pankti fits inside the section.
+       G2 safety glide — within a pankti, only when the spoken word's
+         own row has actually reached the section's bottom edge, glide
+         the minimum: that row becomes the section's last row. Fires at
+         most once per (pankti, row), never while a glide is running.
+       G0 reset — on an item load/switch the current pankti is accounted
+         for without a sentence glide; if the spoken row sits outside
+         the section it is landed at the section top. Seeks are covered
+         by G1 (a seek into another pankti) and the G2 recovery branch
+         (a seek within the pankti that leaves the word above the
+         section lands it at the top).
+     The camera never looks ahead to the next word and never resets
+     position mid-pankti — the two faults of the word-anticipatory
+     model this replaces (two jumps inside one pankti, out of sync
+     with the sentence highlight). */
+  var trackLi = -1, glideTargetY = null, glideKind = "", trackRowKey = "", trackGen = "";
+  function trackGenNow(){ return state.mode + ":" + (state.mode === "ang" ? state.ang : state.id) + ":" + state.loadToken; }
+  function lineFirstRowTop(el){
+    var rs = el.getClientRects();
+    return (rs && rs.length) ? rs[0].top : el.getBoundingClientRect().top;
+  }
+  function startGlide(targetY, kind){
+    if(Math.abs(targetY - window.scrollY) <= 2){ glideTargetY = null; trackMoving = false; return false; }
+    glideTargetY = targetY; glideKind = kind; trackMoving = true; autoScrolling = true;
+    return true;
+  }
   function trackStep(ts){
     trackRAF = 0;
-    if(!autoScrollOn || audio.paused){ trackMoving = false; autoScrolling = false; trackLastTs = 0; return; }
+    if(!autoScrollOn || audio.paused){ trackMoving = false; autoScrolling = false; trackLastTs = 0; glideTargetY = null; return; }
     trackRAF = requestAnimationFrame(trackStep);
     var dt = trackLastTs ? Math.min(0.05, Math.max(0.001, (ts - trackLastTs) / 1000)) : 0.016;
     trackLastTs = ts;
     if(Date.now() < resizeSettleUntil) return; /* reflow settling — stand down, the resize handler re-anchors */
-    if(manualHold){ trackMoving = false; autoScrolling = false; return; }
+    if(manualHold){ trackMoving = false; autoScrolling = false; glideTargetY = null; return; }
+    if(audio.seeking) return;   /* stale geometry mid-seek — the seeked handler re-kicks */
     var found = currentLineEl();
     if(!found){ trackMoving = false; autoScrolling = false; return; }
     zoneRefresh();
     var wEl = currentWordEl();
     var r = wordRect(wEl), wordMode = !!r;
-    if(!wordMode) r = found.el.getBoundingClientRect();   /* word not in the DOM this frame — legacy line behaviour until it is */
-    /* rest test: the page is still while the spoken word is inside the
-       focus section AND the word after it is inside too. The moment the
-       spoken word is the LAST word in the section, the glide begins —
-       the next word is brought into the section before it is spoken,
-       instead of the page reacting after a word has already left */
-    if(!trackMoving){
-      var rest;
-      if(wordMode){
-        var inside = r.top >= zoneT - 2 && r.bottom <= zoneB + 2;
-        var lastInside = false;
-        if(inside){
-          var nr = wordRect(wordElByIndex(trackWi + 1));
-          if(nr) lastInside = !(nr.top >= zoneT - 2 && nr.bottom <= zoneB + 2);
-        }
-        rest = inside && !lastInside;
-      } else rest = Math.abs(r.top - zoneA) <= 46;
-      if(rest){ autoScrolling = false; return; }
+    if(!wordMode) r = found.el.getBoundingClientRect();   /* word not in the DOM this frame — line fallback below */
+    var li = found.li;
+    /* generation change = an item load/switch: G0 reset accounting */
+    var gen = trackGenNow();
+    if(gen !== trackGen){
+      trackGen = gen; trackLi = li; trackRowKey = ""; glideTargetY = null; trackMoving = false;
+      if(wordMode && (r.top < zoneT - 2 || r.bottom > zoneB + 2))
+        startGlide(window.scrollY + (r.top - zoneA), "reset");
     }
-    var delta = r.top - zoneA;
-    /* glide all the way to the anchor (settle at 6px) instead of stopping
-       at the zone's edge — no freeze-then-lunge, and the damping is
-       time-normalised so the glide feels the same on 60Hz and 120Hz */
-    if(Math.abs(delta) <= 6){
-      trackMoving = false; autoScrolling = false;
-      if(flashEl) armFlashClear(900);
+    if(trackMoving && glideTargetY !== null){
+      /* a sentence glide outranks a running safety/reset glide: if the
+         pankti changed mid-glide, retarget to the new pankti's top */
+      if(wordMode && li !== trackLi && glideKind !== "sentence"){
+        var mTop = lineFirstRowTop(found.el);
+        if(!(paraOn && trackWi > 0 && (function(){ var pe = wordElByIndex(trackWi - 1); var pr = wordRect(pe); return pr && Math.abs(pr.top - r.top) < 4; })()))
+          startGlide(window.scrollY + (mTop - zoneA), "sentence");
+        trackLi = li;
+      }
+      var delta = glideTargetY - window.scrollY;
+      if(Math.abs(delta) <= 6){
+        trackMoving = false; autoScrolling = false; glideTargetY = null;
+        if(flashEl) armFlashClear(900);
+        return;
+      }
+      if(flashEl && flashEl !== found.el) clearFlash();
+      var step = delta * (1 - Math.exp(-(Math.abs(delta) > 400 ? 13 : 6.5) * dt));
+      if(step > 130) step = 130; else if(step < -130) step = -130;
+      if(Math.abs(step) < 0.4) step = delta > 0 ? 0.4 : -0.4;
+      window.scrollTo(0, window.scrollY + step);
       return;
     }
-    if(flashEl && flashEl !== found.el) clearFlash();
-    var step = delta * (1 - Math.exp(-(Math.abs(delta) > 400 ? 13 : 6.5) * dt));
-    if(step > 130) step = 130; else if(step < -130) step = -130;
-    if(Math.abs(step) < 0.4) step = delta > 0 ? 0.4 : -0.4;
-    autoScrolling = true; trackMoving = true;
-    window.scrollTo(0, window.scrollY + step);
+    if(!wordMode){
+      /* no word element this frame — legacy line behaviour: rest near
+         the anchor, otherwise glide the line to it */
+      if(Math.abs(r.top - zoneA) <= 46){ autoScrolling = false; return; }
+      startGlide(window.scrollY + (r.top - zoneA), "sentence");
+      return;
+    }
+    if(li !== trackLi){
+      /* G1 — the spoken pankti changed. Paragraph mode: an entry row
+         shared with the previous pankti cannot be isolated, so G1 is
+         cancelled for this pankti and only the safety rule may move. */
+      var mixed = false;
+      if(paraOn && trackWi > 0){
+        var pEl = wordElByIndex(trackWi - 1), pRect = wordRect(pEl);
+        if(pRect && Math.abs(pRect.top - r.top) < 4) mixed = true;
+      }
+      trackLi = li;
+      if(!mixed){
+        startGlide(window.scrollY + (lineFirstRowTop(found.el) - zoneA), "sentence");
+        return;   /* G2 is never evaluated on a pankti-change onset */
+      }
+    }
+    /* G2 — safety, same pankti: the spoken word's own row has reached
+       the section's bottom edge → the minimum shift that makes it the
+       last row inside. A word left fully above the section (a backward
+       seek within the pankti) is landed at the section top instead. */
+    if(r.bottom > zoneB + 1){
+      var rowKey = li + "|" + Math.round((r.top + window.scrollY) / 4);
+      if(rowKey !== trackRowKey){
+        trackRowKey = rowKey;
+        startGlide(window.scrollY + (r.bottom - zoneB), "safety");
+      }
+    } else if(r.bottom < zoneT){
+      var upKey = li + "|up|" + Math.round((r.top + window.scrollY) / 4);
+      if(upKey !== trackRowKey){
+        trackRowKey = upKey;
+        startGlide(window.scrollY + (r.top - zoneA), "safety");
+      }
+    }
   }
   function trackKick(){ if(!trackRAF) trackRAF = requestAnimationFrame(trackStep); }
   function autoScrollToCurrentLine(){
