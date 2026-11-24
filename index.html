@@ -226,6 +226,7 @@
   .paath-text{flex:1;min-width:0;display:flex;flex-direction:column}
   .paath-name{font-size:14.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .paath-sub{font-size:12px;color:var(--muted);margin-top:1px;font-family:"Noto Sans Gurmukhi",sans-serif}
+  .paath-pv{font-family:"Noto Serif Gurmukhi",serif;font-size:13.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .paath-edit{flex:none;display:grid;place-items:center;width:40px;height:40px;min-height:40px;border-radius:50%;color:var(--muted)}
   .paath-edit:active{background:var(--accent-soft)}
   .paath-edit svg{width:15px;height:15px}
@@ -761,9 +762,41 @@
      considered and deliberately skipped — one global focus, always there. */
   var FOCUS_KEY = "gurbani-reader:focus-v1", glf = null;
   try{ glf = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); }catch(e){ glf = null; }
+  function previewText(text){
+    if(!text) return null;
+    var toks = String(text).split(/\s+/), words = [];
+    for(var i=0;i<toks.length;i++){
+      var w = toks[i];
+      if(!w || !/[\u0A01-\u0A5E\u0A70-\u0A76]/.test(w)) continue; /* markers (॥੧॥, ;) carry no letters */
+      words.push(w.replace(/[;,.]+$/, ""));
+      if(words.length >= 6) break;
+    }
+    if(!words.length) return null;
+    var s = words.join(" ");
+    if(s.length > 44) s = s.slice(0, 44).replace(/\s+\S*$/, "");
+    return s + " …";
+  }
+  function lineTextAt(item, idx){
+    /* flatLines carries timings only — the text lives in the per-item stores */
+    if(state.mode === "ang"){
+      var L = state.angLines[item];
+      return (L && L[idx]) ? L[idx].text : null;
+    }
+    var groups = state.baniGroups[item];
+    if(!groups) return null;
+    var k = idx;
+    for(var gi=0; gi<groups.length; gi++){
+      var gl2 = groups[gi].lines || [];
+      if(k < gl2.length) return gl2[k].text || null;
+      k -= gl2.length;
+    }
+    return null;
+  }
   function writeFocus(item, idx, start, tsec){
     if(item == null || typeof idx !== "number") return;
-    glf = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: Date.now() };
+    var pv = previewText(lineTextAt(item, idx));
+    if(!pv && glf && glf.item === item && glf.idx === idx) pv = glf.pv || null;
+    glf = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: Date.now(), pv: pv };
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
   }
   function saveFocus(force){
@@ -1180,6 +1213,21 @@
     if(paathData.current === id) return "ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
     return "Resume at ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
   }
+  function paathGlf(id){
+    if(paathData.current === id) return glf;
+    var snap = readCtx(id);
+    return snap && snap.glf ? snap.glf : null;
+  }
+  function paathPreview(id){
+    var g = paathGlf(id);
+    if(!g || g.item == null || typeof g.idx !== "number") return null;
+    if(g.pv) return g.pv;
+    /* older records have no stored preview — the pankti's text is a
+       property of the item + line, so it can be derived whenever that
+       item is part of the current stream */
+    if(g.mode !== state.mode) return null;
+    return previewText(lineTextAt(g.item, g.idx));
+  }
   var paathEditing = null;
   function buildPaathLists(){
     var notes = document.querySelectorAll("[data-paath-note]");
@@ -1196,7 +1244,8 @@
           html += '<input class="paath-input" data-paath-input value="' + esc(name) + '" aria-label="Paath name" />';
           html += '<button class="paath-edit" data-paath-save aria-label="Save name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></button>';
         } else {
-          html += '<span class="paath-text"><span class="paath-name">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span></span>';
+          var pv2 = paathPreview(id);
+          html += '<span class="paath-text"><span class="paath-name">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span>' + (pv2 ? '<span class="paath-pv">' + esc(pv2) + '</span>' : '') + '</span>';
           html += '<button class="paath-edit" data-paath-edit aria-label="Rename ' + esc(name) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4.2 1.2L5 16Z"/></svg></button>';
         }
         html += '</div>';
@@ -1238,9 +1287,16 @@
     restoreFromPlace(snap && snap.place);
     updateRecenter();
   }
-  function commitPaathRename(){
+  function commitPaathRename(fromEl){
     if(!paathEditing) return;
-    var inp = document.querySelector("[data-paath-input]");
+    /* the list exists twice (Library sheet + switcher popup) and BOTH
+       render an input while editing — read the one in the surface the
+       reader actually used, never the first in DOM order (that silently
+       "saved" the untouched surface's old value and the rename reverted) */
+    var inp = null;
+    if(fromEl && fromEl.tagName === "INPUT") inp = fromEl;
+    else if(fromEl && fromEl.querySelector) inp = fromEl.querySelector("[data-paath-input]");
+    if(!inp) inp = document.querySelector("[data-paath-input]");
     if(inp){
       var v = inp.value.replace(/\s+/g, " ").trim();
       if(v){
@@ -1256,7 +1312,7 @@
   for(var pl2=0;pl2<paathLists.length;pl2++){
     paathLists[pl2].addEventListener("click", function(e){
       var saveBtn = e.target.closest("[data-paath-save]");
-      if(saveBtn){ commitPaathRename(); return; }
+      if(saveBtn){ commitPaathRename(saveBtn.closest("[data-paath-list]")); return; }
       var editBtn = e.target.closest("[data-paath-edit]");
       var rowEl = e.target.closest("[data-paath-row]");
       if(editBtn && rowEl){ paathEditing = rowEl.getAttribute("data-paath-row") || "@default"; buildPaathLists(); return; }
@@ -1264,7 +1320,7 @@
       if(rowEl) switchPaath(rowEl.getAttribute("data-paath-row") || null);
     });
     paathLists[pl2].addEventListener("keydown", function(e){
-      if(e.key === "Enter" && e.target.closest("[data-paath-input]")){ e.preventDefault(); commitPaathRename(); }
+      if(e.key === "Enter" && e.target.closest("[data-paath-input]")){ e.preventDefault(); commitPaathRename(e.target); }
       if(e.key === "Escape"){ paathEditing = null; buildPaathLists(); }
     });
   }
