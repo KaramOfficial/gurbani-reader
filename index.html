@@ -72,22 +72,22 @@
   :root.night{
     --bg:#000;
     --paper:#060606;
-    --ink:#968b76;
-    --ink-soft:#7d7462;
-    --muted:#5f594f;
-    --accent:#96702a;
-    --accent-strong:#b08a3e;
-    --accent-soft:rgba(176,138,62,.16);
-    --line-hl:rgba(176,138,62,.07);
+    --ink:#6e6759;
+    --ink-soft:#59544a;
+    --muted:#47443c;
+    --accent:#826226;
+    --accent-strong:#997431;
+    --accent-soft:rgba(153,116,49,.16);
+    --line-hl:rgba(153,116,49,.07);
     --hairline:rgba(220,205,170,.10);
     --bar-bg:rgba(0,0,0,.94);
     --sheet-bg:#030303;
     --shadow:0 12px 32px rgba(0,0,0,.85), 0 2px 8px rgba(0,0,0,.65);
     color-scheme:dark;
   }
-  :root.night .w.large-pause{color:#77606c}
-  :root.night .w.medium-pause{color:#7d744c}
-  :root.night .w.small-pause{color:#7d6248}
+  :root.night .w.large-pause{color:#66525e}
+  :root.night .w.medium-pause{color:#625a3d}
+  :root.night .w.small-pause{color:#62513b}
   :root.night .seg button.active,
   :root.night .retry-btn,
   :root.night .play-btn{color:#0b0906}
@@ -343,9 +343,9 @@
     transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1);
   }
   .pv-toast.show{transform:translate(-50%,0);opacity:1}
+  .float-pair{position:fixed;left:50%;transform:translateX(-50%);bottom:150px;z-index:45;display:flex;gap:8px;pointer-events:none}
   .recenter{
-    position:fixed;bottom:150px;left:50%;z-index:45;
-    transform:translate(-50%,16px);opacity:0;pointer-events:none;
+    transform:translateY(16px);opacity:0;pointer-events:none;
     display:flex;align-items:center;gap:8px;
     padding:10px 18px;border-radius:999px;background:var(--paper);
     border:1px solid var(--hairline);box-shadow:var(--shadow);
@@ -353,7 +353,8 @@
     transition:opacity .28s,transform .32s cubic-bezier(.32,.72,.24,1);
     white-space:nowrap;
   }
-  .recenter.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .recenter.show{transform:none;opacity:1;pointer-events:auto}
+  .recenter .pg-ico{color:var(--accent);flex:none;display:flex}
   .recenter .rc-arrow{color:var(--accent);font-weight:700;font-family:inherit}
   .ang-island.bump{animation:islandBump .18s ease}
   @keyframes islandBump{50%{transform:translate(-50%,0) scale(1.07)}}
@@ -579,7 +580,7 @@
 </header>
 
 <button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
-<button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button>
+<div class="float-pair" id="floatPair"><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter paath-go" id="paathBtn" aria-label="Go to your Sehaj Paath"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span><span id="paathBtnName">Sehaj Paath</span></button></div>
 <div class="pv-toast" id="pvToast" role="status">Normal speed preview · 1×</div>
 <div class="quick" id="quickCtl">
   <button class="orb" id="qcPlay" aria-label="Pause"><svg id="qcPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="qcPauseIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
@@ -858,7 +859,25 @@
   var DETOUR_KEY = "gurbani-reader:detour-v1";
   function readDetourStore(){ try{ var v = JSON.parse(localStorage.getItem(DETOUR_KEY) || "null"); return v && typeof v === "object" ? v : null; }catch(e){ return null; } }
   function writeDetourStore(s){ try{ if(s) localStorage.setItem(DETOUR_KEY, JSON.stringify(s)); else localStorage.removeItem(DETOUR_KEY); }catch(e){} }
-  function exitDetour(){ detour = null; writeDetourStore(null); }
+  function exitDetour(){ detour = null; detourGlf = null; writeDetourStore(null); }
+  var detourGlf = null;
+  /* the focus Recenter answers to: inside a detour that is the
+     detour's own focus — seeded from the link pankti and afterwards
+     moved only by the audio and tap-to-play, exactly like the global
+     focus (never by the view: the detour place's own fl follows the
+     reader's eyes and would make Recenter chase him); outside a
+     detour, the global focus as always */
+  function effFocus(){
+    if(!detour) return glf;
+    return detourGlf || null;
+  }
+  function paathTargetName(){
+    var ds = readDetourStore();
+    var target = (ds && typeof ds.paath !== "undefined") ? ds.paath : paathData.current;
+    if(target == null) return paathData.defName || "Default";
+    var rec = paathById(target);
+    return rec ? rec.name : (paathData.defName || "Default");
+  }
   function savePlace(force){
     /* transient layouts lie: during a load (state already names the new
        item, the screen still shows the old one) or a prepend compensation,
@@ -924,7 +943,7 @@
     var pv = previewText(lineTextAt(item, idx));
     if(!pv && glf && glf.item === item && glf.idx === idx) pv = glf.pv || null;
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: Date.now(), pv: pv };
-    if(detour){ var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); return; }
+    if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); return; }
     glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
   }
@@ -947,11 +966,12 @@
     if(typeof first !== "number") return;
     writeFocus(item, li - first, state.flatLines[li].start, state.flatLines[li].start);
   }
-  function focusLineEl(){
-    if(!glf || glf.mode !== state.mode) return null;
-    var base = state.mode === "ang" ? state.angFirstLine[glf.item] : state.baniFirstLine[glf.item];
+  function focusLineEl(f){
+    var fg = f || glf;
+    if(!fg || fg.mode !== state.mode) return null;
+    var base = state.mode === "ang" ? state.angFirstLine[fg.item] : state.baniFirstLine[fg.item];
     if(typeof base !== "number") return null;
-    return contentEl.querySelector('.line[data-li="' + (base + glf.idx) + '"]');
+    return contentEl.querySelector('.line[data-li="' + (base + fg.idx) + '"]');
   }
   /* The focus mark: the landed/recentred pankti keeps the soft lite wash
      for as long as the app sits idle at that focus — it is how anyone
@@ -1078,7 +1098,8 @@
   function updateRecenter(){
     var btn = $("recenterBtn"); if(!btn) return;
     var show = false, up = false, arrow = true;
-    if(glf && !autoScrolling && !audioSwitching && (state.mode === "ang" || state.mode === "bani") &&
+    var fg = effFocus();
+    if(fg && !autoScrolling && !audioSwitching && (state.mode === "ang" || state.mode === "bani") &&
        !sheet.classList.contains("open") && $("angPop").hidden){
       var audioItem = state.mode === "ang" ? state.ang : state.id;
       /* auto-scroll following the audio owns the position — the item
@@ -1090,9 +1111,9 @@
       var following = !audio.paused && autoScrollOn && !manualHold;
       var settling = !audio.paused && audioSwitchAt > 0 && Date.now() - audioSwitchAt < 2000;
       if(!following && !settling){
-        if(glf.mode !== state.mode || audioItem !== glf.item){ show = true; arrow = false; }
+        if(fg.mode !== state.mode || audioItem !== fg.item){ show = true; arrow = false; }
         else {
-          var el = focusLineEl();
+          var el = focusLineEl(fg);
           if(!el){ show = true; arrow = false; }
           else {
             var r = el.getBoundingClientRect(), anchor = Math.round(window.innerHeight * 0.35);
@@ -1104,6 +1125,17 @@
       }
     }
     btn.classList.toggle("show", show);
+    /* detour only: the way back to the Sehaj Paath floats beside
+       Recenter — shown whenever Recenter is, and also when there is
+       no detour focus to recenter to yet, so the exit never hides */
+    var pb = $("paathBtn");
+    if(pb){
+      var pshow = !!detour && (show || !fg) && !autoScrolling && !audioSwitching &&
+        (state.mode === "ang" || state.mode === "bani") &&
+        !sheet.classList.contains("open") && $("angPop").hidden;
+      pb.classList.toggle("show", pshow);
+      if(pshow){ var nm = paathTargetName(), ne = $("paathBtnName"); if(ne && ne.textContent !== nm) ne.textContent = nm; }
+    }
     if(show) hideOrb(); /* the two floating affordances never share the screen */
     if(show){
       $("rcArrow").textContent = arrow ? (up ? "↑" : "↓") : "";
@@ -1123,30 +1155,40 @@
     })(t0);
   }
   $("recenterBtn").addEventListener("click", function(){
-    exitDetour();   /* Recenter = back to the Sehaj Paath — the detour's exit */
-    if(!glf) return;
+    var fg = effFocus();   /* normal Recenter — in a detour it answers to the detour's own focus */
+    if(!fg) return;
     manualHold = false;
     $("recenterBtn").classList.remove("show");
     var audioItem = state.mode === "ang" ? state.ang : state.id;
-    var el = (glf.mode === state.mode && audioItem === glf.item) ? focusLineEl() : null;
+    var el = (fg.mode === state.mode && audioItem === fg.item) ? focusLineEl(fg) : null;
     if(el){
-      var base = state.mode === "ang" ? state.angFirstLine[glf.item] : state.baniFirstLine[glf.item];
-      var gli = base + glf.idx;
+      var base = state.mode === "ang" ? state.angFirstLine[fg.item] : state.baniFirstLine[fg.item];
+      var gli = base + fg.idx;
       glideToLine(el, function(){ markFocus(gli); });
       return;
     }
     /* the focus lives in another item (or its section is not rendered):
        reopen that item at the remembered pankti, audio parked there —
        the restore landing marks the pankti when it lands */
-    pendingRestore = { mode: glf.mode, ang: glf.mode === "ang" ? glf.item : null, id: glf.mode === "bani" ? glf.item : null,
-      y: 0, t: glf.t || 0, fl: { item: glf.item, idx: glf.idx, start: glf.start, src: "audio" } };
-    if(glf.mode === "ang") loadAng(glf.item);
-    else { var b = baniById(glf.item); if(b) loadBani(b); }
+    pendingRestore = { mode: fg.mode, ang: fg.mode === "ang" ? fg.item : null, id: fg.mode === "bani" ? fg.item : null,
+      y: 0, t: fg.t || 0, fl: { item: fg.item, idx: fg.idx, start: fg.start, src: "audio" } };
+    if(fg.mode === "ang") loadAng(fg.item);
+    else { var b = baniById(fg.item); if(b) loadBani(b); }
+  });
+  /* the detour's exit: go to the Sehaj Paath that was active when the
+     visit began (remembered in the detour slot) — switchPaath takes
+     the snapshot-free exit and restores that Paath's saved place */
+  $("paathBtn").addEventListener("click", function(){
+    if(!detour) return;
+    var ds = readDetourStore();
+    var target = (ds && typeof ds.paath !== "undefined") ? ds.paath : paathData.current;
+    $("paathBtn").classList.remove("show");
+    switchPaath(target);
   });
   /* keep the pill floating just above the player bar, whatever its height */
   function placeRecenter(){
-    var pl = document.querySelector(".player"), btn = $("recenterBtn");
-    if(pl && btn) btn.style.bottom = (pl.offsetHeight + 10) + "px";
+    var pl = document.querySelector(".player"), pair = $("floatPair");
+    if(pl && pair) pair.style.bottom = (pl.offsetHeight + 10) + "px";
   }
   /* Rotation (and any resize) is a non-event: the layout reflows, the
      anchor moves, line heights change — but the reading must not change.
@@ -1556,7 +1598,7 @@
   window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp"){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); } });
   window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); }, {passive:true});
   document.addEventListener("click", function(e){
-    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#angPop") || e.target.closest(".ang-island")) return;
+    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#paathBtn") || e.target.closest("#angPop") || e.target.closest(".ang-island")) return;
     /* the third tap of a preview triple-tap belongs to the preview */
     if(pvClickMark && e.timeStamp === pvClickMark){ pvClickMark = 0; return; }
     /* immersive playback (audio playing, auto-scroll on, bars hidden):
@@ -2948,8 +2990,9 @@
            visit; the saved place/focus and every Sehaj Paath snapshot
            stay untouched until the reader goes back to his Paath */
         detour = { ang: linkAng, idx: linkLine };
+        detourGlf = { mode: "ang", item: linkAng, idx: linkLine, start: null, t: 0, ts: Date.now(), pv: null };
         writeDetourStore({ place: { mode: "ang", id: null, ang: linkAng, y: 0, t: 0, ts: Date.now(),
-          fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: null });
+          fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: detourGlf, paath: paathData.current });
         pendingRestore = { mode: "ang", ang: linkAng, id: null, y: 0, t: 0,
           fl: { item: linkAng, idx: linkLine, src: "view" } };
       }
@@ -2958,7 +3001,7 @@
     /* a stored detour resumes where the visit left off — ahead of the
        Sehaj Paath's saved place, which waits untouched underneath */
     var dstore = readDetourStore();
-    if(dstore && dstore.place){ detour = { resumed: true }; pendingRestore = null; var saved = dstore.place;
+    if(dstore && dstore.place){ detour = { resumed: true }; detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null); pendingRestore = null; var saved = dstore.place;
       if(saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){ pendingRestore = saved; loadAng(saved.fl.item); }
       else if(saved.mode === "bani" && saved.fl && saved.fl.src === "view" && saved.fl.item){ var dfb = null; BANIS.forEach(function(x){ if(x.id === saved.fl.item) dfb = x; }); if(dfb){ pendingRestore = saved; loadBani(dfb); } else loadBani(BANIS[0]); }
       else if(saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){ pendingRestore = saved; loadAng(saved.ang); }
