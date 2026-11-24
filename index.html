@@ -1193,7 +1193,9 @@
             var r = el.getBoundingClientRect(), anchor = Math.round(window.innerHeight * 0.35);
             /* in place = the pankti overlaps the anchor band (the same 46px
                deadband the auto-scroll tracker parks it within) */
-            if(!(r.bottom > anchor - 46 && r.top < anchor + 46)){ show = true; up = r.bottom <= anchor; }
+            zoneRefresh();
+            var fwEl = el.querySelector(".w"), fr = fwEl ? fwEl.getBoundingClientRect() : r;
+            if(!(fr.top >= zoneT && fr.bottom <= zoneB)){ show = true; up = fr.bottom <= anchor; }
           }
         }
       }
@@ -1316,9 +1318,12 @@
     } else return;
     updatePager();
     if(manualHold){
-      var f2 = currentLineEl();
-      if(f2){ var r2 = f2.el.getBoundingClientRect(), a2 = Math.round(window.innerHeight * 0.35);
-        if(r2.bottom > a2 - 46 && r2.top < a2 + 46) manualHold = false; }
+      zoneRefresh();
+      var wEl3 = currentWordEl(), wr3 = wordRect(wEl3);
+      if(wr3){ if(wr3.top >= zoneT && wr3.bottom <= zoneB) manualHold = false; }
+      else { var f2 = currentLineEl();
+        if(f2){ var r2 = f2.el.getBoundingClientRect(), a2 = Math.round(window.innerHeight * 0.35);
+          if(r2.bottom > a2 - 46 && r2.top < a2 + 46) manualHold = false; } }
     }
     updateRecenter();
     /* the island is a browsing affordance: it appears for hand-driven
@@ -3076,6 +3081,58 @@
      gentle near the anchor, and the 46px calm deadband kept. Because the writes
      are instant, the autoScrolling flag covers them exactly, so the bars never
      mistake the Reader's own motion for the reader's hand. */
+  /* ---------- focus zone (word-exit auto-scroll) ----------
+     The tracker no longer keys on line change. A focus zone sits around
+     the 35% anchor, sized from the measured line height: the spoken WORD
+     travels inside it freely, and only when the word leaves the zone does
+     the page glide — landing the word's top back on the anchor. A word's
+     row fragment is always one line tall, so the model holds at any font
+     size: even when a pankti wraps to 5-6 rows and its sentence wash
+     paints far below the zone, the scroll never waits for the pankti,
+     and no spoken word sinks below the screen. One model for line mode
+     and paragraph mode, every orientation. */
+  var zoneA = 0, zoneT = 0, zoneB = 0, zoneKey = "";
+  function computeZone(){
+    var H = window.innerHeight, lh = 0;
+    var sample = contentEl.querySelector(".line");
+    if(sample){ var cs = window.getComputedStyle(sample); lh = parseFloat(cs.lineHeight) || 0; }
+    if(!lh) lh = FS[fsIdx] * 2.05;
+    zoneA = Math.round(H * 0.35);
+    zoneT = zoneA - Math.max(0.5 * lh, 0.04 * H);
+    zoneB = Math.min(zoneA + Math.max(2 * lh, 0.16 * H), H - 72);
+    if(zoneB < zoneA + 1.2 * lh) zoneB = zoneA + 1.2 * lh;
+  }
+  function zoneRefresh(){
+    var key = window.innerHeight + "|" + FS[fsIdx] + "|" + (paraOn ? "p" : "l");
+    if(key !== zoneKey){ zoneKey = key; computeZone(); }
+  }
+  var trackWi = -1, trackWordEl = null;
+  function currentWordEl(){
+    var words = state.flatWords;
+    if(!words.length) return null;
+    var cur = audio.currentTime || 0;
+    var lo = 0, hi = words.length - 1;
+    if(state.mode === "ang" && typeof state.angFirstWord[state.ang] === "number"){
+      lo = state.angFirstWord[state.ang]; hi = words.length - 1;
+      for(var a in state.angFirstWord){ var fw = state.angFirstWord[a]; if(fw > lo && fw - 1 < hi) hi = fw - 1; }
+    }
+    if(state.mode === "bani" && typeof state.baniFirstWord[state.id] === "number"){
+      lo = state.baniFirstWord[state.id]; hi = words.length - 1;
+      for(var bk in state.baniFirstWord){ var bfw = state.baniFirstWord[bk]; if(bfw > lo && bfw - 1 < hi) hi = bfw - 1; }
+    }
+    var wi = -1, l = lo, r = hi;
+    while(l <= r){ var mid = (l + r) >> 1; if(words[mid].start <= cur){ wi = mid; l = mid + 1; } else r = mid - 1; }
+    if(wi < lo) return null;
+    if(wi === trackWi && trackWordEl && document.contains(trackWordEl)) return trackWordEl;
+    var el = contentEl.querySelector('.w[data-wi="' + wi + '"]');
+    trackWi = wi; trackWordEl = el;
+    return el;
+  }
+  function wordRect(el){
+    if(!el) return null;
+    var rs = el.getClientRects();
+    return (rs && rs.length) ? rs[0] : el.getBoundingClientRect();
+  }
   var trackRAF = 0, trackMoving = false, trackLastTs = 0;
   function trackStep(ts){
     trackRAF = 0;
@@ -3087,18 +3144,21 @@
     if(manualHold){ trackMoving = false; autoScrolling = false; return; }
     var found = currentLineEl();
     if(!found){ trackMoving = false; autoScrolling = false; return; }
-    var r = found.el.getBoundingClientRect();
-    if(paraOn){ var w0 = found.el.querySelector(".w"); if(w0) r = w0.getBoundingClientRect();
-      /* paragraph tolerance band: the spoken pankti's first word may rest
-         anywhere in 30-45% of the height — ease only when it leaves the
-         band, so consecutive panktis sharing rows never micro-scroll */
-      if(!trackMoving && r.top >= window.innerHeight * 0.30 && r.top <= window.innerHeight * 0.45){ autoScrolling = false; return; } }
-    var delta = r.top - window.innerHeight * 0.35;
-    /* hysteresis: wake when the line drifts past the 46px calm band, then glide
-       all the way to the anchor (settle at 6px) instead of stopping at the band's
-       edge — no freeze-then-lunge, and the damping is time-normalised so the
-       glide feels the same on 60Hz and 120Hz screens */
-    if(!trackMoving && Math.abs(delta) <= 46){ autoScrolling = false; return; }
+    zoneRefresh();
+    var wEl = currentWordEl();
+    var r = wordRect(wEl), wordMode = !!r;
+    if(!wordMode) r = found.el.getBoundingClientRect();   /* word not in the DOM this frame — legacy line behaviour until it is */
+    /* rest test: while the spoken word is inside the focus zone the page
+       is still, however many words go by; the zone IS the deadband now,
+       font-relative instead of a fixed 46px guess */
+    if(!trackMoving){
+      var rest = wordMode ? (r.top >= zoneT && r.bottom <= zoneB) : (Math.abs(r.top - zoneA) <= 46);
+      if(rest){ autoScrolling = false; return; }
+    }
+    var delta = r.top - zoneA;
+    /* glide all the way to the anchor (settle at 6px) instead of stopping
+       at the zone's edge — no freeze-then-lunge, and the damping is
+       time-normalised so the glide feels the same on 60Hz and 120Hz */
     if(Math.abs(delta) <= 6){
       trackMoving = false; autoScrolling = false;
       if(flashEl) armFlashClear(900);
@@ -3127,11 +3187,9 @@
         document.documentElement.requestFullscreen().catch(function(){});
       }
     }
-    var r = lineEl.getBoundingClientRect();
-    if(paraOn){ var w1 = lineEl.querySelector(".w"); if(w1) r = w1.getBoundingClientRect(); }
-    /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
-    var targetY = window.innerHeight * 0.35;
-    var needsScroll = Math.abs(r.top - targetY) > 46;
+    zoneRefresh();
+    var wr = wordRect(currentWordEl());
+    var needsScroll = wr ? (wr.top < zoneT || wr.bottom > zoneB) : (Math.abs(lineEl.getBoundingClientRect().top - zoneA) > 46);
     /* one-time flash: first arrival after refresh, and each return after scrolling away.
        It is only a catch-up marker — it must still be ON when the line lands, then it
        turns off once auto-scroll is in motion again. (Timing it from the scroll start
