@@ -163,7 +163,10 @@ this derivation.
 > Trap recorded for rebuilds: the follow-along highlight state
 > (`state.curLine`) is **not** maintained when the highlight mode is Off
 > (the default). Any feature keyed off it will silently never fire.
-> Always derive from the audio clock + timestamps instead.
+> Always derive from the audio clock + timestamps instead. This trap
+> has bitten twice: the Recenter pill at first, and the saved place —
+> `focusedLine()` read `curLine`, so with highlighting off every save
+> fell back to the anchor line and refreshes landed behind the audio.
 
 ## 8. Persistence (device-local storage)
 
@@ -196,8 +199,18 @@ the line at the 35% anchor, is the one saved, not a stale spoken line).
 1. A `?ang=N` deep link wins for that landing only, and is stripped from
    the URL immediately (otherwise every refresh re-applies the link —
    this caused a real bug: saved 165, link 295, refresh bounced forever).
-2. If `fl.src === "view"`, reopen **that item** at the stored pankti and
-   park the audio at the pankti's start.
+2. If `fl.src === "view"`, reopen **that item** and restore the whole
+   **screen**: land at the saved pixel scroll position, so the pankti
+   under the reader's eye returns to the exact spot it left (the
+   anchor line alone sits several lines above a natural reading
+   position — restoring only it landed him that many lines back).
+   The pixel landing is verified against the focus line at the first
+   settle pass and falls back to the line landing if the stream
+   layout shifted (the item was mid-stream when saved). The audio
+   parks at the pankti's start — unless the recording had already
+   played **past** the viewed pankti, in which case it parks at its
+   true saved position, never rewound (the global focus owns the
+   audio's place now; Recenter bridges eyes and audio).
 3. Otherwise reopen the audio item and **derive the pankti from the
    saved audio position** against the line timestamps (§7). This also
    repairs places saved before `fl` existed.
@@ -372,6 +385,11 @@ as the changelog. The arc, by theme:
   audio, survives refresh/click-away/scroll) with Recenter reworked
   around it — including the cross-item return — and the held focus
   mark on landings; text sizes extended to 48px.
+- **Exact refresh landing (Nov 23):** view restores bring back the
+  whole screen (saved pixel position, verified, with line fallback);
+  `focusedLine()` derives the spoken line from the audio clock (the
+  `curLine` trap's second bite); a view restore never rewinds the
+  audio past the viewed pankti.
 
 ## 12. Rebuild checklist (any platform)
 
