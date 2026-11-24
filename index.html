@@ -1154,7 +1154,7 @@
   var viewTick = false;
   window.addEventListener("scroll", function(){
     if(viewTick) return; viewTick = true;
-    requestAnimationFrame(function(){ viewTick = false; trackView(); });
+    requestAnimationFrame(function(){ viewTick = false; updateRecenter(); trackView(); });
   }, {passive:true});
   /* the item on screen, read at the 35% anchor the spoken line parks at;
      falls back to the nearest section when the anchor sits in a gap */
@@ -1181,10 +1181,16 @@
   /* Recenter (Maps-style): the pill belongs to the global last focus.
      Whenever that pankti is not in the main position — scrolled away by
      hand, or clicked away to another Ang or Bani altogether — the pill
-     offers the way back. The one exception is auto-scroll actively
-     following the focus: then the tracker owns the position and the
-     pill stays out of the way (an earlier version keyed off the audio
-     clock alone and popped up at every line change). */
+     offers the way back, whether audio is playing or not. It is
+     evaluated on every scroll frame (see the scroll listener), on
+     render, on pause and while playing on the progress interval —
+     never only while playing: the interval and timeupdate stop when
+     paused, and the view tracker only fires on a viewed-item change,
+     so keying it to either of those hid it for a paused reader who
+     scrolled away inside one Ang. The one exception is auto-scroll
+     actively following the focus: then the tracker owns the position
+     and the pill stays out of the way (an earlier version keyed off
+     the audio clock alone and popped up at every line change). */
   function updateRecenter(){
     var btn = $("recenterBtn"); if(!btn) return;
     var show = false, up = false, arrow = true;
@@ -2937,6 +2943,7 @@
     var dur = audio.duration || state.duration || 0;
     if(audioSwitching || audio.ended || (dur && (audio.currentTime || 0) >= dur - 0.35) || Date.now() - audioSwitchAt < 1200) return;
     saveFocus(true);
+    updateRecenter();
     /* a pause from the quick cluster is not a call for the UI — the
        cluster simply becomes the play button and stays */
     if(Date.now() - qcToggleAt < 600) return;

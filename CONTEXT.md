@@ -399,10 +399,16 @@ the main position** — scrolled away by hand (the manual hold of §6),
 its stream section pruned away, or the reader sitting on another item
 entirely — **except** while auto-scroll is actively following the
 focus (the tracker owns the position then; an earlier clock-keyed
-version popped up at every line change). It is evaluated on scroll,
-on the audio clock, and **at every render** (the view tracker alone
-only fires on viewed-item changes and once left it stale after a
-navigation load). One exemption matters: while playback is running
+version popped up at every line change). It shows **whether the
+audio is playing or not**: a paused reader who scrolls away from
+the focus pankti gets the pill exactly as a playing one does. It
+is therefore evaluated **on every scroll frame** and **at every
+render**, plus on pause and on the playing progress interval —
+never keyed only to the audio clock or the view tracker: both of
+those stop mattering when paused (the interval and `timeupdate`
+do not run, and the view tracker only fires on a viewed-item
+change), which once hid the pill for a paused reader scrolling
+away inside one Ang. One exemption matters: while playback is running
 with auto-scroll on and no manual hold, the tracker owns the position
 and the pill NEVER shows — the check must not require the focus
 record to name the current item, because at an Ang rollover the
@@ -703,7 +709,9 @@ messages are written to be read as the changelog.
    highlight (§8).
 8. UI rules: bars only on call; chevron-only pager; switcher with
    −1/+1 steppers and the expandable Nitnem section; island for
-   hand-browsing only; Recenter only under manual hold; one tap model
+   hand-browsing only; Recenter whenever the focus pankti is not in
+   the main position, playing or paused, evaluated on every scroll
+   frame; one tap model
    (single = fading feedback, double = play) (§9).
 9. Keep the design tokens and the Cook-pass decisions (§10) — and get
    the owner's on-device verdict before calling any of it done.
