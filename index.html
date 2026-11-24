@@ -626,9 +626,15 @@
        line rule — and then it sits at the anchor anyway */
     var following = !audio.paused && autoScrollOn && !manualHold;
     var fromAudio = false;
-    if(following && state.curLine >= 0 && state.flatLines[state.curLine]){ li = state.curLine; fromAudio = true; }
+    /* the spoken line comes from the audio clock (currentLineEl), never
+       state.curLine — curLine is only maintained when follow-along
+       highlighting is on, so with highlighting off (the default) a
+       curLine-based save silently fell back to the anchor line and the
+       refresh landed a line or two behind the audio */
+    var spoken = currentLineEl();
+    if(following && spoken){ li = spoken.li; fromAudio = true; }
     else if(anchorLi >= 0 && state.flatLines[anchorLi]) li = anchorLi;
-    else if(state.curLine >= 0 && state.flatLines[state.curLine]){ li = state.curLine; fromAudio = true; }
+    else if(spoken){ li = spoken.li; fromAudio = true; }
     if(li < 0 || !state.flatLines[li]) return null;
     var item = state.lineAng[li];
     if(item == null) return null;
@@ -1203,7 +1209,6 @@
     if(pendingRestore){
       var pr = pendingRestore; pendingRestore = null;
       var viewFocus = !!(pr.fl && pr.fl.src === "view");
-      pendingSeek = viewFocus ? pr.fl.start : (pr.t > 0 ? pr.t : (pr.fl ? pr.fl.start : 0));
       var focusLi = -1;
       /* the current pankti, worked out from the remembered audio position
          against the line timestamps — the line auto-scroll had in focus */
@@ -1221,17 +1226,43 @@
         if(typeof base !== "number") base = 0;
         if(base + pr.fl.idx < state.flatLines.length) focusLi = base + pr.fl.idx;
       }
+      /* the audio parks at the pankti's start — unless the recording had
+         already played PAST the viewed pankti (listening with auto-scroll
+         off, or browsing back while it played): then it parks at the true
+         saved position, never rewound */
+      pendingSeek = viewFocus ? ((pr.t && focusLi >= 0 && pr.t >= state.flatLines[focusLi].end) ? pr.t : pr.fl.start)
+                              : (pr.t > 0 ? pr.t : (pr.fl ? pr.fl.start : 0));
       if(focusLi >= 0){
+        /* A view restore brings the whole SCREEN back: the saved pixel
+           position, so the pankti the reader's eye was on returns to the
+           exact spot it left — the anchor line alone sat several lines
+           above his reading line and landed him that many lines back.
+           The pixel position is verified against the focus line at the
+           first settle: if the stream layout shifted (the item was
+           mid-stream when saved), fall back to the line landing. */
+        var useY = viewFocus && pr.y > 0;
         var scrollToFocus = function(){
+          if(useY){ window.scrollTo(0, pr.y); return; }
           var el = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
           if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
         };
-        scrollToFocus(); /* land directly on the pankti, before the first paint */
+        scrollToFocus(); /* land directly, before the first paint */
         /* the landed pankti is marked — the soft lite wash, but held: it
            stays for as long as the app sits idle at this focus, and clears
            when reading actually starts (a hand scroll, a play, a new tap) */
         markFocus(focusLi);
-        setTimeout(scrollToFocus, 450);
+        setTimeout(function(){
+          if(useY){
+            var elA = document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(window.innerHeight * 0.35));
+            var lnA = elA && elA.closest ? elA.closest(".line") : null;
+            if(lnA){
+              var itemA = state.lineAng[Number(lnA.getAttribute("data-li"))];
+              var firstA = state.mode === "ang" ? state.angFirstLine[itemA] : state.baniFirstLine[itemA];
+              if(itemA !== pr.fl.item || typeof firstA !== "number" || Math.abs(Number(lnA.getAttribute("data-li")) - firstA - pr.fl.idx) > 1) useY = false;
+            } else useY = false;
+          }
+          scrollToFocus();
+        }, 450);
         setTimeout(scrollToFocus, 1200);
         if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ scrollToFocus(); });
       } else {
