@@ -517,6 +517,14 @@ surface's old value — the rename "reverted" (owner-reported, fixed
 Nov 23). Nothing in the reading/playback code knows trackers
 exist; the live records always belong to the current context.
 
+**Paragraph mode — DESIGNED Nov 24 (Cook jury, mock 7.5/10), NOT built.**
+Full spec: ~/workspace/reader-design/paragraph-mode-spec.md. In one line:
+flowing paragraphs on wide screens (grouping: header / after-ਰਹਾਉ / 5-pankti
+cap at verse boundaries; first-word 35% anchor with a 30–45% tolerance band;
+Layout seg in Menu → Display, stored per size class, kept OUT of sync).
+Two owner calls pending: header treatment (inline semibold vs own centred
+line) and the first-run default (auto-Paragraphs on wide screens vs opt-in).
+
 **Large screens (≥761px, Cook jury Nov 24).** ONE measure — 700px — for the
 reading column, top bar, pager, player card and sheet content (they were
 700/760/680 stacked, which read as a phone layout centred by accident).
