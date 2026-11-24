@@ -396,9 +396,13 @@ opens the UI; its second tap calls the bars back via the play path,
 as it always did.
 
 **Triple-tap a word — normal-speed preview.** Three quick taps
-on a word play that word and the next few (up to five
-words total, never crossing into the next track) at 1×, under a
-floating "Normal speed preview · 1×" pill; when the segment ends,
+on a word (counted at line level — during playback the page eases
+with the speech, so a word can drift a few px between taps) play
+that word and the next few (up to five words total, never crossing
+into the next track) one notch clearer than the current speed,
+under a floating pill: at 1× when listening faster ("Normal speed
+preview · 1×"), at 0.75× when already at 1× ("Slow preview ·
+0.75×"; 0.5× from 0.75×). When the segment ends,
 the reader's own speed resumes from that same spot — hear a section
 clearly without breaking the flow. The speed control and its stored
 value are never touched: the preview sets the element's rate
@@ -501,7 +505,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (54 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (55 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
