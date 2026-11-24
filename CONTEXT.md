@@ -416,6 +416,20 @@ browser's text selection, so the owner moved it to triple-tap.
 Pausing, seeking out of the segment, or the track ending cancels
 the preview (rate restored).
 
+**Deep-link detour (Pankti Voice Search).** A result card there
+links here as ?ang=N&line=L (the search index and the Reader's
+chunks enumerate an Ang's lines identically — verified line-for-line).
+With a line present, the Reader lands on that exact pankti as the
+focus — centred at the anchor, lite-marked, audio parked at its
+start — as a DETOUR: savePlace and writeFocus stand down for the
+whole visit, so the saved place, the global focus and every Sehaj
+Paath snapshot (Default included) stay byte-identical, however much
+he plays, pauses or scrolls. The link is stripped from the address
+bar as before. Deliberate in-app navigation (pager, Ang switcher,
+Library, player steppers, Paath switch, Recenter) ends the detour
+and saving resumes; stream rollovers and appends never end it. A
+plain ?ang=N link (no line) keeps the older behaviour.
+
 **Appearance — Day / Auto / Night.** A Display setting (seg in the
 Menu, and a top-bar button beside Full screen that cycles Day →
 Auto → Night, showing a sun / half-circle / moon for the current
@@ -505,7 +519,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (55 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (56 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -578,6 +592,10 @@ as the changelog. The arc, by theme:
   moved it) to hear it and the next few at 1× under a floating
   pill, then the reader's own speed resumes from that spot; the
   speed control is never touched.
+- **Deep-link detour (Nov 24):** ?ang=N&line=L from Pankti Voice
+  Search lands on the exact pankti as a visit that never writes the
+  saved place/focus or any Sehaj Paath snapshot; deliberate in-app
+  navigation ends the detour.
 - **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,

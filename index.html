@@ -820,7 +820,16 @@
     return { item: item, idx: li - first, start: state.flatLines[li].start, src: fromAudio ? "audio" : "view" };
   }
   var navSettleUntil = 0;
+  /* Detour mode: the page was opened from a Pankti Voice Search result
+     (?ang=N&line=L) — a visit, not a move. While it lasts, nothing is
+     written to disk: the saved place, the global focus and every Sehaj
+     Paath snapshot (Default included) stay exactly as they were, so
+     leaving and coming back resumes the Paath untouched. Deliberate
+     in-app navigation (pager, switcher, Library, Paath switch,
+     Recenter) ends the detour and saving resumes. */
+  var detour = null;
   function savePlace(force){
+    if(detour) return;
     /* transient layouts lie: during a load (state already names the new
        item, the screen still shows the old one) or a prepend compensation,
        the anchor line under the crosshair belongs to the previous item —
@@ -879,6 +888,7 @@
     return null;
   }
   function writeFocus(item, idx, start, tsec){
+    if(detour) return;   /* a search detour never moves the saved focus */
     if(item == null || typeof idx !== "number") return;
     var pv = previewText(lineTextAt(item, idx));
     if(!pv && glf && glf.item === item && glf.idx === idx) pv = glf.pv || null;
@@ -959,7 +969,7 @@
       btn.innerHTML = '<span class="pa"></span><span class="en"></span>';
       btn.querySelector(".pa").textContent = b.pa;
       btn.querySelector(".en").textContent = b.en;
-      btn.addEventListener("click", function(){ onPick(); loadBani(b); });
+      btn.addEventListener("click", function(){ detour = null; onPick(); loadBani(b); });
       container.appendChild(btn);
     });
   }
@@ -1080,6 +1090,7 @@
     })(t0);
   }
   $("recenterBtn").addEventListener("click", function(){
+    detour = null;   /* rejoining the saved focus ends a search detour */
     if(!glf) return;
     manualHold = false;
     $("recenterBtn").classList.remove("show");
@@ -1194,6 +1205,7 @@
     }
   }
   $("prevBtn").addEventListener("click", function(){
+    detour = null;
     if(state.mode === "ang"){ var pa = viewAng || state.ang; if(pa > 1) loadAng(pa - 1); }
     else if(state.mode === "bani"){
       var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
@@ -1201,6 +1213,7 @@
     }
   });
   $("nextBtn").addEventListener("click", function(){
+    detour = null;
     if(state.mode === "ang"){ var na = viewAng || state.ang; if(na < 1430) loadAng(na + 1); }
     else if(state.mode === "bani"){
       var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
@@ -1232,7 +1245,7 @@
   function goAng(){
     var v = parseInt($("angInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("angInput").focus(); $("angInput").select(); return; }
-    closeSheet(); loadAng(v);
+    detour = null; closeSheet(); loadAng(v);
   }
 
   /* ---------- ang switcher popup + shared nitnem expander ---------- */
@@ -1370,6 +1383,7 @@
     else { glf = null; try{ localStorage.removeItem(FOCUS_KEY); }catch(e){} }
     paathEditing = null;
     buildPaathLists();
+    detour = null;   /* the snapshot above was taken under detour gates — clean; resuming a Paath ends the detour */
     restoreFromPlace(snap && snap.place);
     updateRecenter();
   }
@@ -1447,7 +1461,7 @@
   function goPopAng(){
     var v = parseInt($("popAngInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); return; }
-    closeAngPop(); loadAng(v);
+    detour = null; closeAngPop(); loadAng(v);
   }
   $("popAngGo").addEventListener("click", goPopAng);
   $("popAngInput").addEventListener("keydown", function(e){ if(e.key==="Enter") goPopAng(); });
@@ -1456,7 +1470,7 @@
     if(state.mode !== "ang" || !state.ang) return;
     var base = popBaseAng || state.ang;
     var v = Math.min(1430, Math.max(1, base + parseInt(this.getAttribute("data-step"), 10)));
-    if(v !== base){ closeAngPop(); loadAng(v); }
+    if(v !== base){ detour = null; closeAngPop(); loadAng(v); }
   });
 
   /* ---------- hide / show bars on scroll ---------- */
@@ -1654,10 +1668,10 @@
     contentEl.innerHTML = html;
 
     var pb = $("prevBani"), nb = $("nextBani"), pa = $("prevAng"), na = $("nextAng");
-    if(pb) pb.addEventListener("click", function(){ loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})-1]); });
-    if(nb) nb.addEventListener("click", function(){ loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})+1]); });
-    if(pa) pa.addEventListener("click", function(){ loadAng(state.ang-1); });
-    if(na) na.addEventListener("click", function(){ loadAng(state.ang+1); });
+    if(pb) pb.addEventListener("click", function(){ detour = null; loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})-1]); });
+    if(nb) nb.addEventListener("click", function(){ detour = null; loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})+1]); });
+    if(pa) pa.addEventListener("click", function(){ detour = null; loadAng(state.ang-1); });
+    if(na) na.addEventListener("click", function(){ detour = null; loadAng(state.ang+1); });
 
     brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; resetView(); updatePager(); updateRecenter();
     nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Tap a word to listen from there</small>";
@@ -1695,7 +1709,7 @@
       var parkedAtLine = false;
       if(viewFocus){
         if(pr.t && focusLi >= 0 && pr.t >= state.flatLines[focusLi].end) pendingSeek = pr.t;
-        else { pendingSeek = pr.fl.start; parkedAtLine = focusLi >= 0; }
+        else { pendingSeek = (typeof pr.fl.start === "number") ? pr.fl.start : (focusLi >= 0 ? state.flatLines[focusLi].start : 0); parkedAtLine = focusLi >= 0; }
       } else {
         pendingSeek = pr.t > 0 ? pr.t : (pr.fl ? pr.fl.start : 0);
         parkedAtLine = focusLi >= 0;
@@ -2852,17 +2866,28 @@
   /* ---------- start: ?ang=N deep link (e.g. from Pankti Voice Search) wins
      over the saved place; then reopen last opened page if saved ---------- */
   (function(){
-    var linkAng = null;
+    var linkAng = null, linkLine = null;
     try{
       var qs = new URLSearchParams(window.location.search);
       var qa = parseInt(qs.get("ang"), 10);
       if(qa >= 1 && qa <= 1430) linkAng = qa;
+      var ql = parseInt(qs.get("line"), 10);
+      if(linkAng && ql >= 0 && ql <= 500) linkLine = ql;
     }catch(e){}
     if(linkAng){
       /* the link wins for this landing only: strip it from the address bar, so a
          later refresh reopens the saved place (wherever the reader has since
          navigated to) instead of re-applying the link's Ang forever */
-      try{ var u = new URL(window.location.href); u.searchParams.delete("ang"); history.replaceState(null, "", u.href); }catch(e){}
+      try{ var u = new URL(window.location.href); u.searchParams.delete("ang"); u.searchParams.delete("line"); history.replaceState(null, "", u.href); }catch(e){}
+      if(linkLine != null){
+        /* exact-pankti link (Pankti Voice Search): land on that pankti as
+           the focus — centred, marked, audio parked at its start — as a
+           DETOUR: the saved place/focus and every Sehaj Paath snapshot
+           stay untouched until the reader navigates deliberately */
+        detour = { ang: linkAng, idx: linkLine };
+        pendingRestore = { mode: "ang", ang: linkAng, id: null, y: 0, t: 0,
+          fl: { item: linkAng, idx: linkLine, src: "view" } };
+      }
       loadAng(linkAng); return;
     }
     var saved = readPlace();
