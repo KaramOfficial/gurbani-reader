@@ -2135,7 +2135,7 @@
      part (॥, ॥N॥, a verse number) joins the part before it with a
      non-breaking space, so word + danda + number wrap as one unit */
   function joinParts(parts){
-    if(!paraOn) return joinParts(parts);
+    if(!paraOn) return parts.join(" ");
     var out = "";
     parts.forEach(function(part, i){
       if(i === 0){ out = part; return; }
