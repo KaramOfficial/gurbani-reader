@@ -1566,12 +1566,17 @@
   }
   function showBars(){ hideOrb(); document.body.classList.remove("bars-hidden"); scheduleAutoHide(); }
   var orbTimer = null;
+  var qcToggleAt = 0;   /* when the cluster's own play/pause was last tapped — its toggles are exempt from the bars' pause/play reflexes */
   function showOrb(){
     var b = $("quickCtl"); if(!b) return;
     if(recenterBtn.classList.contains("show")) return; /* Recenter outranks the cluster — never both */
     paintQcSpeed();
     b.classList.add("show");
-    clearTimeout(orbTimer); orbTimer = setTimeout(hideOrb, 5000);
+    clearTimeout(orbTimer);
+    /* the fade belongs to playback: while paused the cluster IS the
+       play button and stays put — the full UI comes back only when
+       the reader calls it with the controls (sliders) button */
+    orbTimer = setTimeout(function(){ if(!audio.paused) hideOrb(); }, 5000);
   }
   function hideOrb(){
     var b = $("quickCtl"); if(!b) return;
@@ -2511,10 +2516,20 @@
   playBtn.addEventListener("click", function(){
     if(audio.paused){ playAudio(); } else { pauseAudio(); showBars(); }
   });
-  /* the cluster's own play/pause — same behaviour as the player's */
+  /* the cluster's own play/pause — deliberately NOT the player's
+     behaviour: pausing here must not drag the full UI up. The button
+     simply becomes a play button and stays; the bars return only via
+     the cluster's controls (sliders) button */
   var qcPlayBtn = $("qcPlay");
   if(qcPlayBtn) qcPlayBtn.addEventListener("click", function(){
-    if(audio.paused){ playAudio(); } else { pauseAudio(); showBars(); }
+    qcToggleAt = Date.now();
+    if(audio.paused){ playAudio(); showOrb(); } else { pauseAudio(); }
+  });
+  /* any pause while the cluster is up (track end included) cancels a
+     fade armed during playback — a paused cluster never times out */
+  audio.addEventListener("pause", function(){
+    var b = $("quickCtl");
+    if(b && b.classList.contains("show")) clearTimeout(orbTimer);
   });
   /* the cluster's speed: tap cycles the player's speed options in
      order, applied through the select's own change handler */
@@ -2561,6 +2576,9 @@
     var dur = audio.duration || state.duration || 0;
     if(audioSwitching || audio.ended || (dur && (audio.currentTime || 0) >= dur - 0.35) || Date.now() - audioSwitchAt < 1200) return;
     saveFocus(true);
+    /* a pause from the quick cluster is not a call for the UI — the
+       cluster simply becomes the play button and stays */
+    if(Date.now() - qcToggleAt < 600) return;
     showBars();
   });
   audio.addEventListener("ended", function(){
@@ -2587,7 +2605,7 @@
     }
     setPlayIcon(false); showBars(); clearHighlight();
   });
-  audio.addEventListener("play", function(){ applySpeed(); clearFocusMark(); hideOrb(); });
+  audio.addEventListener("play", function(){ applySpeed(); clearFocusMark(); if(Date.now() - qcToggleAt >= 600) hideOrb(); });
   audio.addEventListener("loadedmetadata", function(){
     applySpeed();
     tDur.textContent = fmt(audio.duration || state.duration || 0);

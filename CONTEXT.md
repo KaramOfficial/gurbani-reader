@@ -384,8 +384,12 @@ on a line, on empty space — raises only a small floating cluster
 vacates) instead of the whole chrome; a second tap dismisses it, and
 it fades on its own after ~5s. The cluster carries the three things
 a listener reaches for: a play/pause button (mirrors the player's,
-icons painted by the same function; pausing calls the bars, as the
-player's button does), a speed pill showing the current speed
+icons painted by the same function — but pausing here deliberately
+does NOT call the bars, the owner's ruling Nov 24: the button simply
+becomes a play button and the cluster stays, exempt from the
+pause/play bars reflexes via a toggle timestamp; the 5s fade also
+belongs to playback only, so a paused cluster never times out), a
+speed pill showing the current speed
 ("1.5×") that cycles the player's speed options on tap — applied
 through the select's own change handler, so it saves and re-rates
 exactly like the menu control — and the original sliders orb, which
@@ -547,7 +551,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (60 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (61 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
