@@ -202,6 +202,7 @@ this derivation.
 | `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` (`ctx-default` for the Default) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
+| `gurbani-reader:detour-v1` | The live search detour's own place + focus (present only while a detour is active) |
 | `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint |
 | `gurbani-reader:apply-guard` (sessionStorage) | One-shot: the cloud blob just applied, re-written once after the apply reload |
 
@@ -431,14 +432,20 @@ links here as ?ang=N&line=L (the search index and the Reader's
 chunks enumerate an Ang's lines identically — verified line-for-line).
 With a line present, the Reader lands on that exact pankti as the
 focus — centred at the anchor, lite-marked, audio parked at its
-start — as a DETOUR: savePlace and writeFocus stand down for the
-whole visit, so the saved place, the global focus and every Sehaj
-Paath snapshot (Default included) stay byte-identical, however much
-he plays, pauses or scrolls. The link is stripped from the address
-bar as before. Deliberate in-app navigation (pager, Ang switcher,
-Library, player steppers, Paath switch, Recenter) ends the detour
-and saving resumes; stream rollovers and appends never end it. A
-plain ?ang=N link (no line) keeps the older behaviour.
+start — as a DETOUR. The detour is a world of its own: savePlace
+and writeFocus write to a dedicated slot (detour-v1, a place + a
+focus, same shapes as the real ones), so the visit persists across
+refreshes and reopens like any reading — while the saved place,
+the global focus and every Sehaj Paath snapshot (Default included)
+are never written, however much he plays, pauses, scrolls or
+navigates (ordinary navigation stays inside the detour and updates
+its slot). The link is stripped from the address bar as before.
+The detour ends only when he goes back to his Paath: Recenter
+(which always points at the Paath's saved focus), or picking a
+Sehaj Paath — the current one included; exiting restores that
+Paath's saved place and normal saving resumes. A stored detour
+resumes ahead of the Paath's place at boot. A plain ?ang=N link
+(no line) keeps the older behaviour.
 
 **Appearance — Day / Auto / Night.** A Display setting (seg in the
 Menu, and a top-bar button beside Full screen that cycles Day →
@@ -529,7 +536,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (57 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (58 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -607,9 +614,10 @@ as the changelog. The arc, by theme:
   the sliders orb — same tap trigger, same 5s fade; Cook jury Day
   7.5/10, Night 8/10, fixes applied.
 - **Deep-link detour (Nov 24):** ?ang=N&line=L from Pankti Voice
-  Search lands on the exact pankti as a visit that never writes the
-  saved place/focus or any Sehaj Paath snapshot; deliberate in-app
-  navigation ends the detour.
+  Search lands on the exact pankti as a visit with its own
+  persisted place/focus (detour-v1) — it survives refreshes, never
+  writes the saved place/focus or any Sehaj Paath snapshot, and
+  ends only via Recenter or picking a Sehaj Paath.
 - **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,

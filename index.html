@@ -847,15 +847,19 @@
   }
   var navSettleUntil = 0;
   /* Detour mode: the page was opened from a Pankti Voice Search result
-     (?ang=N&line=L) — a visit, not a move. While it lasts, nothing is
-     written to disk: the saved place, the global focus and every Sehaj
-     Paath snapshot (Default included) stay exactly as they were, so
-     leaving and coming back resumes the Paath untouched. Deliberate
-     in-app navigation (pager, switcher, Library, Paath switch,
-     Recenter) ends the detour and saving resumes. */
+     (?ang=N&line=L) — a visit, not a move. The detour keeps its OWN
+     persisted place + focus (detour-v1), so it survives refreshes and
+     reopens like any reading — but the saved place, the global focus
+     and every Sehaj Paath snapshot (Default included) are never
+     written while it lasts. It ends only when the reader goes back to
+     his Paath: Recenter, or picking a Sehaj Paath (the current one
+     included). Ordinary navigation stays inside the detour. */
   var detour = null;
+  var DETOUR_KEY = "gurbani-reader:detour-v1";
+  function readDetourStore(){ try{ var v = JSON.parse(localStorage.getItem(DETOUR_KEY) || "null"); return v && typeof v === "object" ? v : null; }catch(e){ return null; } }
+  function writeDetourStore(s){ try{ if(s) localStorage.setItem(DETOUR_KEY, JSON.stringify(s)); else localStorage.removeItem(DETOUR_KEY); }catch(e){} }
+  function exitDetour(){ detour = null; writeDetourStore(null); }
   function savePlace(force){
-    if(detour) return;
     /* transient layouts lie: during a load (state already names the new
        item, the screen still shows the old one) or a prepend compensation,
        the anchor line under the crosshair belongs to the previous item —
@@ -864,11 +868,13 @@
        those windows; render's own post-landing save passes force. */
     if(!force && (Date.now() < navSettleUntil || Date.now() < resizeSettleUntil || state.prepending || state.prependingBani)) return;
     try{
-      localStorage.setItem(LAST_KEY, JSON.stringify({
+      var placeRec = {
         mode: state.mode, id: state.id, ang: state.ang,
         y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: Date.now(),
         fl: focusedLine()
-      }));
+      };
+      if(detour){ var dsp = readDetourStore() || {}; dsp.place = placeRec; writeDetourStore(dsp); }
+      else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
       if(audio && !audio.paused) saveFocus();
     }catch(e){}
   }
@@ -914,11 +920,12 @@
     return null;
   }
   function writeFocus(item, idx, start, tsec){
-    if(detour) return;   /* a search detour never moves the saved focus */
     if(item == null || typeof idx !== "number") return;
     var pv = previewText(lineTextAt(item, idx));
     if(!pv && glf && glf.item === item && glf.idx === idx) pv = glf.pv || null;
-    glf = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: Date.now(), pv: pv };
+    var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: Date.now(), pv: pv };
+    if(detour){ var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); return; }
+    glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
   }
   function saveFocus(force){
@@ -995,7 +1002,7 @@
       btn.innerHTML = '<span class="pa"></span><span class="en"></span>';
       btn.querySelector(".pa").textContent = b.pa;
       btn.querySelector(".en").textContent = b.en;
-      btn.addEventListener("click", function(){ detour = null; onPick(); loadBani(b); });
+      btn.addEventListener("click", function(){ onPick(); loadBani(b); });
       container.appendChild(btn);
     });
   }
@@ -1116,7 +1123,7 @@
     })(t0);
   }
   $("recenterBtn").addEventListener("click", function(){
-    detour = null;   /* rejoining the saved focus ends a search detour */
+    exitDetour();   /* Recenter = back to the Sehaj Paath — the detour's exit */
     if(!glf) return;
     manualHold = false;
     $("recenterBtn").classList.remove("show");
@@ -1231,7 +1238,6 @@
     }
   }
   $("prevBtn").addEventListener("click", function(){
-    detour = null;
     if(state.mode === "ang"){ var pa = viewAng || state.ang; if(pa > 1) loadAng(pa - 1); }
     else if(state.mode === "bani"){
       var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
@@ -1239,7 +1245,6 @@
     }
   });
   $("nextBtn").addEventListener("click", function(){
-    detour = null;
     if(state.mode === "ang"){ var na = viewAng || state.ang; if(na < 1430) loadAng(na + 1); }
     else if(state.mode === "bani"){
       var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
@@ -1271,7 +1276,7 @@
   function goAng(){
     var v = parseInt($("angInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("angInput").focus(); $("angInput").select(); return; }
-    detour = null; closeSheet(); loadAng(v);
+    closeSheet(); loadAng(v);
   }
 
   /* ---------- ang switcher popup + shared nitnem expander ---------- */
@@ -1398,7 +1403,12 @@
   }
   function switchPaath(id){
     closeSheet(); closeAngPop();
-    if(id === paathData.current) return;
+    if(id === paathData.current){
+      /* already the current Paath — but if a detour is live, picking it
+         is the reader asking to go back: exit and restore its place */
+      if(detour){ exitDetour(); restoreFromPlace(readPlace()); updateRecenter(); }
+      return;
+    }
     try{ savePlace(); }catch(e){}
     writeCtx(paathData.current, { place: readPlace(), glf: glf });
     paathData.current = id; savePaathData();
@@ -1409,7 +1419,7 @@
     else { glf = null; try{ localStorage.removeItem(FOCUS_KEY); }catch(e){} }
     paathEditing = null;
     buildPaathLists();
-    detour = null;   /* the snapshot above was taken under detour gates — clean; resuming a Paath ends the detour */
+    exitDetour();   /* the snapshot above was taken from the untouched Paath records — clean; resuming a Paath ends the detour */
     restoreFromPlace(snap && snap.place);
     updateRecenter();
   }
@@ -1487,7 +1497,7 @@
   function goPopAng(){
     var v = parseInt($("popAngInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); return; }
-    detour = null; closeAngPop(); loadAng(v);
+    closeAngPop(); loadAng(v);
   }
   $("popAngGo").addEventListener("click", goPopAng);
   $("popAngInput").addEventListener("keydown", function(e){ if(e.key==="Enter") goPopAng(); });
@@ -1496,7 +1506,7 @@
     if(state.mode !== "ang" || !state.ang) return;
     var base = popBaseAng || state.ang;
     var v = Math.min(1430, Math.max(1, base + parseInt(this.getAttribute("data-step"), 10)));
-    if(v !== base){ detour = null; closeAngPop(); loadAng(v); }
+    if(v !== base){ closeAngPop(); loadAng(v); }
   });
 
   /* ---------- hide / show bars on scroll ---------- */
@@ -1695,10 +1705,10 @@
     contentEl.innerHTML = html;
 
     var pb = $("prevBani"), nb = $("nextBani"), pa = $("prevAng"), na = $("nextAng");
-    if(pb) pb.addEventListener("click", function(){ detour = null; loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})-1]); });
-    if(nb) nb.addEventListener("click", function(){ detour = null; loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})+1]); });
-    if(pa) pa.addEventListener("click", function(){ detour = null; loadAng(state.ang-1); });
-    if(na) na.addEventListener("click", function(){ detour = null; loadAng(state.ang+1); });
+    if(pb) pb.addEventListener("click", function(){ loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})-1]); });
+    if(nb) nb.addEventListener("click", function(){ loadBani(BANIS[BANIS.findIndex(function(b){return b.id===state.id;})+1]); });
+    if(pa) pa.addEventListener("click", function(){ loadAng(state.ang-1); });
+    if(na) na.addEventListener("click", function(){ loadAng(state.ang+1); });
 
     brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; resetView(); updatePager(); updateRecenter();
     nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Tap a word to listen from there</small>";
@@ -2934,13 +2944,27 @@
       if(linkLine != null){
         /* exact-pankti link (Pankti Voice Search): land on that pankti as
            the focus — centred, marked, audio parked at its start — as a
-           DETOUR: the saved place/focus and every Sehaj Paath snapshot
-           stay untouched until the reader navigates deliberately */
+           DETOUR with its own persisted place, so a refresh resumes the
+           visit; the saved place/focus and every Sehaj Paath snapshot
+           stay untouched until the reader goes back to his Paath */
         detour = { ang: linkAng, idx: linkLine };
+        writeDetourStore({ place: { mode: "ang", id: null, ang: linkAng, y: 0, t: 0, ts: Date.now(),
+          fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: null });
         pendingRestore = { mode: "ang", ang: linkAng, id: null, y: 0, t: 0,
           fl: { item: linkAng, idx: linkLine, src: "view" } };
       }
       loadAng(linkAng); return;
+    }
+    /* a stored detour resumes where the visit left off — ahead of the
+       Sehaj Paath's saved place, which waits untouched underneath */
+    var dstore = readDetourStore();
+    if(dstore && dstore.place){ detour = { resumed: true }; pendingRestore = null; var saved = dstore.place;
+      if(saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){ pendingRestore = saved; loadAng(saved.fl.item); }
+      else if(saved.mode === "bani" && saved.fl && saved.fl.src === "view" && saved.fl.item){ var dfb = null; BANIS.forEach(function(x){ if(x.id === saved.fl.item) dfb = x; }); if(dfb){ pendingRestore = saved; loadBani(dfb); } else loadBani(BANIS[0]); }
+      else if(saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){ pendingRestore = saved; loadAng(saved.ang); }
+      else if(saved.mode === "bani" && saved.id){ var db0 = null; BANIS.forEach(function(x){ if(x.id === saved.id) db0 = x; }); if(db0){ pendingRestore = saved; loadBani(db0); } else loadBani(BANIS[0]); }
+      else loadAng(1);
+      return;
     }
     var saved = readPlace();
     if(saved && saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){
