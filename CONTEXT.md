@@ -218,7 +218,8 @@ this derivation.
 | `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` (`ctx-default` for the Default) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
-| `gurbani-reader:detour-v1` | The live search detour's own place + focus (present only while a detour is active) |
+| `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world |
+| `gurbani-reader:mode-v1` | Which world the reader left in: `free` (Default reading) or `paath` |
 | `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint |
 | `gurbani-reader:apply-guard` (sessionStorage) | One-shot: the cloud blob just applied, re-written once after the apply reload |
 
@@ -449,33 +450,45 @@ browser's text selection, so the owner moved it to triple-tap.
 Pausing, seeking out of the segment, or the track ending cancels
 the preview (rate restored).
 
-**Deep-link detour (Pankti Voice Search).** A result card there
-links here as ?ang=N&line=L (the search index and the Reader's
-chunks enumerate an Ang's lines identically — verified line-for-line).
-With a line present, the Reader lands on that exact pankti as the
-focus — centred at the anchor, lite-marked, audio parked at its
-start — as a DETOUR. The detour is a world of its own: savePlace
-and writeFocus write to a dedicated slot (detour-v1, a place + a
-focus, same shapes as the real ones), so the visit persists across
-refreshes and reopens like any reading — while the saved place,
-the global focus and every Sehaj Paath snapshot (Default included)
-are never written, however much he plays, pauses, scrolls or
-navigates (ordinary navigation stays inside the detour and updates
-its slot). The link is stripped from the address bar as before.
-Inside the detour, Recenter behaves NORMALLY — it answers to the
-detour's own focus (seeded from the link pankti, afterwards moved
-only by the audio and tap-to-play, never by the view). The exit
-has its own floating pill that appears beside Recenter whenever
-Recenter shows (and also when there is no detour focus yet):
-a book glyph + the name of the last active Sehaj Paath. That
-target is ordinary, always-live app state (paaths-v1's current),
-read at tap time — never snapshotted into the detour, the owner's
-ruling — so if the state has moved (e.g. a sync apply from another
-device), the exit follows the state. Tapping it exits and restores
-that Paath's saved place (picking a Sehaj Paath in the
-Library/switcher does the same). A stored
-detour resumes ahead of the Paath's place at boot. A plain
-?ang=N link (no line) keeps the older behaviour.
+**Two worlds: a Sehaj Paath, or Default (free) reading.** The
+reader is always in one of two worlds. Inside a Sehaj Paath, its
+place + focus ARE the app's place + focus and everything tracks to
+it. **Default reading** is the other world: just reading Gurbani,
+not part of any Paath — it has its own persisted place + focus (the
+detour-v1 slot, same shapes as the real ones), so neither world
+ever disturbs the other, and `mode-v1` remembers which world the
+reader left in; at boot that world resumes (an existing install
+with no mode key boots into its Paath world, unchanged). Default
+reading is entered three ways: a **fresh install** starts there; a
+**Pankti Voice Search deep link** (?ang=N&line=L — the search index
+and the Reader's chunks enumerate an Ang's lines identically,
+verified line-for-line) lands there on that exact pankti as the
+focus, centred at the anchor, lite-marked, audio parked at its
+start, the link stripped from the address bar; and the **Paath
+popup's Default row** (below). A plain ?ang=N link (no line) keeps
+the older in-world behaviour. In Default reading, Recenter behaves
+NORMALLY — it answers to the free world's own focus (seeded from
+the link pankti when there is one, afterwards moved only by the
+audio and tap-to-play, never by the view).
+
+**The floating pair + Paath popup.** Recenter stays centred above
+the player, flanked by two small icon buttons that show whenever
+Recenter does (and when there is no focus yet), in BOTH worlds:
+a **book icon** (left) and a **bookmark icon** (right). The book
+opens the **Paath popup**: a "Default — just reading · not a
+Paath" row (marked current in Default reading; choosing it leaves
+the Paath world via a snapshot of the outgoing Paath, the
+switchPaath trick in reverse) followed by every Sehaj Paath (the
+Default Paath included) with its place label and focus preview;
+choosing one switches to it. Default-the-mode appears ONLY in this
+popup — never in the Library/switcher Paath lists. The bookmark
+opens the same popup in **assign mode**: choosing a Paath makes
+the pankti the reader is on (the focus if there is one, else the
+pankti at the anchor — captured when the popup opens, since the
+popup covers the anchor) that Paath's resume point, by rewriting
+its snapshot (or the live place/focus when it is the current
+Paath); the reader never moves, and a toast confirms. This is the
+manual counterpart to a Paath's automatic tracking.
 
 **Appearance — Day / Auto / Night.** A Display setting (seg in the
 Menu, and a top-bar button beside Full screen that cycles Day →
@@ -687,6 +700,11 @@ as the changelog. The arc, by theme:
   three-part cluster — play/pause, a tap-to-cycle speed pill, and
   the sliders orb — same tap trigger, same 5s fade; Cook jury Day
   7.5/10, Night 8/10, fixes applied.
+- **Default (free) reading + Paath popup (Nov 24, later):** the
+  detour generalised into a standing Default mode (mode-v1), the
+  named go-to-Paath pill replaced by icon buttons flanking a
+  centred Recenter, a Paath popup (go / assign modes), and
+  set-any-Paath-to-this-pankti. See §9.
 - **Deep-link detour (Nov 24):** ?ang=N&line=L from Pankti Voice
   Search lands on the exact pankti as a visit with its own
   persisted place/focus (detour-v1) — it survives refreshes, never
