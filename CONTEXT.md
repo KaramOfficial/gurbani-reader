@@ -517,13 +517,21 @@ surface's old value — the rename "reverted" (owner-reported, fixed
 Nov 23). Nothing in the reading/playback code knows trackers
 exist; the live records always belong to the current context.
 
-**Paragraph mode — DESIGNED Nov 24 (Cook jury, mock 7.5/10), NOT built.**
-Full spec: ~/workspace/reader-design/paragraph-mode-spec.md. In one line:
-flowing paragraphs on wide screens (grouping: header / after-ਰਹਾਉ / 5-pankti
-cap at verse boundaries; first-word 35% anchor with a 30–45% tolerance band;
-Layout seg in Menu → Display, stored per size class, kept OUT of sync).
-Two owner calls pending: header treatment (inline semibold vs own centred
-line) and the first-run default (auto-Paragraphs on wide screens vs opt-in).
+**Paragraph mode (LIVE Nov 24, Cook jury 8/10).** Print flow as on
+readgurbani.com: panktis run inline and wrap at the column edge. Paragraph
+breaks: before a header pankti (ਮਹਲਾ line ≤44 chars, class `hdr` — bold
+accent inline, or its own centred line when the header setting says Own
+line), after a ਰਹਾਉ pankti, and after 5 panktis at the next verse-end;
+never across a section/Ang. Word + ॥ + verse number are one unbreakable
+unit (`joinParts` glues punctuation-only parts with NBSP in para mode).
+Auto-scroll/Recenter anchor the pankti's FIRST WORD at 35%; the tracker
+eases only outside a 30–45% tolerance band. Menu → Display: **Layout**
+(Lines/Paragraphs) + **Paragraph headers** (Inline/Own line). Layout is
+stored PER SIZE CLASS (`layout-wide-v1` / `layout-narrow-v1`; wide =
+≥761px wide and ≥500px tall), defaults Paragraphs-wide / Lines-narrow, is
+kept OUT of sync, and re-applies on rotation/resize class flips; switching
+rebuilds mounted sections and re-anchors to the focus pankti. Header style
+is `parahead-v1` (synced normally). Spec: ~/workspace/reader-design/paragraph-mode-spec.md.
 
 **Large screens (≥761px, Cook jury Nov 24).** ONE measure — 700px — for the
 reading column, top bar, pager, player card and sheet content (they were
@@ -579,7 +587,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (67 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (69 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
