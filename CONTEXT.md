@@ -380,8 +380,10 @@ toggle right as an icon-only round button whose ON state is an accent
 **The quick cluster (immersive interruption).** While audio plays
 with auto-scroll on and the bars hidden, a tap ANYWHERE — on a word,
 on a line, on empty space — raises only a small floating cluster
-(hard against the bottom-right edge, in the zone the hidden player
-vacates) instead of the whole chrome; a second tap dismisses it, and
+(a vertical column along the right edge, stacked up from the
+bottom-right corner — settings orb on top, speed in the middle,
+play/pause at the corner; the owner's layout call Nov 24) instead
+of the whole chrome; a second tap dismisses it, and
 it fades on its own after ~5s. The cluster carries the three things
 a listener reaches for: a play/pause button (mirrors the player's,
 icons painted by the same function — but pausing here deliberately
@@ -554,7 +556,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (62 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (63 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -640,6 +642,8 @@ as the changelog. The arc, by theme:
   active Paath's name — is the exit back to that Paath.
 - **Night deepened (Nov 24):** night text #968b76 → washed warm
   grey #6e6759, whole scale in proportion (Cook jury 9/10).
+- **Cluster column (Nov 24):** the quick cluster is a vertical
+  column along the right edge, not a bottom row.
 - **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,

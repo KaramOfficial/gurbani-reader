@@ -302,8 +302,8 @@
      three — play/pause, a tap-to-cycle speed, and the orb (controls) */
   .quick{
     position:fixed;right:16px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:42;
-    display:flex;align-items:center;gap:8px;
-    opacity:0;transform:translateY(10px) scale(.92);pointer-events:none;
+    display:flex;flex-direction:column-reverse;align-items:flex-end;gap:8px;
+    opacity:0;transform:translateX(10px) scale(.92);pointer-events:none;
     transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1);
   }
   .quick.show{opacity:1;transform:none;pointer-events:auto}
