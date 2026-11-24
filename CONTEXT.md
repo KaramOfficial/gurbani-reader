@@ -517,6 +517,16 @@ surface's old value — the rename "reverted" (owner-reported, fixed
 Nov 23). Nothing in the reading/playback code knows trackers
 exist; the live records always belong to the current context.
 
+**Large screens (≥761px, Cook jury Nov 24).** ONE measure — 700px — for the
+reading column, top bar, pager, player card and sheet content (they were
+700/760/680 stacked, which read as a phone layout centred by accident).
+First run on a ≥1280px screen with no saved font size starts one step up
+(26px); a saved choice always wins. At ≥1024px the Menu sheet is a centred
+700px panel (side hairlines, top-drop kept) instead of a full-width curtain,
+and the quick cluster anchors to the reading column
+(`right: calc(50% - 412px)` — column edge + 16px gap) instead of the
+viewport edge. Phone CSS untouched.
+
 **Landscape phones.** In landscape (short height), the chrome merges
 to one row each: the top bar drops the wordmark to the ੴ mark alone so
 the pager (chevrons + current item) sits centred as one unit, the
@@ -561,7 +571,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (65 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (67 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
