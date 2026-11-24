@@ -135,7 +135,11 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   therefore held in one JS variable (the single source of truth) and
   **re-applied on `loadedmetadata` and on every `play` event**. Any
   rebuild must do the equivalent on its platform.
-- Speeds offered: 0.75×, 1×, 1.25×, 1.5×, 2×. Skip ±5s buttons flank the
+- Speeds offered: 0.75×, 1×, 1.25×, 1.5×, 2× — plus, only when
+  **Advanced mode** is on (Menu → Reading, an Off/On seg, persisted
+  as advanced-v1): 2.25×, 2.5×, 2.75×, 3×. Turning it off above 2×
+  falls back to 2×; the cluster's speed pill cycles whatever ladder
+  is currently offered. Skip ±5s buttons flank the
   transport. A seek bar reflects and controls position.
 - Wake Lock is held while playing so the screen stays awake.
 - Fullscreen: attempted once playback is flowing and auto-scroll is
@@ -195,6 +199,7 @@ this derivation.
 | `gurbani-reader:fontsize-v1` | Font size index |
 | `gurbani-reader:focus-v1` | The global last focus (§9) |
 | `gurbani-reader:speed-v1` | Playback speed |
+| `gurbani-reader:advanced-v1` | Advanced mode (unlocks speeds to 3×): 1 / 0 |
 | `gurbani-reader:hlmode-v1` | Follow-along mode: off / sentence / word |
 | `gurbani-reader:autoscroll-v1` | Auto-scroll on/off |
 | `gurbani-reader:nitnem-open` | Nitnem section expanded in switcher/Library |
@@ -381,9 +386,9 @@ toggle right as an icon-only round button whose ON state is an accent
 with auto-scroll on and the bars hidden, a tap ANYWHERE — on a word,
 on a line, on empty space — raises only a small floating cluster
 (a vertical column along the right edge, stacked up from the
-bottom-right corner — settings orb on top, speed in the middle,
-play/pause at the corner; the owner's layout call Nov 24) instead
-of the whole chrome; a second tap dismisses it, and
+bottom-right corner — top to bottom: play/pause, the speed pill,
+the A− / A+ font pair, and the settings orb at the corner; the
+owner's layout calls Nov 24) instead of the whole chrome; a second tap dismisses it, and
 it fades on its own after ~5s. The cluster carries the three things
 a listener reaches for: a play/pause button (mirrors the player's,
 icons painted by the same function — but pausing here deliberately
@@ -556,7 +561,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (63 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (65 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -643,7 +648,11 @@ as the changelog. The arc, by theme:
 - **Night deepened (Nov 24):** night text #968b76 → washed warm
   grey #6e6759, whole scale in proportion (Cook jury 9/10).
 - **Cluster column (Nov 24):** the quick cluster is a vertical
-  column along the right edge, not a bottom row.
+  column along the right edge, not a bottom row; it also carries
+  the font A− / A+ pair (driving the Menu's own buttons), ordered
+  play/pause, speed, A−, A+, settings.
+- **Advanced mode (Nov 24):** a Menu → Reading Off/On seg unlocks
+  speeds 2.25×–3×; off, the ladder is the classic five.
 - **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,
