@@ -431,18 +431,14 @@
   .line + .line{margin-top:2px}
   .line.lite{background:color-mix(in srgb, var(--accent) 10%, transparent);box-shadow:0 0 0 5px color-mix(in srgb, var(--accent) 10%, transparent);border-radius:8px}
   .line.current{background:var(--line-hl)}
-  /* Mool Mantar — Gutka page-1 frame (Cook jury winner, 8.7/10): the double
-     rule of a printed Gutka, no shadow, no fill colour; colours only from
-     palette variables so Day / Auto / Night all inherit. Ik Onkar stays the
-     line's first word — styled in place, never moved or duplicated. */
-  .line.mool{display:block;text-align:center;background:var(--paper);
-    border:1.5px solid var(--accent);border-radius:2px;
-    box-shadow:inset 0 0 0 3px var(--paper), inset 0 0 0 4px var(--hairline);
-    padding:.8em .75em .9em;margin:.3em 0 .9em;font-size:calc(var(--reader-fs) * 1.12);line-height:1.9}
-  body.para .line.mool{display:block;text-align:center;padding:.8em .75em .9em}
-  .line.mool.current{background:var(--line-hl)}
-  .line.mool.lite{background:color-mix(in srgb, var(--accent) 10%, transparent);
-    box-shadow:inset 0 0 0 3px var(--paper), inset 0 0 0 4px var(--hairline), 0 0 0 5px color-mix(in srgb, var(--accent) 10%, transparent)}
+  /* Mool Mantar — its own ceremonial line (owner-corrected Nov 24: NO
+     frame, NO special background; the special place comes from standing
+     alone, centred, with air around it — never inline with the flow,
+     in paragraph/print flow too). Ik Onkar stays the line's first word,
+     styled in place, never moved or duplicated. */
+  .line.mool{display:block;text-align:center;
+    margin:1.15em 0 1.25em;font-size:calc(var(--reader-fs) * 1.12);line-height:1.9}
+  body.para .line.mool{display:block;text-align:center}
   .line.mool .w:first-child{font-size:1.45em;font-weight:700;color:var(--accent-strong);vertical-align:-.06em;margin-right:.1em}
   /* paragraph mode — print flow (readgurbani-style): panktis run inline and
      wrap at the column edge instead of stacking; .pbrk spacers open the
