@@ -2008,6 +2008,28 @@
     for(var i=0;i<CHUNKS.length;i++){ if(ang >= CHUNKS[i][0] && ang <= CHUNKS[i][1]) return CHUNKS[i]; }
     return CHUNKS[0];
   }
+  /* V2 fixed timestamps for Angs 1-8 (Japji Sahib): same lines/text as the
+     chunk data, only word/line timings replaced. Falls back to chunk (CTC)
+     timings if the V2 file is missing or its line count differs. */
+  var v2AngCache = {};
+  function applyV2(data, v2){
+    if(!v2 || !v2.lines || v2.lines.length !== data.lines.length) return data;
+    var merged = {}; for(var k in data) merged[k] = data[k];
+    merged.lines = data.lines.map(function(l, i){
+      var nl = {}; for(var k2 in l) nl[k2] = l[k2];
+      nl.start = v2.lines[i].start; nl.end = v2.lines[i].end; nl.words = v2.lines[i].words;
+      return nl;
+    });
+    return merged;
+  }
+  function withV2(ang, data){
+    if(ang < 1 || ang > 8 || !data || !data.lines) return Promise.resolve(data);
+    if(v2AngCache[ang]) return Promise.resolve(applyV2(data, v2AngCache[ang]));
+    return fetch(BASE + "/data/ang" + ang + ".v2.json?v=21")
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(v2){ v2AngCache[ang] = v2; return applyV2(data, v2); })
+      .catch(function(){ return data; });
+  }
   /* ---------- infinite Ang stream (only while auto-scroll is on) ---------- */
   function paNum(n){ return String(n).split("").map(function(d){ return "੦੧੨੩੪੫੬੭੮੯"[Number(d)]; }).join(""); }
   function sepHTML(ang){
@@ -2099,10 +2121,14 @@
     var url = BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json";
     fetch(url).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function(json){
-      state.appending = false;
-      if(token !== state.loadToken || state.mode !== "ang") return;
+      if(token !== state.loadToken || state.mode !== "ang"){ state.appending = false; return null; }
       var data = json.angs && json.angs[String(ang)];
-      if(!data || !data.lines || !data.lines.length){ if(opts.play) loadAng(ang, true); return; }
+      if(!data || !data.lines || !data.lines.length){ state.appending = false; if(opts.play) loadAng(ang, true); return null; }
+      return withV2(ang, data);
+    })
+    .then(function(data){
+      state.appending = false;
+      if(!data || token !== state.loadToken || state.mode !== "ang") return;
       state.angLines[ang] = data.lines; state.angDur[ang] = data.duration || 0;
       state.angFirstLine[ang] = state.flatLines.length;
       state.angFirstWord[ang] = state.flatWords.length;
@@ -2140,10 +2166,14 @@
     var c = chunkFor(ang);
     fetch(BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json").then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function(json){
-      state.prepending = false;
-      if(token !== state.loadToken || state.mode !== "ang") return;
+      if(token !== state.loadToken || state.mode !== "ang"){ state.prepending = false; return null; }
       var data = json.angs && json.angs[String(ang)];
-      if(!data || !data.lines || !data.lines.length) return;
+      if(!data || !data.lines || !data.lines.length){ state.prepending = false; return null; }
+      return withV2(ang, data);
+    })
+    .then(function(data){
+      state.prepending = false;
+      if(!data || token !== state.loadToken || state.mode !== "ang") return;
       if(state.streamAngs.indexOf(ang) >= 0) return;
       var anchorEl = firstStreamEl(); if(!anchorEl) return;
       var oldFirst = state.streamAngs[0];
@@ -2480,9 +2510,13 @@
     var url = BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json";
     fetch(url).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function(json){
-      if(token !== state.loadToken) return;
+      if(token !== state.loadToken) return null;
       var data = json.angs && json.angs[String(ang)];
       if(!data || !data.lines || !data.lines.length) throw new Error("missing ang");
+      return withV2(ang, data);
+    })
+    .then(function(data){
+      if(!data || token !== state.loadToken) return;
       state.duration = data.duration || 0;
       render([{title:"", lines:data.lines}], {
         titlePa: paTitle, titleEn: "Sri Guru Granth Sahib Ji · Ang " + ang, location:""
