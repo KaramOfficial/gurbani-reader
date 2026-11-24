@@ -431,6 +431,17 @@
   .line + .line{margin-top:2px}
   .line.lite{background:color-mix(in srgb, var(--accent) 10%, transparent);box-shadow:0 0 0 5px color-mix(in srgb, var(--accent) 10%, transparent);border-radius:8px}
   .line.current{background:var(--line-hl)}
+  /* paragraph mode — print flow (readgurbani-style): panktis run inline and
+     wrap at the column edge instead of stacking; .pbrk spacers open the
+     paragraph gaps; every wash (lite / current / sentence / focus) paints
+     per wrapped fragment via box-decoration-break */
+  body.para .line{display:inline;padding:0 1px;text-align:left;border-radius:6px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  body.para .line + .line{margin-top:0}
+  body.para .section{text-align:left}
+  .pbrk{display:none}
+  body.para .pbrk{display:block;height:.85em}
+  body.para .line.hdr{font-weight:700;color:var(--accent-strong)}
+  body.para.hdr-own .line.hdr{display:block;text-align:center;margin:16px 0 6px;font-weight:600;color:var(--ink)}
   .w{cursor:pointer;border-radius:6px;padding:1px 0;transition:background .18s,color .18s;-webkit-tap-highlight-color:transparent}
   .w.large-pause{color:#A0728E}
   .w.medium-pause{color:#C9A634}
@@ -637,6 +648,28 @@
         <button data-app="day">Day</button>
         <button data-app="auto" class="active">Auto</button>
         <button data-app="night">Night</button>
+      </div>
+    </div>
+    <div class="menu-row">
+      <div>
+        <span class="menu-label">Layout</span>
+        <p class="menu-note">Paragraphs flow like print, as on readgurbani.com. Saved per screen size, on this device only.</p>
+      </div>
+      <span class="menu-spacer"></span>
+      <div class="seg" id="layoutSeg" role="group" aria-label="Layout">
+        <button data-layout="lines">Lines</button>
+        <button data-layout="para">Paragraphs</button>
+      </div>
+    </div>
+    <div class="menu-row" id="paraHdrRow">
+      <div>
+        <span class="menu-label">Paragraph headers</span>
+        <p class="menu-note">Section lines (raag / mahala) inside paragraphs.</p>
+      </div>
+      <span class="menu-spacer"></span>
+      <div class="seg" id="paraHdrSeg" role="group" aria-label="Paragraph headers">
+        <button data-phdr="inline">Inline</button>
+        <button data-phdr="own">Own line</button>
       </div>
     </div>
     <h3>Reading</h3>
@@ -1185,7 +1218,7 @@
   }
   function glideToLine(el, onDone){
     var startY = window.scrollY;
-    var target = Math.max(0, el.getBoundingClientRect().top + startY - Math.round(window.innerHeight * 0.35));
+    var target = Math.max(0, anchorTopOf(el) + startY - Math.round(window.innerHeight * 0.35));
     if(Math.abs(target - startY) < 4){ if(onDone) onDone(); return; }
     autoScrolling = true;
     var t0 = performance.now(), dur = Math.min(650, Math.max(280, Math.abs(target - startY) * 0.35));
@@ -1243,11 +1276,13 @@
     resizeSettleUntil = Date.now() + 400;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function(){
+      var wasPara = paraOn; computePara();
+      if(paraOn !== wasPara){ applyLayoutClass(); relayoutStream(); }   /* rotation / window resize crossed the size class — the other class's layout choice applies */
       if(!audio.paused && autoScrollOn && !manualHold){
         var found = currentLineEl();
         if(found){
           autoScrolling = true;
-          window.scrollTo(0, Math.max(0, found.el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
+          window.scrollTo(0, Math.max(0, anchorTopOf(found.el) + window.scrollY - Math.round(window.innerHeight * 0.35)));
           setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60);
         }
         trackKick();
@@ -1727,10 +1762,11 @@
     groups.forEach(function(g){
       html += '<section class="section">';
       if(g.title) html += '<div class="section-head"><h2>' + esc(g.title) + '</h2></div>';
-      g.lines.forEach(function(line){
+      var deco = paraOn ? paraDeco(g.lines) : null;
+      g.lines.forEach(function(line, lidx){
         var li = state.flatLines.length;
         state.flatLines.push({start:line.start, end:line.end});
-        html += '<p class="line" data-li="' + li + '">';
+        html += '<p class="line' + (deco && deco.hdr[lidx] ? ' hdr' : '') + '" data-li="' + li + '">';
         if(line.words && line.words.length && line.text){
           /* Render from line.text (Sehaj Paath, readgurbani-verified) so standalone
              punctuation like dandi (। / ॥) is never dropped: tokens matching the
@@ -1757,18 +1793,18 @@
             state.flatWords.push({start:w2.start, end:w2.end, line:li});
             parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w2.word) + '</span>');
           }
-          html += parts2.join(" ");
+          html += joinParts(parts2);
         } else if(line.words && line.words.length){
           var parts = [];
           line.words.forEach(function(w){
             state.flatWords.push({start:w.start, end:w.end, line:li});
             parts.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w.word) + '</span>');
           });
-          html += parts.join(" ");
+          html += joinParts(parts);
         } else {
           html += esc(line.text || "");
         }
-        html += '</p>';
+        html += '</p>' + (deco ? paraSuffix(deco, lidx) : '');
       });
       html += '</section>';
     });
@@ -1850,7 +1886,7 @@
           if(useY){ window.scrollTo(0, pr.y); }
           else {
             var el = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
-            if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
+            if(el) window.scrollTo(0, Math.max(0, anchorTopOf(el) + window.scrollY - Math.round(window.innerHeight * 0.35)));
           }
           /* the pill's verdict must be re-taken at the LANDED position —
              its render-time call ran before the landing scroll, and the
@@ -2059,13 +2095,63 @@
       '<span class="ang-sep-label"><b>ਅੰਗ ' + paNum(ang) + '</b> · Ang ' + ang + '</span>' +
       '<span class="ang-sep-rule r"></span></div>';
   }
+  /* ---------- paragraph (print-flow) layout ---------- */
+  var LAYOUT_WIDE_KEY = "gurbani-reader:layout-wide-v1", LAYOUT_NARROW_KEY = "gurbani-reader:layout-narrow-v1";
+  var paraOn = false, paraHdrOwn = false;
+  try{ paraHdrOwn = localStorage.getItem("gurbani-reader:parahead-v1") === "own"; }catch(e){}
+  function sizeClassWide(){ return window.innerWidth >= 761 && window.innerHeight >= 500; }
+  function layoutKey(){ return sizeClassWide() ? LAYOUT_WIDE_KEY : LAYOUT_NARROW_KEY; }
+  function computePara(){
+    var c = null;
+    try{ c = localStorage.getItem(layoutKey()); }catch(e){}
+    paraOn = c ? (c === "para") : sizeClassWide();   /* default: Paragraphs on wide screens, Lines on narrow — switchable in Menu > Display */
+  }
+  function isHeaderLine(tx){
+    if(!tx) return false;
+    var s = tx.replace(/\s+/g, " ").trim();
+    return s.length <= 44 && s.indexOf("ਮਹਲਾ") >= 0;
+  }
+  /* paragraph grouping for one section's lines: break BEFORE a header
+     pankti, AFTER a rahaao pankti, and after 5 panktis at the next
+     verse-end (digit + danda) — paragraphs never cross a section */
+  function paraDeco(lines){
+    var hdr = {}, brk = {}, count = 0;
+    lines.forEach(function(line, i){
+      var tx = line.text || "";
+      if(isHeaderLine(tx)){ hdr[i] = true; if(count > 0 && i > 0) brk[i - 1] = true; count = 0; }
+      count++;
+      if(tx.indexOf("ਰਹਾਉ") >= 0){ brk[i] = true; count = 0; }
+      else if(count >= 5 && /[੦-੯]\s*॥\s*$/.test(tx)){ brk[i] = true; count = 0; }
+    });
+    return { hdr: hdr, brk: brk };
+  }
+  function paraSuffix(deco, i){ return paraOn ? (deco.brk[i] ? '<span class="pbrk"></span>' : ' ') : ''; }
+  /* print never strands a danda: in paragraph flow a punctuation-only
+     part (॥, ॥N॥, a verse number) joins the part before it with a
+     non-breaking space, so word + danda + number wrap as one unit */
+  function joinParts(parts){
+    if(!paraOn) return joinParts(parts);
+    var out = "";
+    parts.forEach(function(part, i){
+      if(i === 0){ out = part; return; }
+      var txt = part.replace(/<[^>]*>/g, "");
+      out += (/^[\s॥।੦-੯]+$/.test(txt) ? "\u00A0" : " ") + part;
+    });
+    return out;
+  }
+  function anchorTopOf(el){
+    if(!el) return 0;
+    if(paraOn){ var w = el.querySelector(".w"); if(w) return w.getBoundingClientRect().top; }
+    return el.getBoundingClientRect().top;
+  }
   function buildLinesInner(lines, ang){
     var html = "", wi = state.flatWords.length;
-    lines.forEach(function(line){
+    var deco = paraOn ? paraDeco(lines) : null;
+    lines.forEach(function(line, lidx){
       var li = state.flatLines.length;
       state.flatLines.push({start:line.start, end:line.end});
       state.lineAng[li] = ang;
-      html += '<p class="line" data-li="' + li + '">';
+      html += '<p class="line' + (deco && deco.hdr[lidx] ? ' hdr' : '') + '" data-li="' + li + '">';
       if(line.words && line.words.length && line.text){
         var wlist = line.words, wptr = 0, parts2 = [];
         line.text.split(/\s+/).filter(Boolean).forEach(function(tok){
@@ -2085,16 +2171,16 @@
           state.flatWords.push({start:w2.start, end:w2.end, line:li});
           parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w2.word) + '</span>');
         }
-        html += parts2.join(" ");
+        html += joinParts(parts2);
       } else if(line.words && line.words.length){
         var parts = [];
         line.words.forEach(function(w){
           state.flatWords.push({start:w.start, end:w.end, line:li});
           parts.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w.word) + '</span>');
         });
-        html += parts.join(" ");
+        html += joinParts(parts);
       } else { html += esc(line.text || ""); }
-      html += '</p>';
+      html += '</p>' + (deco ? paraSuffix(deco, lidx) : '');
     });
     return html;
   }
@@ -2232,9 +2318,10 @@
   function preloadAngAudio(ang){ if(ang >= 1 && ang <= 1430 && preAudio.getAttribute("src") !== angAudioUrl(ang)){ preAudio.src = angAudioUrl(ang); try{ preAudio.load(); }catch(e){} } }
   function buildLinesInnerAt(lines, ang){
     var html = "", wi = state.angFirstWord[ang] || 0, baseLi = state.angFirstLine[ang] || 0;
+    var deco = paraOn ? paraDeco(lines) : null;
     lines.forEach(function(line, idx){
       var li = baseLi + idx;
-      html += '<p class="line" data-li="' + li + '">';
+      html += '<p class="line' + (deco && deco.hdr[idx] ? ' hdr' : '') + '" data-li="' + li + '">';
       if(line.words && line.words.length && line.text){
         var wlist = line.words, wptr = 0, parts2 = [];
         line.text.split(/\s+/).filter(Boolean).forEach(function(tok){
@@ -2249,13 +2336,13 @@
           } else { parts2.push(esc(tok)); }
         });
         while(wptr < wlist.length){ var w2 = wlist[wptr++]; parts2.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w2.word) + '</span>'); }
-        html += parts2.join(" ");
+        html += joinParts(parts2);
       } else if(line.words && line.words.length){
         var parts = [];
         line.words.forEach(function(w){ parts.push('<span class="w" data-wi="' + (wi++) + '">' + esc(w.word) + '</span>'); });
-        html += parts.join(" ");
+        html += joinParts(parts);
       } else { html += esc(line.text || ""); }
-      html += '</p>';
+      html += '</p>' + (deco ? paraSuffix(deco, idx) : '');
     });
     return html;
   }
@@ -2809,6 +2896,50 @@
      Day -> Auto -> Night; the Menu seg picks directly. */
   var appearance = "auto";
   try{ var apv = localStorage.getItem("gurbani-reader:appearance-v1"); if(apv === "day" || apv === "night") appearance = apv; }catch(e){}
+  /* ---------- layout wiring (Lines / Paragraphs + header style) ---------- */
+  function paintLayoutSegs(){
+    var ls = $("layoutSeg");
+    if(ls) ls.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-layout") === "para") === paraOn); });
+    var hs = $("paraHdrSeg");
+    if(hs) hs.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-phdr") === "own") === paraHdrOwn); });
+    var row = $("paraHdrRow");
+    if(row) row.style.display = paraOn ? "" : "none";
+  }
+  function applyLayoutClass(){
+    computePara();
+    document.body.classList.toggle("para", paraOn);
+    document.body.classList.toggle("hdr-own", paraOn && paraHdrOwn);
+    paintLayoutSegs();
+  }
+  function relayoutStream(){
+    contentEl.querySelectorAll("section[data-ang]").forEach(function(sec){
+      var ang = Number(sec.getAttribute("data-ang"));
+      if(state.angLines[ang]) sec.innerHTML = buildLinesInnerAt(state.angLines[ang], ang);
+    });
+    contentEl.querySelectorAll("section[data-bani]").forEach(function(sec){
+      var id = sec.getAttribute("data-bani");
+      if(state.baniGroups[id]) sec.innerHTML = buildBaniInnerAt(state.baniGroups[id], id);
+    });
+    var f = effFocus(), el = f ? focusLineEl(f) : null;
+    if(!el){ var cl = currentLineEl(); if(cl) el = cl.el; }
+    if(el) glideToLine(el);
+    updateRecenter();
+  }
+  function setLayout(mode){
+    try{ localStorage.setItem(layoutKey(), mode); }catch(e){}
+    var was = paraOn;
+    applyLayoutClass();
+    if(paraOn !== was) relayoutStream();
+  }
+  function setParaHdr(own){
+    paraHdrOwn = own;
+    try{ localStorage.setItem("gurbani-reader:parahead-v1", own ? "own" : "inline"); }catch(e){}
+    applyLayoutClass();   /* pure CSS switch — the hdr class is always emitted */
+  }
+  var layoutSeg = $("layoutSeg");
+  if(layoutSeg) layoutSeg.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){ setLayout(b.getAttribute("data-layout")); }); });
+  var paraHdrSegEl = $("paraHdrSeg");
+  if(paraHdrSegEl) paraHdrSegEl.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){ setParaHdr(b.getAttribute("data-phdr") === "own"); }); });
   var advSeg = $("advSeg");
   function paintAdvSeg(){ if(!advSeg) return; advSeg.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-adv") === "on") === advancedMode); }); }
   function setAdvanced(on){
@@ -2846,6 +2977,7 @@
     applyAppearance();
   }
   applyAppearance();
+  applyLayoutClass();
   if(appSeg) appSeg.addEventListener("click", function(e){
     var b = e.target.closest("button"); if(!b) return;
     setAppearance(b.getAttribute("data-app"));
@@ -2956,6 +3088,11 @@
     var found = currentLineEl();
     if(!found){ trackMoving = false; autoScrolling = false; return; }
     var r = found.el.getBoundingClientRect();
+    if(paraOn){ var w0 = found.el.querySelector(".w"); if(w0) r = w0.getBoundingClientRect();
+      /* paragraph tolerance band: the spoken pankti's first word may rest
+         anywhere in 30-45% of the height — ease only when it leaves the
+         band, so consecutive panktis sharing rows never micro-scroll */
+      if(!trackMoving && r.top >= window.innerHeight * 0.30 && r.top <= window.innerHeight * 0.45){ autoScrolling = false; return; } }
     var delta = r.top - window.innerHeight * 0.35;
     /* hysteresis: wake when the line drifts past the 46px calm band, then glide
        all the way to the anchor (settle at 6px) instead of stopping at the band's
@@ -2991,6 +3128,7 @@
       }
     }
     var r = lineEl.getBoundingClientRect();
+    if(paraOn){ var w1 = lineEl.querySelector(".w"); if(w1) r = w1.getBoundingClientRect(); }
     /* keep the spoken line a bit higher than centre (~35% from top), small deadband against jitter */
     var targetY = window.innerHeight * 0.35;
     var needsScroll = Math.abs(r.top - targetY) > 46;
@@ -3210,7 +3348,7 @@
       try{
         for(var i=0;i<localStorage.length;i++){
           var k = localStorage.key(i);
-          if(k && k.indexOf("gurbani-reader:") === 0 && k !== META) keys[k] = localStorage.getItem(k);
+          if(k && k.indexOf("gurbani-reader:") === 0 && k !== META && k !== LAYOUT_WIDE_KEY && k !== LAYOUT_NARROW_KEY) keys[k] = localStorage.getItem(k);   /* layout is per-device, per size class — never synced */
         }
       }catch(e){}
       return keys;
