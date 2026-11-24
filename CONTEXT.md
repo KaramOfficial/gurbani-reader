@@ -440,12 +440,17 @@ the global focus and every Sehaj Paath snapshot (Default included)
 are never written, however much he plays, pauses, scrolls or
 navigates (ordinary navigation stays inside the detour and updates
 its slot). The link is stripped from the address bar as before.
-The detour ends only when he goes back to his Paath: Recenter
-(which always points at the Paath's saved focus), or picking a
-Sehaj Paath — the current one included; exiting restores that
-Paath's saved place and normal saving resumes. A stored detour
-resumes ahead of the Paath's place at boot. A plain ?ang=N link
-(no line) keeps the older behaviour.
+Inside the detour, Recenter behaves NORMALLY — it answers to the
+detour's own focus (seeded from the link pankti, afterwards moved
+only by the audio and tap-to-play, never by the view). The exit
+has its own floating pill that appears beside Recenter whenever
+Recenter shows (and also when there is no detour focus yet):
+a book glyph + the name of the Sehaj Paath that was active when
+the visit began — the detour slot remembers it (paath) — and
+tapping it exits and restores that Paath's saved place (picking a
+Sehaj Paath in the Library/switcher does the same). A stored
+detour resumes ahead of the Paath's place at boot. A plain
+?ang=N link (no line) keeps the older behaviour.
 
 **Appearance — Day / Auto / Night.** A Display setting (seg in the
 Menu, and a top-bar button beside Full screen that cycles Day →
@@ -458,7 +463,13 @@ light palette, or the dark palette under the phone's dark scheme.
 **Night** forces a least-light palette: true black background,
 washed warm-gray text, every accent and the vishraam colours muted
 in proportion, and even solid accent buttons (Sign in / Go) washed
-to a soft fill — no surface left glowing. The class lives on
+to a soft fill — no surface left glowing. Deepened Nov 24 on the
+owner's word (the first cut still read too bright): a Cook jury
+over four candidates picked "warm ash" 9/10 — --ink #6e6759,
+--ink-soft #59544a, --muted #47443c, --accent #826226 /
+--accent-strong #997431, vishraams #66525e / #625a3d / #62513b
+(the mauve capped at/below ink luminance — distinguishable by hue
+only); one step darker (#625b4f) failed readability. The class lives on
 <html>; a head script sets it from the stored key before first
 paint, so a forced mode never flashes the wrong palette. Cook jury:
 Night 8/10, Day 6.5/10 (fixes applied: the night sign-in slab
@@ -536,7 +547,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (58 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (60 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -616,8 +627,12 @@ as the changelog. The arc, by theme:
 - **Deep-link detour (Nov 24):** ?ang=N&line=L from Pankti Voice
   Search lands on the exact pankti as a visit with its own
   persisted place/focus (detour-v1) — it survives refreshes, never
-  writes the saved place/focus or any Sehaj Paath snapshot, and
-  ends only via Recenter or picking a Sehaj Paath.
+  writes the saved place/focus or any Sehaj Paath snapshot.
+  Recenter stays normal inside it (detour's own focus); a second
+  floating pill beside Recenter — book glyph + the remembered
+  active Paath's name — is the exit back to that Paath.
+- **Night deepened (Nov 24):** night text #968b76 → washed warm
+  grey #6e6759, whole scale in proportion (Cook jury 9/10).
 - **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,
