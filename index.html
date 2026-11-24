@@ -302,7 +302,7 @@
      three — play/pause, a tap-to-cycle speed, and the orb (controls) */
   .quick{
     position:fixed;right:16px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:42;
-    display:flex;flex-direction:column-reverse;align-items:flex-end;gap:8px;
+    display:flex;flex-direction:column;align-items:flex-end;gap:8px;
     opacity:0;transform:translateX(10px) scale(.92);pointer-events:none;
     transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1);
   }
@@ -355,6 +355,8 @@
   }
   .recenter.show{transform:none;opacity:1;pointer-events:auto}
   .recenter .pg-ico{color:var(--accent);flex:none;display:flex}
+  .qc-font{font-family:"Noto Serif Gurmukhi",serif;font-size:15px;font-weight:600;color:var(--ink-soft)}
+  .quick .orb:disabled{opacity:.38}
   .recenter .rc-arrow{color:var(--accent);font-weight:700;font-family:inherit}
   .ang-island.bump{animation:islandBump .18s ease}
   @keyframes islandBump{50%{transform:translate(-50%,0) scale(1.07)}}
@@ -585,6 +587,8 @@
 <div class="quick" id="quickCtl">
   <button class="orb" id="qcPlay" aria-label="Pause"><svg id="qcPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="qcPauseIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
   <button class="qc-speed" id="qcSpeed" aria-label="Playback speed">1×</button>
+  <button class="orb qc-font" id="qcFontDown" aria-label="Smaller text">A−</button>
+  <button class="orb qc-font" id="qcFontUp" aria-label="Larger text">A+</button>
   <button class="orb" id="orbBtn" aria-label="Show the controls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg></button>
 </div>
 
@@ -628,6 +632,17 @@
         <button data-hl="off" class="active">Off</button>
         <button data-hl="sentence">Sentence</button>
         <button data-hl="word">Word</button>
+      </div>
+    </div>
+    <div class="menu-row">
+      <div>
+        <span class="menu-label">Advanced mode</span>
+        <p class="menu-note">Unlocks playback speeds up to 3×.</p>
+      </div>
+      <span class="menu-spacer"></span>
+      <div class="seg" id="advSeg" role="group" aria-label="Advanced mode">
+        <button data-adv="off" class="active">Off</button>
+        <button data-adv="on">On</button>
       </div>
     </div>
     <h3>Account</h3>
@@ -1007,6 +1022,9 @@
     document.documentElement.style.setProperty("--reader-fs", FS[fsIdx] + "px");
     $("fontDown").disabled = fsIdx <= 0;
     $("fontUp").disabled = fsIdx >= FS.length - 1;
+    var qfd = $("qcFontDown"), qfu = $("qcFontUp");
+    if(qfd) qfd.disabled = fsIdx <= 0;
+    if(qfu) qfu.disabled = fsIdx >= FS.length - 1;
     try{ localStorage.setItem("gurbani-reader:fontsize-v1", String(fsIdx)); }catch(e){}
   }
   $("fontDown").addEventListener("click", function(){ if(fsIdx>0){ fsIdx--; applyFs(); } });
@@ -2539,6 +2557,12 @@
     b.textContent = opt ? opt.textContent : s.value + "×";
     b.setAttribute("aria-label", "Playback speed " + b.textContent + " — tap to change");
   }
+  /* the cluster's font pair — the Menu's own A− / A+ buttons, driven
+     directly so size, bounds and persistence can never drift apart */
+  var qcFontDownBtn = $("qcFontDown");
+  if(qcFontDownBtn) qcFontDownBtn.addEventListener("click", function(){ $("fontDown").click(); showOrb(); });
+  var qcFontUpBtn = $("qcFontUp");
+  if(qcFontUpBtn) qcFontUpBtn.addEventListener("click", function(){ $("fontUp").click(); showOrb(); });
   var qcSpeedBtn = $("qcSpeed");
   if(qcSpeedBtn) qcSpeedBtn.addEventListener("click", function(){
     var s = $("speed"); if(!s) return;
@@ -2549,7 +2573,27 @@
   });
   $("back5").addEventListener("click", function(){ seekTo((audio.currentTime||0) - 5); });
   $("fwd5").addEventListener("click", function(){ seekTo((audio.currentTime||0) + 5); });
-  try{ var spv = localStorage.getItem("gurbani-reader:speed-v1"); if(spv && $("speed").querySelector('option[value="' + spv + '"]')) $("speed").value = spv; }catch(e){}
+  /* Advanced mode (Menu → Reading) extends the speed ladder up to
+     3×; off, the classic five. The flag persists (advanced-v1) and
+     syncs like every other setting; a stored speed that the current
+     ladder doesn't offer falls back to the fastest it does (2×). */
+  var advancedMode = false;
+  try{ advancedMode = localStorage.getItem("gurbani-reader:advanced-v1") === "1"; }catch(e){}
+  var SPEED_BASE = ["0.75", "1", "1.25", "1.5", "2"], SPEED_ADV = ["2.25", "2.5", "2.75", "3"];
+  function buildSpeedOptions(){
+    var s = $("speed"); if(!s) return;
+    var cur = s.value || "1";
+    var vals = advancedMode ? SPEED_BASE.concat(SPEED_ADV) : SPEED_BASE.slice();
+    s.innerHTML = "";
+    vals.forEach(function(v){ var o = document.createElement("option"); o.value = v; o.textContent = v + "×"; s.appendChild(o); });
+    if(vals.indexOf(cur) < 0) cur = vals[vals.length - 1];
+    s.value = cur;
+    paintQcSpeed();
+  }
+  buildSpeedOptions();
+  try{ var spv = localStorage.getItem("gurbani-reader:speed-v1");
+    if(spv){ if($("speed").querySelector('option[value="' + spv + '"]')) $("speed").value = spv;
+      else if(Number(spv) > 2) $("speed").value = "2"; } }catch(e){}
   var speedRate = Number($("speed").value) || 1;
   function applySpeed(){ try{ audio.playbackRate = speedRate; }catch(e){} }
   $("speed").addEventListener("change", function(){ speedRate = Number(this.value) || 1; applySpeed(); if(pvState){ try{ audio.playbackRate = pvState.rate; }catch(e){} } try{ localStorage.setItem("gurbani-reader:speed-v1", this.value); }catch(e){} });
@@ -2692,6 +2736,18 @@
      Day -> Auto -> Night; the Menu seg picks directly. */
   var appearance = "auto";
   try{ var apv = localStorage.getItem("gurbani-reader:appearance-v1"); if(apv === "day" || apv === "night") appearance = apv; }catch(e){}
+  var advSeg = $("advSeg");
+  function paintAdvSeg(){ if(!advSeg) return; advSeg.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-adv") === "on") === advancedMode); }); }
+  function setAdvanced(on){
+    advancedMode = !!on;
+    try{ localStorage.setItem("gurbani-reader:advanced-v1", advancedMode ? "1" : "0"); }catch(e){}
+    buildSpeedOptions();
+    var v = Number($("speed").value) || 1;
+    if(v !== speedRate){ speedRate = v; applySpeed(); try{ localStorage.setItem("gurbani-reader:speed-v1", $("speed").value); }catch(e){} }
+    paintAdvSeg();
+  }
+  if(advSeg) advSeg.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){ setAdvanced(b.getAttribute("data-adv") === "on"); }); });
+  paintAdvSeg();
   var appSeg = $("appSeg");
   function paintAppSeg(){ if(!appSeg) return; appSeg.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-app") === appearance); }); }
   function paintAppBtn(){ var nb = $("appBtn"); if(!nb) return;
