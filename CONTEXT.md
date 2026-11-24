@@ -386,12 +386,13 @@ they always did (a tap calls the bars). The point is a cheap, low-
 commitment interruption while reading is flowing: one tap to *maybe*
 interrupt, one more to actually open the UI.
 
-**Tap empty space to dismiss.** When the bars ARE showing, a tap on
-an empty stretch — the book head, a separator, the margins, anywhere
-with no pankti under the finger — puts the bars away; tapping again
-brings them back. Taps on a line never hide (they keep their jobs:
-lite feedback, double-tap to play), and double-tap keeps meaning
-ONLY play-from-that-sentence — it never opens the UI.
+**Tap anywhere to dismiss.** When the bars ARE showing, a tap
+anywhere outside the UI itself — on a pankti, on empty space, on the
+book head — puts the bars away; tapping again brings them back. The
+tap's own jobs still happen (lite feedback on a word), and
+double-tap keeps meaning ONLY play-from-that-sentence — it never
+opens the UI; its second tap calls the bars back via the play path,
+as it always did.
 
 **Sehaj Paath trackers.** A Sehaj Paath is one whole read of Sri Guru
 Granth Sahib Ji — days to years — and a reader may keep several going
@@ -465,7 +466,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (50 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (51 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:

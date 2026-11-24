@@ -1440,11 +1440,12 @@
       if($("orbBtn").classList.contains("show")) hideOrb(); else showOrb();
       return;
     }
-    /* bars up + a tap on an EMPTY stretch (no pankti under the finger —
-       the head, a separator, the margins): put the bars away. Tapping
-       to dismiss beats scrolling to dismiss. Taps on a line keep their
-       own jobs (lite feedback, double-tap to play) and never hide. */
-    if(!document.body.classList.contains("bars-hidden") && !(e.target.closest && e.target.closest(".line"))){
+    /* bars up + a tap ANYWHERE outside the UI itself — on a pankti,
+       on empty space, anywhere: put the bars away. Tapping to dismiss
+       beats scrolling to dismiss. The tap's own jobs still happen
+       (lite feedback on a word; a double-tap's second tap plays from
+       there and calls the bars back via the play path, as before). */
+    if(!document.body.classList.contains("bars-hidden")){
       hideBars(); return;
     }
     showBars();
