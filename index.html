@@ -529,6 +529,15 @@
         <button data-hl="word">Word</button>
       </div>
     </div>
+    <h3>Account</h3>
+    <div class="menu-row">
+      <div>
+        <span class="menu-label">Sync</span>
+        <p class="menu-note" id="syncNote">Optional — sync your place, Sehaj Paaths &amp; settings across devices.</p>
+      </div>
+      <span class="menu-spacer"></span>
+      <button class="ang-go" id="syncBtn" style="flex:none">Sign in with Google</button>
+    </div>
     <button class="menu-navrow" id="libraryNav">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
       <span class="menu-navrow-text"><span class="menu-label">Library</span><span class="menu-note">Sri Guru Granth Sahib Ji · Nitnem Banis</span></span>
@@ -655,6 +664,9 @@
 
 <audio id="audio" preload="metadata"></audio>
 
+<script src="firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1427,6 +1439,13 @@
     if(!audio.paused && autoScrollOn && document.body.classList.contains("bars-hidden")){
       if($("orbBtn").classList.contains("show")) hideOrb(); else showOrb();
       return;
+    }
+    /* bars up + a tap on an EMPTY stretch (no pankti under the finger —
+       the head, a separator, the margins): put the bars away. Tapping
+       to dismiss beats scrolling to dismiss. Taps on a line keep their
+       own jobs (lite feedback, double-tap to play) and never hide. */
+    if(!document.body.classList.contains("bars-hidden") && !(e.target.closest && e.target.closest(".line"))){
+      hideBars(); return;
     }
     showBars();
   });
@@ -2722,6 +2741,110 @@
       var b = null; BANIS.forEach(function(x){ if(x.id === saved.id) b = x; });
       if(b){ pendingRestore = saved; loadBani(b); } else loadBani(BANIS[0]);
     } else loadBani(BANIS[0]);
+  })();
+
+  /* ---------- Google sign-in + cloud sync ----------
+     Optional, and invisible when unused. localStorage stays the source
+     of truth on this device; signing in mirrors every gurbani-reader:*
+     key (place, focus, settings, Sehaj Paaths + their snapshots) into
+     the reader's own field (readerJson) of the user's doc in the same
+     Firebase project/collection the Nitnem Tracker uses, so the rules
+     that already let the Tracker sync let this sync too, and neither
+     app touches the other's field. Newer state wins wholesale (per-key
+     stamps live in the sync meta); applying cloud state reloads once.
+     SDK blocked/offline -> local-only, exactly like the Tracker. */
+  (function(){
+    /* apply-guard: if the previous page just wrote cloud state and
+       reloaded, write it once more before anything trusts localStorage —
+       the dying page's own place saves can land after the apply's writes
+       in the reload window and silently clobber the synced place. */
+    try{
+      var guard = sessionStorage.getItem("gurbani-reader:apply-guard");
+      if(guard){
+        sessionStorage.removeItem("gurbani-reader:apply-guard");
+        var gk = (JSON.parse(guard) || {}).keys || {};
+        Object.keys(gk).forEach(function(k){ if(gk[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, gk[k]); });
+      }
+    }catch(e){}
+    var btn = $("syncBtn"), note = $("syncNote");
+    if(!btn) return;
+    if(!window.firebase){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
+    var CFG = { apiKey: "AIzaSyADH6-AzMWjDLPzoxu7WZy1-vvYNsHXtxk", authDomain: "nitnem-tracker.firebaseapp.com", projectId: "nitnem-tracker", storageBucket: "nitnem-tracker.firebasestorage.app", messagingSenderId: "712584913445", appId: "1:712584913445:web:a7f0fd0d2082fc6e7755cc" };
+    var auth, db;
+    try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
+    catch(e){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
+    var META = "gurbani-reader:sync-v1";
+    var user = null, lastSent = null, applying = false, timer = null, syncReady = false;
+    function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
+    function collectKeys(){
+      var keys = {};
+      try{
+        for(var i=0;i<localStorage.length;i++){
+          var k = localStorage.key(i);
+          if(k && k.indexOf("gurbani-reader:") === 0 && k !== META) keys[k] = localStorage.getItem(k);
+        }
+      }catch(e){}
+      return keys;
+    }
+    function setNote(s){ if(note) note.textContent = s; }
+    function paint(){
+      if(user){ btn.textContent = "Sign out"; setNote("Signed in as " + (user.email || "") + " — place, Paaths & settings sync to your account."); }
+      else { btn.textContent = "Sign in with Google"; setNote("Optional — sync your place, Sehaj Paaths & settings across devices."); }
+    }
+    function saveNow(){
+      if(!user || applying || !syncReady) return;
+      var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
+      if(keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
+      var at = Date.now();
+      var stamped = JSON.stringify({ keys: keys, savedAt: at });
+      try{ localStorage.setItem(META, JSON.stringify({ savedAt: at, keysJson: keysJson })); }catch(e){}
+      lastSent = stamped;
+      db.collection("progress").doc(user.uid).set({ readerJson: stamped, readerAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+        .then(function(){ if(user) setNote("Synced ✓ — signed in as " + (user.email || "")); })
+        .catch(function(){ lastSent = null; });
+    }
+    setInterval(function(){
+      if(!user || applying || !syncReady) return;
+      if(JSON.stringify(collectKeys()) !== (meta().keysJson || "")){ clearTimeout(timer); timer = setTimeout(saveNow, 1200); }
+    }, 2500);
+    window.addEventListener("pagehide", saveNow);
+    btn.addEventListener("click", function(){
+      if(user){ auth.signOut(); return; }
+      var prov = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(prov).catch(function(){ auth.signInWithRedirect(prov); });
+    });
+    auth.onAuthStateChanged(function(u){
+      user = u;
+      syncReady = false;
+      if(!u){ paint(); lastSent = null; return; }
+      paint();
+      setNote("Signed in — syncing…");
+      var ref = db.collection("progress").doc(u.uid);
+      ref.get().then(function(snap){
+        var cloud = snap.exists ? (snap.data().readerJson || null) : null;
+        var cloudAt = 0, cloudKeys = null;
+        if(cloud){ try{ var cj = JSON.parse(cloud); cloudAt = cj.savedAt || 0; cloudKeys = cj.keys || null; }catch(e){} }
+        var m = meta();
+        syncReady = true;
+        if(cloudKeys && cloudAt > (m.savedAt || 0)){
+          applying = true;
+          try{
+            Object.keys(cloudKeys).forEach(function(k){ if(cloudKeys[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, cloudKeys[k]); });
+            localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys) }));
+          }catch(e){}
+          lastSent = cloud;
+          try{ sessionStorage.setItem("gurbani-reader:apply-guard", cloud); }catch(e){}
+          setNote("Found your synced reading — refreshing…");
+          setTimeout(function(){ location.reload(); }, 700);
+        } else {
+          if(cloudKeys && JSON.stringify(cloudKeys) === JSON.stringify(collectKeys())){
+            try{ localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys) })); }catch(e){}
+            lastSent = cloud;
+            setNote("Synced ✓ — signed in as " + (u.email || ""));
+          } else saveNow();
+        }
+      }).catch(function(){ syncReady = true; saveNow(); });
+    });
   })();
 })();
 </script>

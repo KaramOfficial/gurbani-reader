@@ -201,6 +201,8 @@ this derivation.
 | `gurbani-reader:paaths-v1` | Sehaj Paath trackers: the list, the current one, the Default's custom name |
 | `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` (`ctx-default` for the Default) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
+| `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint |
+| `gurbani-reader:apply-guard` (sessionStorage) | One-shot: the cloud blob just applied, re-written once after the apply reload |
 
 Font sizes: `[20, 22, 24, 26, 29, 32, 36, 40, 44, 48]px`, default
 index 2 (24px). New sizes are only ever **appended** — a saved index
@@ -384,6 +386,13 @@ they always did (a tap calls the bars). The point is a cheap, low-
 commitment interruption while reading is flowing: one tap to *maybe*
 interrupt, one more to actually open the UI.
 
+**Tap empty space to dismiss.** When the bars ARE showing, a tap on
+an empty stretch — the book head, a separator, the margins, anywhere
+with no pankti under the finger — puts the bars away; tapping again
+brings them back. Taps on a line never hide (they keep their jobs:
+lite feedback, double-tap to play), and double-tap keeps meaning
+ONLY play-from-that-sentence — it never opens the UI.
+
 **Sehaj Paath trackers.** A Sehaj Paath is one whole read of Sri Guru
 Granth Sahib Ji — days to years — and a reader may keep several going
 at once. Below the Nitnem expandable (in BOTH the Library and the
@@ -401,7 +410,15 @@ no snapshot starts at ਅੰਗ ੧. Row sub-labels say the action: "Resume at
 ਅੰਗ ੧੬੫ · 12% complete" for a journey in progress ("ਅੰਗ … · % complete"
 for the current one), "Not started" otherwise; the Default row shows
 just its Ang. Every row — Default included — carries a pencil to
-rename it inline. Nothing in the reading/playback code knows trackers
+rename it inline. Under the sub-label, each row previews its focus
+pankti — the line's first few Gurmukhi words plus " …" — stored on
+the focus record itself, so snapshots carry it (rows whose line text
+isn't loaded derive it when the item is in memory, else no preview).
+Rename reads the input in the surface actually used: the list exists
+twice (Library + popup) and both render an input while editing, and
+reading the first in DOM order silently saved the untouched
+surface's old value — the rename "reverted" (owner-reported, fixed
+Nov 23). Nothing in the reading/playback code knows trackers
 exist; the live records always belong to the current context.
 
 **Landscape phones.** In landscape (short height), the chrome merges
@@ -412,6 +429,27 @@ block so the seek bar gets the width (~288px vs ~170px) — total chrome
 ≈117px of a 412px height (was ~196px, nearly half the screen), with
 44px minimum touch targets. Rotating changes nothing else: bars
 hidden stays hidden, bars shown stays shown, fullscreen persists.
+
+**Account & cloud sync (optional).** The Menu carries a compact
+Account block: "Sign in with Google", or the signed-in email + Sign
+out. It uses the same Firebase project as the Nitnem Tracker
+(`nitnem-tracker`, compat SDK vendored under `firebasejs/10.12.5/`)
+and mirrors the Tracker's pattern: every `gurbani-reader:*` key
+(place, focus, settings, Paaths + snapshots — the sync meta itself
+excluded) is serialised into the `readerJson` field of the user's
+own doc in the Tracker's `progress` collection (merge write; the
+two apps never touch each other's fields, so the rules that let
+the Tracker sync let this sync). Newer state wins wholesale by
+client stamp; applying cloud state reloads once, with a one-shot
+sessionStorage guard re-writing the applied keys after the reload
+(the dying page's own place saves can otherwise clobber the synced
+place in the reload window). No push happens before the sign-in's
+initial cloud check settles, and pushes fire only when the key set
+actually changed (2.5s poll, debounced, plus on pagehide) — an idle
+signed-in tab never overwrites another device. Last-writer-wins is
+the known limit, same as the Tracker. Signed out, SDK blocked, or
+offline: local-only, exactly as before — sign-in is invisible
+unless wanted.
 
 ## 10. Design language
 
@@ -427,7 +465,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (48 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (50 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -489,6 +527,12 @@ as the changelog. The arc, by theme:
   6.5/10 → fixes applied: centred pager, seek widened, 44px targets,
   orb/Recenter mutually exclusive); Sehaj Paath trackers land as
   snapshot worlds in a Library/switcher expandable.
+- **Preview, rename fix, tap-to-dismiss, sign-in (Nov 23, later):**
+  Paath rows preview their focus pankti; the popup-surface rename
+  bug is fixed (it read the other surface's input and silently
+  saved the old value); a tap on empty space dismisses showing
+  bars; optional Google sign-in syncs place/Paaths/settings via
+  the Tracker's Firebase project.
 
 ## 12. Rebuild checklist (any platform)
 
