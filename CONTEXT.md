@@ -147,14 +147,23 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
 
 ## 6. Auto-scroll — the tracker
 
-- A `requestAnimationFrame` tracker eases the page so the **spoken line
-  rests at the anchor: 35% of the viewport height** from the top. It
-  writes scroll positions directly (no CSS smooth-scroll animations to
-  fight or outlive their flags), with velocity damping and hysteresis:
-  it wakes when the line drifts past a **46px calm band** and settles
-  inside ~6px. (An earlier burst/stepped scroller stuttered visibly —
-  the continuous tracker replaced it; do not reintroduce stepped
-  scrolling.)
+- A `requestAnimationFrame` tracker keys on the **spoken word**, not the
+  line (redesigned Nov 24 after a design jury; the line-change trigger
+  broke at large fonts, where a pankti spans 5–6 rows). A **focus zone**
+  sits around the anchor (35% of viewport height): top = anchor −
+  max(½ line-height, 4% of height), bottom = min(anchor + max(2
+  line-heights, 16% of height), height − 72px), floored at anchor +
+  1.2 line-heights. While the spoken word's rect is inside the zone the
+  page is **still** — however many words go by; only when the word exits
+  the zone does the tracker glide, landing the word's top back on the
+  anchor (settle ~6px, time-normalised easing, 130px/frame cap). The
+  zone replaces both the old fixed 46px deadband and paragraph mode's
+  30–45% band — one model for lines and paragraphs, every font size and
+  orientation. The sentence highlight still paints the **full pankti**;
+  only the scroll trigger is word-based, so a giant pankti's later words
+  never sink below the screen waiting for a line change. If the spoken
+  word's element is not in the DOM (spacer-swapped section), the tracker
+  falls back to the legacy line behaviour for that frame.
 - Rollover between Angs must not slam the new first line to the top —
   the tracker carries it to the anchor like any other line.
 - **The manual hold (Maps model, §9 Recenter):** the moment the reader
@@ -164,7 +173,9 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   was rejected.) The hold releases only when: the reader scrolls back
   so the audio's pankti is within the anchor band again, taps Recenter,
   presses play, taps a word/line to play from there, or the item
-  changes. The audio itself is never paused or moved by any of this.
+  changes. (Since the Nov 24 zone redesign, "back in place" for the
+  hold and for the Recenter pill means the spoken/focus word is inside
+  the focus zone, not the old 46px line band.) The audio itself is never paused or moved by any of this.
 - **Rotation is a non-event:** rotating the phone mid-playback must not
   chase-scroll, flash the pill, or change the bars' state. On resize
   the tracker stands down for a short settle window (~400ms), then the
@@ -587,7 +598,20 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (69 commits, 2026-11-21 → 2026-11-23)
+**Mool Mantar (Nov 24).** The opening pankti of Japji Sahib and of
+Ang 1 (ੴ ਸਤਿਨਾਮੁ … ਗੁਰਪ੍ਰਸਾਦਿ ॥ — detected by content in all three line
+builders; it occurs nowhere else in this form) is always presented in
+the printed-Gutka page-1 frame: a double rule (1.5px `--accent` outer
+border + `--hairline` inner rule via inset box-shadow on `--paper`),
+centred text at 1.12× the reader font size, and ੴ — still the line's
+first word, with its own timing/tap/highlight — at 1.45× in
+`--accent-strong`. No shadow, no fill colour, palette variables only,
+so Day/Auto/Night inherit. In paragraph mode the frame is a forced
+block. (Cook jury: Gutka frame 8.7/10 over invocation-rules 7.2 and
+plaque-panel 5.4; references were printed Gutka page 1 and Mool Mantar
+calligraphy plaques.)
+
+## 11. Revision history (74 commits, 2026-11-21 → 2026-11-24)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -683,6 +707,17 @@ as the changelog. The arc, by theme:
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,
   Day 6.5/10, fixes applied.
+- **Large screens + paragraph mode (Nov 24):** unified 700px caps,
+  centred Menu panel and column-anchored cluster at desktop widths;
+  print-style paragraph flow (readgurbani-like) with per-size-class
+  Layout setting.
+- **Word-exit auto-scroll (Nov 24):** the tracker redesign in §6.
+- **Lines-mode crash fix (Nov 24):** paragraph mode's `joinParts`
+  shipped an infinitely recursive non-paragraph branch
+  (`return joinParts(parts)`), so every lines-mode load died with a
+  stack overflow behind the fetch-error state. Fixed to a plain join;
+  caught by harness bisect (para loads fine, lines loads dead).
+- **Mool Mantar Gutka frame (Nov 24):** see §10.
 
 ## 12. Rebuild checklist (any platform)
 
