@@ -376,16 +376,26 @@ line's end time passes.
 toggle right as an icon-only round button whose ON state is an accent
 **ring**, not a filled disc. Auto-scroll defaults ON and persists.
 
-**The orb (immersive interruption).** While audio plays with
-auto-scroll on and the bars hidden, a tap ANYWHERE — on a word, on a
-line, on empty space — raises only a small floating circular button
-(bottom-right, sliders glyph) instead of the whole chrome; a second
-tap dismisses it, and it fades on its own after ~5s. Tapping the orb
-calls the full bars. It never appears together with the Recenter pill
-(Recenter outranks it). Outside immersive playback, taps behave as
-they always did (a tap calls the bars). The point is a cheap, low-
-commitment interruption while reading is flowing: one tap to *maybe*
-interrupt, one more to actually open the UI.
+**The quick cluster (immersive interruption).** While audio plays
+with auto-scroll on and the bars hidden, a tap ANYWHERE — on a word,
+on a line, on empty space — raises only a small floating cluster
+(hard against the bottom-right edge, in the zone the hidden player
+vacates) instead of the whole chrome; a second tap dismisses it, and
+it fades on its own after ~5s. The cluster carries the three things
+a listener reaches for: a play/pause button (mirrors the player's,
+icons painted by the same function; pausing calls the bars, as the
+player's button does), a speed pill showing the current speed
+("1.5×") that cycles the player's speed options on tap — applied
+through the select's own change handler, so it saves and re-rates
+exactly like the menu control — and the original sliders orb, which
+calls the full bars. It never appears together with the Recenter
+pill (Recenter outranks it). Outside immersive playback, taps behave
+as they always did (a tap calls the bars). The point is a cheap,
+low-commitment interruption while reading is flowing: one tap to
+*maybe* interrupt, one more to actually open the UI. Cook jury:
+Day 7.5/10, Night 8/10 (fixes applied: cluster dropped to the
+bottom edge off the text, light-scheme pill borders strengthened,
+night pause glyph washed one step).
 
 **Tap anywhere to dismiss.** When the bars ARE showing, a tap
 anywhere outside the UI itself — on a pankti, on empty space, on the
@@ -519,7 +529,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (56 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (57 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -592,6 +602,10 @@ as the changelog. The arc, by theme:
   moved it) to hear it and the next few at 1× under a floating
   pill, then the reader's own speed resumes from that spot; the
   speed control is never touched.
+- **Quick cluster (Nov 24):** the immersive orb grew into a
+  three-part cluster — play/pause, a tap-to-cycle speed pill, and
+  the sliders orb — same tap trigger, same 5s fade; Cook jury Day
+  7.5/10, Night 8/10, fixes applied.
 - **Deep-link detour (Nov 24):** ?ang=N&line=L from Pankti Voice
   Search lands on the exact pankti as a visit that never writes the
   saved place/focus or any Sehaj Paath snapshot; deliberate in-app
