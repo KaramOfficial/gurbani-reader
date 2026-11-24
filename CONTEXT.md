@@ -394,6 +394,20 @@ double-tap keeps meaning ONLY play-from-that-sentence — it never
 opens the UI; its second tap calls the bars back via the play path,
 as it always did.
 
+**Hold a word — normal-speed preview.** A long-press (~0.5s,
+unmoved) on any word plays that word and the next few (up to five
+words total, never crossing into the next track) at 1×, under a
+floating "Normal speed preview · 1×" pill; when the segment ends,
+the reader's own speed resumes from that same spot — hear a section
+clearly without breaking the flow. The speed control and its stored
+value are never touched: the preview sets the element's rate
+directly, re-asserts it against the app's own play/metadata rate
+resets, and applySpeed() restores the reader's rate at the end. The
+click that follows a hold is swallowed before any other handler, so
+it can't reach the tap model or the bars. Pausing, seeking out of
+the segment, or the track ending cancels the preview (rate
+restored).
+
 **Sehaj Paath trackers.** A Sehaj Paath is one whole read of Sri Guru
 Granth Sahib Ji — days to years — and a reader may keep several going
 at once. Below the Nitnem expandable (in BOTH the Library and the
@@ -466,7 +480,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (51 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (52 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -534,6 +548,9 @@ as the changelog. The arc, by theme:
   saved the old value); a tap on empty space dismisses showing
   bars; optional Google sign-in syncs place/Paaths/settings via
   the Tracker's Firebase project.
+- **Normal-speed preview (Nov 24):** hold a word to hear it and the
+  next few at 1× under a floating pill, then the reader's own speed
+  resumes from that spot; the speed control is never touched.
 
 ## 12. Rebuild checklist (any platform)
 
