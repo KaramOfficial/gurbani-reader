@@ -364,6 +364,10 @@
   .sheet-close{width:38px;height:38px;border-radius:50%;border:1px solid var(--hairline);display:grid;place-items:center;background:var(--paper)}
   .sheet-close svg{width:16px;height:16px}
 
+  /* the stream compensates prepends by hand (see compensateScroll) —
+     the browser's own scroll anchoring must NOT also adjust, or the two
+     compensations fight and landings drift */
+  html,body{overflow-anchor:none}
   /* ---------- reading column ---------- */
   main{
     max-width:700px;margin:0 auto;
@@ -647,18 +651,6 @@
       <span class="menu-spacer"></span>
       <button class="fbtn small" id="fontDown" aria-label="Smaller text">A−</button>
       <button class="fbtn large" id="fontUp" aria-label="Larger text">A+</button>
-    </div>
-    <div class="menu-row">
-      <div>
-        <span class="menu-label">Appearance</span>
-        <p class="menu-note">Day for outdoors · Night is black, washed-out — least light · Auto follows your phone.</p>
-      </div>
-      <span class="menu-spacer"></span>
-      <div class="seg" id="appSeg" role="group" aria-label="Appearance">
-        <button data-app="day">Day</button>
-        <button data-app="auto" class="active">Auto</button>
-        <button data-app="night">Night</button>
-      </div>
     </div>
     <div class="menu-row">
       <div>
@@ -2445,6 +2437,7 @@
       if(!data || token !== state.loadToken || state.mode !== "ang") return;
       if(state.streamAngs.indexOf(ang) >= 0) return;
       var anchorEl = firstStreamEl(); if(!anchorEl) return;
+      var anchorTopBefore = anchorEl.getBoundingClientRect().top;
       var oldFirst = state.streamAngs[0];
       state.angLines[ang] = data.lines; state.angDur[ang] = data.duration || 0;
       state.angFirstLine[ang] = state.flatLines.length;
@@ -2463,8 +2456,10 @@
         nodes.push(sepNode);
       }
       state.streamAngs.unshift(ang);
-      var h = 0; nodes.forEach(function(n){ h += n.offsetHeight || 0; });
-      compensateScroll(h);
+      /* the inserted height is the anchor's own displacement — margins,
+         separators and all — not a sum of offsetHeights (which drops
+         margins and drifted every landing) */
+      compensateScroll(anchorEl.getBoundingClientRect().top - anchorTopBefore);
       observeTail(); pruneStream();
     })
     .catch(function(){ state.prepending = false; });
@@ -2672,6 +2667,7 @@
       if(!groups.length) return;
       if(state.streamBanis.indexOf(id) >= 0) return;
       var anchorEl = firstStreamEl(); if(!anchorEl) return;
+      var anchorTopBefore = anchorEl.getBoundingClientRect().top;
       var oldFirst = state.streamBanis[0];
       state.baniGroups[id] = groups; state.baniDur[id] = json.duration || 0;
       state.baniFirstLine[id] = state.flatLines.length;
@@ -2694,8 +2690,7 @@
         }
       }
       state.streamBanis.unshift(id);
-      var h = 0; nodes.forEach(function(n){ h += n.offsetHeight || 0; });
-      compensateScroll(h);
+      compensateScroll(anchorEl.getBoundingClientRect().top - anchorTopBefore);
       observeBaniTail(); pruneBaniStream();
     })
     .catch(function(){ state.prependingBani = false; });
@@ -2901,7 +2896,7 @@
      ladder doesn't offer falls back to the fastest it does (2×). */
   var advancedMode = false;
   try{ advancedMode = localStorage.getItem("gurbani-reader:advanced-v1") === "1"; }catch(e){}
-  var SPEED_BASE = ["0.75", "1", "1.25", "1.5", "2"], SPEED_ADV = ["2.25", "2.5", "2.75", "3"];
+  var SPEED_BASE = ["0.75", "1", "1.25", "1.5", "2"], SPEED_ADV = ["2.25", "2.5", "2.75", "3", "3.25", "3.5", "3.75", "4"];
   function buildSpeedOptions(){
     var s = $("speed"); if(!s) return;
     var cur = s.value || "1";

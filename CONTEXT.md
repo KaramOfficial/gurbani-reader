@@ -113,7 +113,14 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   link exists for every chain Bani except the first). Prepending inserts
   the sections above and compensates the scroll position by their exact
   height in the same gesture, so the pankti under the reader's eye never
-  moves. New sections' lines join the same flat line list — every lookup
+  moves. The compensation is measured as the displacement of the first
+  stream element itself (its rect before vs after insertion — margins
+  and separators included), never as a sum of offsetHeights, and the
+  document sets `overflow-anchor: none`: the browser's own scroll
+  anchoring must not also adjust, or the two compensations fight and
+  every landing drifts (the pre-fix landing visibly re-anchored itself
+  two or three times before settling; with this pair in place the
+  restore landing's verification re-lands are no-ops). New sections' lines join the same flat line list — every lookup
   goes through the per-item first-line maps, never DOM order — and the
   pruning window is unchanged, so memory stays bounded no matter how
   far the reader travels in either direction.
@@ -137,7 +144,8 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   rebuild must do the equivalent on its platform.
 - Speeds offered: 0.75×, 1×, 1.25×, 1.5×, 2× — plus, only when
   **Advanced mode** is on (Menu → Reading, an Off/On seg, persisted
-  as advanced-v1): 2.25×, 2.5×, 2.75×, 3×. Turning it off above 2×
+  as advanced-v1): 2.25×, 2.5×, 2.75×, 3×, 3.25×, 3.5×, 3.75×, 4×.
+  Turning it off above 2×
   falls back to 2×; the cluster's speed pill cycles whatever ladder
   is currently offered. Skip ±5s buttons flank the
   transport. A seek bar reflects and controls position.
@@ -227,7 +235,7 @@ this derivation.
 | `gurbani-reader:fontsize-v1` | Font size index |
 | `gurbani-reader:focus-v1` | The global last focus (§9) |
 | `gurbani-reader:speed-v1` | Playback speed |
-| `gurbani-reader:advanced-v1` | Advanced mode (unlocks speeds to 3×): 1 / 0 |
+| `gurbani-reader:advanced-v1` | Advanced mode (unlocks speeds to 4×): 1 / 0 |
 | `gurbani-reader:hlmode-v1` | Follow-along mode: off / sentence / word |
 | `gurbani-reader:autoscroll-v1` | Auto-scroll on/off |
 | `gurbani-reader:nitnem-open` | Nitnem section expanded in switcher/Library |
@@ -507,8 +515,8 @@ its snapshot (or the live place/focus when it is the current
 Paath); the reader never moves, and a toast confirms. This is the
 manual counterpart to a Paath's automatic tracking.
 
-**Appearance — Day / Auto / Night.** A Display setting (seg in the
-Menu, and a top-bar button beside Full screen that cycles Day →
+**Appearance — Day / Auto / Night.** Controlled only by the top-bar
+button beside Full screen, which cycles Day →
 Auto → Night, showing a sun / half-circle / moon for the current
 mode, washed accent when a mode is forced). **Day** forces a
 bright palette tuned for outdoors (near-white paper, deep ink,
