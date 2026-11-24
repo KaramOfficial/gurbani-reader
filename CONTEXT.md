@@ -201,6 +201,7 @@ this derivation.
 | `gurbani-reader:paaths-v1` | Sehaj Paath trackers: the list, the current one, the Default's custom name |
 | `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` (`ctx-default` for the Default) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
+| `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
 | `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint |
 | `gurbani-reader:apply-guard` (sessionStorage) | One-shot: the cloud blob just applied, re-written once after the apply reload |
 
@@ -408,6 +409,23 @@ it can't reach the tap model or the bars. Pausing, seeking out of
 the segment, or the track ending cancels the preview (rate
 restored).
 
+**Appearance — Day / Auto / Night.** A Display setting (seg in the
+Menu, and a top-bar button beside Full screen that cycles Day →
+Auto → Night, showing a sun / half-circle / moon for the current
+mode, washed accent when a mode is forced). **Day** forces a
+bright palette tuned for outdoors (near-white paper, deep ink,
+stronger hairlines, vishraam colours deepened a step past the
+settled light ones). **Auto** is the original behaviour — the
+light palette, or the dark palette under the phone's dark scheme.
+**Night** forces a least-light palette: true black background,
+washed warm-gray text, every accent and the vishraam colours muted
+in proportion, and even solid accent buttons (Sign in / Go) washed
+to a soft fill — no surface left glowing. The class lives on
+<html>; a head script sets it from the stored key before first
+paint, so a forced mode never flashes the wrong palette. Cook jury:
+Night 8/10, Day 6.5/10 (fixes applied: the night sign-in slab
+washed; day vishraams deepened).
+
 **Sehaj Paath trackers.** A Sehaj Paath is one whole read of Sri Guru
 Granth Sahib Ji — days to years — and a reader may keep several going
 at once. Below the Nitnem expandable (in BOTH the Library and the
@@ -480,7 +498,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (52 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (53 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -551,6 +569,10 @@ as the changelog. The arc, by theme:
 - **Normal-speed preview (Nov 24):** hold a word to hear it and the
   next few at 1× under a floating pill, then the reader's own speed
   resumes from that spot; the speed control is never touched.
+- **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
+  Night (true black, washed-out, least light) — Menu seg plus a
+  cycling top-bar button beside Full screen; Cook jury Night 8/10,
+  Day 6.5/10, fixes applied.
 
 ## 12. Rebuild checklist (any platform)
 
