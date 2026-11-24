@@ -369,6 +369,23 @@
     padding:calc(128px + env(safe-area-inset-top)) 22px 210px;
   }
   @media (min-width:760px){ main{padding-left:34px;padding-right:34px} }
+  /* large screens: ONE measure (700px) for every horizontal element —
+     top bar, pager, player card, sheet content and the reading column
+     share the same edges (Cook jury, Nov 24: three stacked caps at
+     760/700/680 read as a phone layout centred by accident) */
+  @media (min-width:761px){
+    .topbar-in{max-width:700px}
+    .pager{max-width:700px}
+    .sheet-in{max-width:700px}
+  }
+  /* wide screens: the Menu is a centred panel, not a full-width
+     curtain, and the quick cluster anchors to the reading column
+     (its right edge + a 16px gap) instead of the viewport edge */
+  @media (min-width:1024px){
+    .sheet{left:50%;right:auto;width:min(700px,100%);transform:translate(-50%,-106%);border-left:1px solid var(--hairline);border-right:1px solid var(--hairline)}
+    .sheet.open{transform:translate(-50%,0)}
+    .quick{right:calc(50% - 412px)}
+  }
   .book-head{text-align:center;padding:34px 0 10px}
   .ornament{color:var(--accent);font-size:14px;letter-spacing:.55em;text-indent:.55em;user-select:none;opacity:.8}
   .book-head .pa-title{
@@ -473,6 +490,7 @@
     box-shadow:var(--shadow);
     padding:7px 14px 8px;
   }
+  @media (min-width:761px){ .player-in{max-width:700px} }
   .seek-row{display:flex;align-items:center;gap:10px}
   .time{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
   input[type="range"]{
@@ -1017,7 +1035,10 @@
 
   /* ---------- font size ---------- */
   var FS = [20,22,24,26,29,32,36,40,44,48], fsIdx = 2;
-  try{ var fsv = parseInt(localStorage.getItem("gurbani-reader:fontsize-v1"), 10); if(fsv >= 0 && fsv < FS.length) fsIdx = fsv; }catch(e){}
+  try{ var fsRaw = localStorage.getItem("gurbani-reader:fontsize-v1");
+    var fsv = parseInt(fsRaw, 10); if(fsv >= 0 && fsv < FS.length) fsIdx = fsv;
+    else if(fsRaw === null && window.innerWidth >= 1280) fsIdx = 3;   /* first run on a big screen starts one step up (26px) — reading distance; any saved choice wins */
+  }catch(e){}
   function applyFs(){
     document.documentElement.style.setProperty("--reader-fs", FS[fsIdx] + "px");
     $("fontDown").disabled = fsIdx <= 0;
