@@ -669,11 +669,14 @@
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
   }
   function saveFocus(force){
-    if(!force && saveFocus._at && Date.now() - saveFocus._at < 3000) return;
     var found = currentLineEl(); if(!found) return;
     var item = state.lineAng[found.li]; if(item == null) return;
     var first = state.mode === "ang" ? state.angFirstLine[item] : state.baniFirstLine[item];
     if(typeof first !== "number") return;
+    /* the throttle only applies within the same item — when the audio has
+       moved to a new item (a rollover), the record is stale by definition
+       and updates immediately */
+    if(!force && glf && glf.mode === state.mode && glf.item === item && saveFocus._at && Date.now() - saveFocus._at < 3000) return;
     saveFocus._at = Date.now();
     writeFocus(item, found.li - first, state.flatLines[found.li].start, audio.currentTime || 0);
   }
@@ -818,8 +821,15 @@
     if(glf && !autoScrolling && !audioSwitching && (state.mode === "ang" || state.mode === "bani") &&
        !sheet.classList.contains("open") && $("angPop").hidden){
       var audioItem = state.mode === "ang" ? state.ang : state.id;
-      var following = !audio.paused && autoScrollOn && !manualHold && glf.mode === state.mode && audioItem === glf.item;
-      if(!following){
+      /* auto-scroll following the audio owns the position — the item
+         match is deliberately NOT required here: at a rollover the
+         focus record still names the previous Ang for a few hundred
+         milliseconds, and requiring the match flashed the pill at
+         every Ang change. A switch that just happened gets the same
+         grace while playback resumes. */
+      var following = !audio.paused && autoScrollOn && !manualHold;
+      var settling = !audio.paused && audioSwitchAt > 0 && Date.now() - audioSwitchAt < 2000;
+      if(!following && !settling){
         if(glf.mode !== state.mode || audioItem !== glf.item){ show = true; arrow = false; }
         else {
           var el = focusLineEl();
