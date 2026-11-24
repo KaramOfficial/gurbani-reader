@@ -294,7 +294,14 @@ focus (the tracker owns the position then; an earlier clock-keyed
 version popped up at every line change). It is evaluated on scroll,
 on the audio clock, and **at every render** (the view tracker alone
 only fires on viewed-item changes and once left it stale after a
-navigation load). Tapping it: if the pankti is rendered, glide back
+navigation load). One exemption matters: while playback is running
+with auto-scroll on and no manual hold, the tracker owns the position
+and the pill NEVER shows — the check must not require the focus
+record to name the current item, because at an Ang rollover the
+record lags the switch by a few hundred milliseconds and requiring
+the match flashed the pill at every Ang change (the focus save's
+throttle likewise applies only within one item, so the record
+follows the audio across a switch at the first save). Tapping it: if the pankti is rendered, glide back
 so it sits at the anchor, release the hold, and **mark it** on
 arrival; otherwise reopen its item through the restore machinery
 (§8), landing on the exact pankti with the audio parked there, and
@@ -385,6 +392,9 @@ as the changelog. The arc, by theme:
   audio, survives refresh/click-away/scroll) with Recenter reworked
   around it — including the cross-item return — and the held focus
   mark on landings; text sizes extended to 48px.
+- **Rollover pill flash (Nov 23):** the following-exemption drops its
+  item match and the focus-save throttle becomes per-item, so the
+  Recenter pill never flashes at an Ang change during auto-scroll.
 - **Exact refresh landing (Nov 23):** view restores bring back the
   whole screen (saved pixel position, verified, with line fallback);
   `focusedLine()` derives the spoken line from the audio clock (the
