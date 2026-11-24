@@ -217,6 +217,21 @@
   .nitnem-head.open .nitnem-chev{transform:rotate(180deg)}
   .nitnem-head:active{background:var(--accent-soft)}
   .nitnem-body{padding:2px 0 6px}
+  /* Sehaj Paath trackers: one row per journey */
+  .paath-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--hairline);border-radius:14px;background:var(--bg);margin:0 0 8px;cursor:pointer;min-height:0}
+  .paath-row:active{background:var(--accent-soft)}
+  .paath-row.current{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .paath-dot{width:8px;height:8px;border-radius:50%;background:var(--hairline);flex:none}
+  .paath-row.current .paath-dot{background:var(--accent)}
+  .paath-text{flex:1;min-width:0;display:flex;flex-direction:column}
+  .paath-name{font-size:14.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .paath-sub{font-size:12px;color:var(--muted);margin-top:1px;font-family:"Noto Sans Gurmukhi",sans-serif}
+  .paath-edit{flex:none;display:grid;place-items:center;width:40px;height:40px;min-height:40px;border-radius:50%;color:var(--muted)}
+  .paath-edit:active{background:var(--accent-soft)}
+  .paath-edit svg{width:15px;height:15px}
+  .paath-add{width:100%;padding:10px 12px;border:1px dashed var(--hairline);border-radius:14px;background:transparent;color:var(--accent-strong);font-weight:600;font-size:14px;cursor:pointer;min-height:0}
+  .paath-add:active{background:var(--accent-soft)}
+  .paath-input{flex:1;min-width:0;border:1px solid var(--accent);border-radius:9px;background:var(--paper);padding:7px 9px;font-size:14.5px;font-weight:600;color:var(--ink)}
   /* ---------- current-item island: drops in while browsing the stream ---------- */
   .ang-island{
     position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;z-index:45;
@@ -229,6 +244,22 @@
   }
   .ang-island.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
   /* ---------- recenter pill: appears when the audio's pankti is scrolled away ---------- */
+  /* the light-touch orb: during immersive playback (audio playing,
+     auto-scroll on, bars hidden) a tap anywhere raises only this one
+     small floating button — never the whole chrome. Tapping it opens
+     the full bars; it fades on its own after a few seconds. */
+  .orb{
+    position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:42;
+    width:46px;height:46px;min-height:46px;border-radius:50%;
+    display:grid;place-items:center;
+    background:var(--paper);border:1px solid var(--hairline);box-shadow:var(--shadow);
+    color:var(--ink-soft);
+    opacity:0;transform:translateY(10px) scale(.85);pointer-events:none;
+    transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1);
+  }
+  .orb.show{opacity:1;transform:none;pointer-events:auto}
+  .orb:active{background:var(--accent-soft)}
+  .orb svg{width:21px;height:21px}
   .recenter{
     position:fixed;bottom:150px;left:50%;z-index:45;
     transform:translate(-50%,16px);opacity:0;pointer-events:none;
@@ -403,6 +434,41 @@
     border:0;background:transparent;border-radius:999px;
     padding:6px 2px;font-size:13.5px;font-weight:600;min-height:38px;max-width:66px;color:var(--ink-soft);
   }
+  /* ---------- landscape phones: chrome collapses to two slim rows ----------
+     A landscape phone is only ~360-410px tall; the portrait chrome (a
+     two-row top bar + a two-row player, ~204px) would eat over half the
+     screen and hide the Bani. So in landscape the top bar becomes ONE
+     row (mark + title + pager inline, subtitle yields) and the player
+     becomes ONE row (seek and controls side by side — landscape has the
+     width for it). Same controls, same order, same behaviour; only the
+     shape changes. Scoped to short viewports so tablets keep the
+     portrait layout. */
+  @media (orientation: landscape) and (max-height: 500px){
+    .topbar{display:flex;align-items:center}
+    .topbar-in{flex:0 1 auto;padding:5px 4px 5px 10px}
+    .brand{gap:7px;flex:0 0 auto}
+    .brand .ik{width:30px;height:30px;font-size:16px}
+    .brand h1{display:none}
+    .brand p{display:none}
+    .now-playing{display:none}
+    .topbar .tbtn,.pager .tbtn{min-width:44px;min-height:44px}
+    .ctrl-row button{min-width:44px;min-height:44px}
+    .pager{flex:1 1 auto;max-width:none;border-top:0;padding:5px 10px 5px 0;align-self:center}
+    .pager-btn{width:34px;height:34px;min-height:34px}
+    .pager-cur{min-height:30px}
+    main{padding-top:calc(62px + env(safe-area-inset-top));padding-bottom:118px}
+    .book-head{padding:16px 0 6px}
+    .player{padding:0 10px calc(6px + env(safe-area-inset-bottom))}
+    .player-in{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:14px}
+    .seek-row{flex:1 1 auto;min-width:0}
+    .ctrl-row{flex:0 0 auto;margin-top:0}
+    .play-btn{width:40px;height:40px}
+    .skip-btn{width:38px;height:38px}
+    .skip-btn.auto-btn{width:38px;height:38px}
+    .speed-wrap{height:33px}
+    .speed-wrap select{min-height:33px}
+    .orb{bottom:calc(14px + env(safe-area-inset-bottom))}
+  }
 </style>
 </head>
 <body>
@@ -430,6 +496,7 @@
 
 <button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
 <button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button>
+<button class="orb" id="orbBtn" aria-label="Show the controls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg></button>
 
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" aria-label="Choose what to read">
@@ -484,6 +551,17 @@
         <div class="bani-grid" id="baniGrid"></div>
       </div>
     </div>
+    <div class="nitnem">
+      <button class="nitnem-head" data-paath-head aria-expanded="false">
+        <span class="nitnem-title">ਸਹਜ ਪਾਠ</span>
+        <span class="nitnem-note" data-paath-note>Sehaj Paath</span>
+        <span class="nitnem-chev" aria-hidden="true">▾</span>
+      </button>
+      <div class="nitnem-body" data-paath-body hidden>
+        <div data-paath-list></div>
+        <button class="paath-add" data-paath-add>+ New Sehaj Paath</button>
+      </div>
+    </div>
     <p class="ang-hint" style="margin-top:12px">Sehaj Paath audio by Bhagat Jaswant Singh Ji.</p>
     </div>
   </div>
@@ -515,6 +593,17 @@
       </button>
       <div class="nitnem-body" data-nitnem-body hidden>
         <div class="bani-grid" id="popBaniGrid"></div>
+      </div>
+    </div>
+    <div class="nitnem">
+      <button class="nitnem-head" data-paath-head aria-expanded="false">
+        <span class="nitnem-title">ਸਹਜ ਪਾਠ</span>
+        <span class="nitnem-note" data-paath-note>Sehaj Paath</span>
+        <span class="nitnem-chev" aria-hidden="true">▾</span>
+      </button>
+      <div class="nitnem-body" data-paath-body hidden>
+        <div data-paath-list></div>
+        <button class="paath-add" data-paath-add>+ New Sehaj Paath</button>
       </div>
     </div>
   </div>
@@ -601,13 +690,14 @@
   try{ if("scrollRestoration" in history) history.scrollRestoration = "manual"; }catch(e){}
   state.streamAngs = []; state.lineAng = {}; state.angLines = {};
   state.angFirstLine = {}; state.angFirstWord = {}; state.angHeight = {};
-  state.angDur = {}; state.appending = false;
+  state.angDur = {}; state.appending = false; state.prepending = false;
   /* Bani chain stream (Nitnem 5, then Sukhmani Sahib) — mirrors the Ang stream */
   var BANI_CHAIN = ["japji","jaap","tav","chaupai","anand","sukhmani"];
   state.streamBanis = []; state.baniGroups = {}; state.baniFirstLine = {}; state.baniFirstWord = {};
-  state.baniLineCount = {}; state.baniDur = {}; state.baniHeight = {}; state.appendingBani = false;
+  state.baniLineCount = {}; state.baniDur = {}; state.baniHeight = {}; state.appendingBani = false; state.prependingBani = false;
   function baniById(id){ return BANIS.find(function(b){ return b.id === id; }) || null; }
   function chainNext(id){ var i = BANI_CHAIN.indexOf(id); return (i >= 0 && i < BANI_CHAIN.length - 1) ? BANI_CHAIN[i + 1] : null; }
+  function chainPrev(id){ var i = BANI_CHAIN.indexOf(id); return i > 0 ? BANI_CHAIN[i - 1] : null; }
   function baniAudioUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".mp3"; }
   function baniDataUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".json"; }
   function preloadBaniAudio(id){ if(!id) return; var b = baniById(id); if(!b) return; var u = baniAudioUrl(b); if(preAudio.getAttribute("src") !== u){ preAudio.src = u; try{ preAudio.load(); }catch(e){} } }
@@ -642,7 +732,15 @@
     if(typeof first !== "number") return null;
     return { item: item, idx: li - first, start: state.flatLines[li].start, src: fromAudio ? "audio" : "view" };
   }
-  function savePlace(){
+  var navSettleUntil = 0;
+  function savePlace(force){
+    /* transient layouts lie: during a load (state already names the new
+       item, the screen still shows the old one) or a prepend compensation,
+       the anchor line under the crosshair belongs to the previous item —
+       a save sampled then writes a place whose focus line points at the
+       wrong Ang, and the next refresh bounces back to it. Stand down in
+       those windows; render's own post-landing save passes force. */
+    if(!force && (Date.now() < navSettleUntil || Date.now() < resizeSettleUntil || state.prepending || state.prependingBani)) return;
     try{
       localStorage.setItem(LAST_KEY, JSON.stringify({
         mode: state.mode, id: state.id, ang: state.ang,
@@ -844,6 +942,7 @@
       }
     }
     btn.classList.toggle("show", show);
+    if(show) hideOrb(); /* the two floating affordances never share the screen */
     if(show){
       $("rcArrow").textContent = arrow ? (up ? "↑" : "↓") : "";
       $("rcArrow").style.display = arrow ? "" : "none";
@@ -886,11 +985,37 @@
     var pl = document.querySelector(".player"), btn = $("recenterBtn");
     if(pl && btn) btn.style.bottom = (pl.offsetHeight + 10) + "px";
   }
-  window.addEventListener("resize", placeRecenter);
+  /* Rotation (and any resize) is a non-event: the layout reflows, the
+     anchor moves, line heights change — but the reading must not change.
+     While the reflow settles, the tracker, the bars logic and the view
+     tracker all stand down; then, if auto-scroll was following, the
+     spoken line is placed at the new anchor in ONE silent jump — never
+     chased at catch-up speed — and following resumes. The bars keep
+     whatever state they had; fullscreen is the browser's and is never
+     touched. */
+  var resizeSettleUntil = 0, resizeTimer = null;
+  window.addEventListener("resize", function(){
+    placeRecenter();
+    resizeSettleUntil = Date.now() + 400;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function(){
+      if(!audio.paused && autoScrollOn && !manualHold){
+        var found = currentLineEl();
+        if(found){
+          autoScrolling = true;
+          window.scrollTo(0, Math.max(0, found.el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
+          setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60);
+        }
+        trackKick();
+      }
+      updateRecenter();
+    }, 170);
+  });
   placeRecenter();
 
   function trackView(){
     if(audioSwitching) return;
+    if(Date.now() < resizeSettleUntil) return; /* no pager/island churn mid-rotation */
     if(sheet.classList.contains("open")) return;
     var pop = $("angPop"); if(pop && !pop.hidden) return;
     var key, label;
@@ -970,7 +1095,7 @@
       btns[i].classList.toggle("active", state.mode==="bani" && btns[i].getAttribute("data-bani")===state.id);
     }
   }
-  function openSheet(){ islandHide(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function openSheet(){ islandHide(); buildPaathLists(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
   function showMenuPanel(which){
     var st = $("sheetTitle"); if(st) st.textContent = which === "library" ? "Library" : "Menu";
     var main = $("menuMain"), lib = $("menuLibrary");
@@ -1006,6 +1131,153 @@
   var nheads = document.querySelectorAll("[data-nitnem-head]");
   for(var n=0;n<nheads.length;n++) nheads[n].addEventListener("click", function(){ setNitnemOpen(!nitnemOpen); });
   setNitnemOpen(nitnemOpen);
+
+  /* ---------- Sehaj Paath trackers ----------
+     A Sehaj Paath is one whole read of Sri Guru Granth Sahib Ji — days,
+     months, sometimes years — and a reader may keep several going. Each
+     tracker is a complete little world: its own saved place + its own
+     global focus, snapshotted under its id. The LIVE records always
+     belong to the current context (the Default state, or the selected
+     Paath); switching stashes the live records under the old context,
+     installs the target's, and lands through the same restore path as
+     a refresh — so "continue" lands on that Paath's pankti, marked,
+     with the audio parked there. Nothing per-read needs to know Paaths
+     exist. */
+  var PAATHS_KEY = "gurbani-reader:paaths-v1";
+  var paathData = { list: [], current: null };
+  try{ var pd0 = JSON.parse(localStorage.getItem(PAATHS_KEY) || "null"); if(pd0 && Array.isArray(pd0.list)) paathData = { list: pd0.list, current: pd0.current || null, defName: pd0.defName || null }; }catch(e){}
+  function savePaathData(){ try{ localStorage.setItem(PAATHS_KEY, JSON.stringify(paathData)); }catch(e){} }
+  if(!paathData.list.length){
+    paathData.list = [1,2,3,4].map(function(n){ return { id: "p" + n, name: "Sehaj Paath " + paNum(n) }; });
+    savePaathData();
+  }
+  paathData.list.forEach(function(x){ var mm = /^Sehaj Paath (\d+)$/.exec(x.name); if(mm) x.name = "Sehaj Paath " + paNum(parseInt(mm[1], 10)); });
+  savePaathData();
+  function paathById(id){ for(var i=0;i<paathData.list.length;i++) if(paathData.list[i].id === id) return paathData.list[i]; return null; }
+  function ctxKey(id){ return "gurbani-reader:ctx-" + (id || "default"); }
+  function readCtx(id){ try{ return JSON.parse(localStorage.getItem(ctxKey(id)) || "null"); }catch(e){ return null; } }
+  function writeCtx(id, snap){ try{ localStorage.setItem(ctxKey(id), JSON.stringify(snap)); }catch(e){} }
+  var paathsOpen = false;
+  try{ paathsOpen = localStorage.getItem("gurbani-reader:paaths-open") === "1"; }catch(e){}
+  function setPaathsOpen(open){
+    paathsOpen = open;
+    try{ localStorage.setItem("gurbani-reader:paaths-open", open ? "1" : "0"); }catch(e){}
+    var bodies = document.querySelectorAll("[data-paath-body]");
+    for(var i=0;i<bodies.length;i++) bodies[i].hidden = !open;
+    var heads = document.querySelectorAll("[data-paath-head]");
+    for(var j=0;j<heads.length;j++){ heads[j].classList.toggle("open", open); heads[j].setAttribute("aria-expanded", open ? "true" : "false"); }
+    if(open) buildPaathLists();
+  }
+  var pheads = document.querySelectorAll("[data-paath-head]");
+  for(var ph=0;ph<pheads.length;ph++) pheads[ph].addEventListener("click", function(){ setPaathsOpen(!paathsOpen); });
+  function paathPlaceLabel(id){
+    var place = (paathData.current === id) ? readPlace() : (readCtx(id) || {}).place;
+    if(!place) return "Not started";
+    if(place.mode === "bani"){ var bb = baniById((place.fl && place.fl.item) || place.id); return bb ? bb.pa : "ਨਿਤਨੇਮ"; }
+    var a = (place.fl && place.fl.item) || place.ang;
+    if(!a) return "Not started";
+    if(!id) return "ਅੰਗ " + paNum(a);
+    if(paathData.current === id) return "ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
+    return "Resume at ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
+  }
+  var paathEditing = null;
+  function buildPaathLists(){
+    var notes = document.querySelectorAll("[data-paath-note]");
+    var cur = paathData.current ? paathById(paathData.current) : null;
+    for(var n=0;n<notes.length;n++) notes[n].textContent = "Current · " + (cur ? cur.name : (paathData.defName || "Default"));
+    var lists = document.querySelectorAll("[data-paath-list]");
+    for(var c=0;c<lists.length;c++){
+      var html = "";
+      var row = function(id, name){
+        var isCur = paathData.current === id;
+        html += '<div class="paath-row' + (isCur ? " current" : "") + '" data-paath-row="' + (id || "") + '">';
+        html += '<span class="paath-dot" aria-hidden="true"></span>';
+        if(paathEditing !== null && paathEditing === (id || "@default")){
+          html += '<input class="paath-input" data-paath-input value="' + esc(name) + '" aria-label="Paath name" />';
+          html += '<button class="paath-edit" data-paath-save aria-label="Save name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></button>';
+        } else {
+          html += '<span class="paath-text"><span class="paath-name">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span></span>';
+          html += '<button class="paath-edit" data-paath-edit aria-label="Rename ' + esc(name) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4.2 1.2L5 16Z"/></svg></button>';
+        }
+        html += '</div>';
+      };
+      row(null, paathData.defName || "Default");
+      paathData.list.forEach(function(pt){ row(pt.id, pt.name); });
+      lists[c].innerHTML = html;
+    }
+    if(paathEditing){
+      var inp = document.querySelector("[data-paath-input]");
+      if(inp){ inp.focus(); inp.select(); }
+    }
+  }
+  function restoreFromPlace(pl){
+    if(pl && pl.mode === "ang" && pl.fl && pl.fl.src === "view" && pl.fl.item >= 1 && pl.fl.item <= 1430){ pendingRestore = pl; loadAng(pl.fl.item); }
+    else if(pl && pl.mode === "bani" && pl.fl && pl.fl.src === "view" && pl.fl.item){
+      var fb = baniById(pl.fl.item);
+      if(fb){ pendingRestore = pl; loadBani(fb); }
+      else if(pl.id){ var b0 = baniById(pl.id); if(b0){ pendingRestore = pl; loadBani(b0); } else loadBani(BANIS[0]); }
+      else loadBani(BANIS[0]);
+    }
+    else if(pl && pl.mode === "ang" && pl.ang >= 1 && pl.ang <= 1430){ pendingRestore = pl; loadAng(pl.ang); }
+    else if(pl && pl.mode === "bani" && pl.id){ var b = baniById(pl.id); if(b){ pendingRestore = pl; loadBani(b); } else loadBani(BANIS[0]); }
+    else loadAng(1);
+  }
+  function switchPaath(id){
+    closeSheet(); closeAngPop();
+    if(id === paathData.current) return;
+    try{ savePlace(); }catch(e){}
+    writeCtx(paathData.current, { place: readPlace(), glf: glf });
+    paathData.current = id; savePaathData();
+    var snap = readCtx(id);
+    if(snap && snap.place){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(snap.place)); }catch(e){} }
+    else { try{ localStorage.removeItem(LAST_KEY); }catch(e){} }
+    if(snap && snap.glf){ glf = snap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){} }
+    else { glf = null; try{ localStorage.removeItem(FOCUS_KEY); }catch(e){} }
+    paathEditing = null;
+    buildPaathLists();
+    restoreFromPlace(snap && snap.place);
+    updateRecenter();
+  }
+  function commitPaathRename(){
+    if(!paathEditing) return;
+    var inp = document.querySelector("[data-paath-input]");
+    if(inp){
+      var v = inp.value.replace(/\s+/g, " ").trim();
+      if(v){
+        if(paathEditing === "@default") paathData.defName = v;
+        else { var pt = paathById(paathEditing); if(pt) pt.name = v; }
+        savePaathData();
+      }
+    }
+    paathEditing = null;
+    buildPaathLists();
+  }
+  var paathLists = document.querySelectorAll("[data-paath-list]");
+  for(var pl2=0;pl2<paathLists.length;pl2++){
+    paathLists[pl2].addEventListener("click", function(e){
+      var saveBtn = e.target.closest("[data-paath-save]");
+      if(saveBtn){ commitPaathRename(); return; }
+      var editBtn = e.target.closest("[data-paath-edit]");
+      var rowEl = e.target.closest("[data-paath-row]");
+      if(editBtn && rowEl){ paathEditing = rowEl.getAttribute("data-paath-row") || "@default"; buildPaathLists(); return; }
+      if(e.target.closest("[data-paath-input]")) return;
+      if(rowEl) switchPaath(rowEl.getAttribute("data-paath-row") || null);
+    });
+    paathLists[pl2].addEventListener("keydown", function(e){
+      if(e.key === "Enter" && e.target.closest("[data-paath-input]")){ e.preventDefault(); commitPaathRename(); }
+      if(e.key === "Escape"){ paathEditing = null; buildPaathLists(); }
+    });
+  }
+  var paathAdds = document.querySelectorAll("[data-paath-add]");
+  for(var pa=0;pa<paathAdds.length;pa++) paathAdds[pa].addEventListener("click", function(){
+    var n = paathData.list.length + 1;
+    var names = {}; paathData.list.forEach(function(x){ names[x.name] = true; });
+    while(names["Sehaj Paath " + paNum(n)]) n++;
+    paathData.list.push({ id: "p" + Date.now().toString(36), name: "Sehaj Paath " + paNum(n) });
+    savePaathData(); buildPaathLists();
+  });
+  setPaathsOpen(paathsOpen);
+  buildPaathLists();
   function openAngPop(){
     if(sheet.classList.contains("open")) closeSheet();
     islandHide();
@@ -1013,6 +1285,7 @@
     popBaseAng = state.mode === "ang" ? (viewAng || state.ang) : null;
     if(state.mode === "ang" && state.ang) cur.textContent = "ਹੁਣ · ਅੰਗ " + paNum(popBaseAng);
     else if(state.mode === "bani" && state.id){ var cb = baniById(viewBaniId || state.id); cur.textContent = cb ? "ਹੁਣ · " + cb.pa : ""; }
+    buildPaathLists();
     $("popSteps").style.display = state.mode === "ang" ? "" : "none";
     $("popAngInput").value = "";
     angPop.hidden = false;
@@ -1057,11 +1330,24 @@
     if(audio.paused) return;
     barsTimer = setTimeout(function(){ if(!audio.paused) hideBars(); }, 3000);
   }
-  function showBars(){ document.body.classList.remove("bars-hidden"); scheduleAutoHide(); }
+  function showBars(){ hideOrb(); document.body.classList.remove("bars-hidden"); scheduleAutoHide(); }
+  var orbTimer = null;
+  function showOrb(){
+    var b = $("orbBtn"); if(!b) return;
+    if(recenterBtn.classList.contains("show")) return; /* Recenter outranks the orb — never both */
+    b.classList.add("show");
+    clearTimeout(orbTimer); orbTimer = setTimeout(hideOrb, 5000);
+  }
+  function hideOrb(){
+    var b = $("orbBtn"); if(!b) return;
+    b.classList.remove("show"); clearTimeout(orbTimer);
+  }
+  $("orbBtn").addEventListener("click", function(){ hideOrb(); showBars(); });
   function hideBars(){ if(sheet.classList.contains("open")) return; document.body.classList.add("bars-hidden"); }
   window.addEventListener("scroll", function(){
     var y = window.scrollY;
     if(autoScrolling){ lastY = y; return; }
+    if(Date.now() < resizeSettleUntil){ lastY = y; return; } /* a resize is not a scroll gesture — bars keep their state */
     manualScrollAt = Date.now(); flashArmed = true;
     if(y > lastY + 7 && y > 140){ hideBars(); }
     else if(y < lastY - 5 || y <= 60){
@@ -1077,7 +1363,15 @@
   window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp"){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); } });
   window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); }, {passive:true});
   document.addEventListener("click", function(e){
-    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet")) return;
+    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#orbBtn") || e.target.closest("#recenterBtn") || e.target.closest("#angPop") || e.target.closest(".ang-island")) return;
+    /* immersive playback (audio playing, auto-scroll on, bars hidden):
+       a tap anywhere — on a word, on a line, on empty space — raises only
+       the small floating button, never the whole chrome; a second tap
+       dismisses it. Outside that state, a tap calls the bars as before. */
+    if(!audio.paused && autoScrollOn && document.body.classList.contains("bars-hidden")){
+      if($("orbBtn").classList.contains("show")) hideOrb(); else showOrb();
+      return;
+    }
     showBars();
   });
 
@@ -1228,20 +1522,32 @@
         }
         if(focusLi < 0 && state.flatLines.length && pr.t >= state.flatLines[state.flatLines.length - 1].start) focusLi = state.flatLines.length - 1;
       }
+      var focusBase = 0;
+      if(focusLi >= 0){
+        var rb = state.mode === "ang" ? state.angFirstLine[pr.ang] : state.baniFirstLine[pr.id];
+        focusBase = typeof rb === "number" ? rb : 0;
+      }
       if(focusLi < 0 && pr.fl){
         /* a restore always lands on a fresh load, where the restored item is
            the first section and its lines start at index 0 — the first-line
            maps are only filled in after render(), so fall back to 0 */
         var base = state.mode === "ang" ? state.angFirstLine[pr.fl.item] : state.baniFirstLine[pr.fl.item];
         if(typeof base !== "number") base = 0;
+        focusBase = base;
         if(base + pr.fl.idx < state.flatLines.length) focusLi = base + pr.fl.idx;
       }
       /* the audio parks at the pankti's start — unless the recording had
          already played PAST the viewed pankti (listening with auto-scroll
          off, or browsing back while it played): then it parks at the true
          saved position, never rewound */
-      pendingSeek = viewFocus ? ((pr.t && focusLi >= 0 && pr.t >= state.flatLines[focusLi].end) ? pr.t : pr.fl.start)
-                              : (pr.t > 0 ? pr.t : (pr.fl ? pr.fl.start : 0));
+      var parkedAtLine = false;
+      if(viewFocus){
+        if(pr.t && focusLi >= 0 && pr.t >= state.flatLines[focusLi].end) pendingSeek = pr.t;
+        else { pendingSeek = pr.fl.start; parkedAtLine = focusLi >= 0; }
+      } else {
+        pendingSeek = pr.t > 0 ? pr.t : (pr.fl ? pr.fl.start : 0);
+        parkedAtLine = focusLi >= 0;
+      }
       if(focusLi >= 0){
         /* A view restore brings the whole SCREEN back: the saved pixel
            position, so the pankti the reader's eye was on returns to the
@@ -1252,15 +1558,34 @@
            mid-stream when saved), fall back to the line landing. */
         var useY = viewFocus && pr.y > 0;
         var scrollToFocus = function(){
-          if(useY){ window.scrollTo(0, pr.y); return; }
-          var el = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
-          if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
+          if(useY){ window.scrollTo(0, pr.y); }
+          else {
+            var el = contentEl.querySelector('.line[data-li="' + focusLi + '"]');
+            if(el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight * 0.35)));
+          }
+          /* the pill's verdict must be re-taken at the LANDED position —
+             its render-time call ran before the landing scroll, and the
+             view tracker early-returns when the item never changed, so
+             without this the pill could stay up over a perfect landing */
+          updateRecenter();
         };
         scrollToFocus(); /* land directly, before the first paint */
         /* the landed pankti is marked — the soft lite wash, but held: it
            stays for as long as the app sits idle at this focus, and clears
            when reading actually starts (a hand scroll, a play, a new tap) */
         markFocus(focusLi);
+        /* Landing DEFINES the focus when the restore is on the focus's own
+           item (or there is no focus yet) and the audio parks at the landed
+           pankti: the landed line becomes the global focus, so the pill
+           agrees with the landing and stays quiet — the reader is already
+           there. A restore onto a DIFFERENT item than the focus (clicked
+           away, then refreshed) leaves the focus untouched, and the pill
+           keeps offering the way back. */
+        if(parkedAtLine){
+          var rit = pr.fl ? pr.fl.item : (state.mode === "ang" ? pr.ang : pr.id);
+          if(rit != null && (!glf || (glf.mode === state.mode && glf.item === rit)))
+            writeFocus(rit, focusLi - focusBase, state.flatLines[focusLi].start, pendingSeek || state.flatLines[focusLi].start);
+        }
         setTimeout(function(){
           if(useY){
             var elA = document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round(window.innerHeight * 0.35));
@@ -1279,7 +1604,7 @@
         pendingSeek = pr.t || 0;
         if(pr.y > 0){ setTimeout(function(){ window.scrollTo(0, pr.y); }, 60); }
       }
-    } else { savePlace(); }
+    } else { savePlace(true); }
   }
 
   /* word tap: single = light highlight only · double = full highlight + play from word
@@ -1357,6 +1682,7 @@
   /* ---------- loading ---------- */
   function loadBani(b, autoplay){
     if(!b) return;
+    navSettleUntil = Date.now() + 2000;
     var token = ++state.loadToken;
     state.mode = "bani"; state.id = b.id; state.ang = null;
     state.titlePa = b.pa; state.titleEn = b.en;
@@ -1501,6 +1827,61 @@
     })
     .catch(function(){ state.appending = false; if(opts.play) loadAng(ang, true); });
   }
+  /* The stream runs both ways: landing on an Ang is a window into one
+     continuous scroll — the previous Ang prepends above as the reader
+     approaches the top, exactly as the next appends below. A prepended
+     section's lines are allocated at the END of flatLines (every lookup
+     goes through the per-item first-line maps, never through DOM order),
+     and the scroll position is compensated by the inserted height in the
+     same turn, so the page under the reader's eye never moves. */
+  function firstStreamEl(){
+    return contentEl.querySelector('section[data-ang], section[data-bani], .ang-spacer');
+  }
+  function compensateScroll(h){
+    if(!(h > 0)) return;
+    resizeSettleUntil = Date.now() + 250; /* bars/tracker/view stand down for the shift */
+    autoScrolling = true;
+    window.scrollTo(0, window.scrollY + h);
+    setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60);
+  }
+  function prependAng(ang){
+    if(state.mode !== "ang" || state.appending || state.prepending || !ang || ang < 1) return;
+    if(state.streamAngs.indexOf(ang) >= 0) return;
+    state.prepending = true;
+    var token = state.loadToken;
+    var c = chunkFor(ang);
+    fetch(BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json").then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(json){
+      state.prepending = false;
+      if(token !== state.loadToken || state.mode !== "ang") return;
+      var data = json.angs && json.angs[String(ang)];
+      if(!data || !data.lines || !data.lines.length) return;
+      if(state.streamAngs.indexOf(ang) >= 0) return;
+      var anchorEl = firstStreamEl(); if(!anchorEl) return;
+      var oldFirst = state.streamAngs[0];
+      state.angLines[ang] = data.lines; state.angDur[ang] = data.duration || 0;
+      state.angFirstLine[ang] = state.flatLines.length;
+      state.angFirstWord[ang] = state.flatWords.length;
+      var tmp = document.createElement("div");
+      tmp.innerHTML = '<section class="section" data-ang="' + ang + '">' + buildLinesInner(data.lines, ang) + '</section>';
+      var nodes = Array.prototype.slice.call(tmp.childNodes);
+      nodes.forEach(function(n){ anchorEl.parentNode.insertBefore(n, anchorEl); });
+      var oldSec = contentEl.querySelector('section[data-ang="' + oldFirst + '"]');
+      if(oldSec){
+        var st = document.createElement("div");
+        st.innerHTML = sepHTML(oldFirst);
+        var sepNode = st.firstChild;
+        oldSec.parentNode.insertBefore(sepNode, oldSec);
+        oldSec.classList.add("stream-sec");
+        nodes.push(sepNode);
+      }
+      state.streamAngs.unshift(ang);
+      var h = 0; nodes.forEach(function(n){ h += n.offsetHeight || 0; });
+      compensateScroll(h);
+      observeTail(); pruneStream();
+    })
+    .catch(function(){ state.prepending = false; });
+  }
   /* Virtualized windowing (the standard pattern: react-window / TanStack Virtual /
      RecyclerView): only the viewport window + overscan stays mounted. Far sections
      are swapped for measured-height spacers (height cached per Ang, so total height
@@ -1592,15 +1973,27 @@
   }, {rootMargin: "200% 0px 200% 0px"}) : {observe:function(){}, unobserve:function(){}, disconnect:function(){}};
   var tailObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
     if(!entries.some(function(e){ return e.isIntersecting; })) return;
-    if(state.mode !== "ang" || !autoScrollOn || state.appending) return;
+    if(state.mode !== "ang" || state.appending || state.prepending) return;
     var last = state.streamAngs[state.streamAngs.length - 1];
     if(last && last < 1430) appendAng(last + 1, {});
   }, {rootMargin: "0px 0px 150% 0px"}) : {observe:function(){}, disconnect:function(){}};
+  var headObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+    if(!entries.some(function(e){ return e.isIntersecting; })) return;
+    if(state.mode !== "ang" || state.appending || state.prepending) return;
+    var first = state.streamAngs[0];
+    if(first && first > 1) prependAng(first - 1);
+  }, {rootMargin: "150% 0px 0px 0px"}) : {observe:function(){}, disconnect:function(){}};
   function observeTail(){
-    if(!tailObserver.observe) return;
-    tailObserver.disconnect();
-    var secs = contentEl.querySelectorAll("section[data-ang]");
-    if(secs.length) tailObserver.observe(secs[secs.length - 1]);
+    if(tailObserver.observe){
+      tailObserver.disconnect();
+      var secs = contentEl.querySelectorAll("section[data-ang]");
+      if(secs.length) tailObserver.observe(secs[secs.length - 1]);
+    }
+    if(headObserver.observe){
+      headObserver.disconnect();
+      var firstEl = contentEl.querySelector('section[data-ang], .ang-spacer');
+      if(firstEl) headObserver.observe(firstEl);
+    }
   }
 
   /* ---------- Bani chain stream: Nitnem 5, then Sukhmani Sahib (same pattern as Angs) ---------- */
@@ -1677,6 +2070,48 @@
     })
     .catch(function(){ state.appendingBani = false; if(opts.play) loadBani(b, true); });
   }
+  function prependBani(id){
+    if(state.mode !== "bani" || state.appendingBani || state.prependingBani || !id) return;
+    var b = baniById(id); if(!b) return;
+    if(state.streamBanis.indexOf(id) >= 0) return;
+    state.prependingBani = true;
+    var token = state.loadToken;
+    fetch(baniDataUrl(b)).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(json){
+      state.prependingBani = false;
+      if(token !== state.loadToken || state.mode !== "bani") return;
+      var groups = normalize(json);
+      if(!groups.length) return;
+      if(state.streamBanis.indexOf(id) >= 0) return;
+      var anchorEl = firstStreamEl(); if(!anchorEl) return;
+      var oldFirst = state.streamBanis[0];
+      state.baniGroups[id] = groups; state.baniDur[id] = json.duration || 0;
+      state.baniFirstLine[id] = state.flatLines.length;
+      state.baniFirstWord[id] = state.flatWords.length;
+      var tmp = document.createElement("div");
+      tmp.innerHTML = '<section class="section" data-bani="' + id + '">' + buildBaniInner(groups, id) + '</section>';
+      state.baniLineCount[id] = state.flatLines.length - state.baniFirstLine[id];
+      var nodes = Array.prototype.slice.call(tmp.childNodes);
+      nodes.forEach(function(n){ anchorEl.parentNode.insertBefore(n, anchorEl); });
+      var oldSec = contentEl.querySelector('section[data-bani="' + oldFirst + '"]');
+      if(oldSec){
+        var ob = baniById(oldFirst);
+        if(ob){
+          var st = document.createElement("div");
+          st.innerHTML = sepBaniHTML(ob);
+          var sepNode = st.firstChild;
+          oldSec.parentNode.insertBefore(sepNode, oldSec);
+          oldSec.classList.add("stream-sec");
+          nodes.push(sepNode);
+        }
+      }
+      state.streamBanis.unshift(id);
+      var h = 0; nodes.forEach(function(n){ h += n.offsetHeight || 0; });
+      compensateScroll(h);
+      observeBaniTail(); pruneBaniStream();
+    })
+    .catch(function(){ state.prependingBani = false; });
+  }
   function renderedBanis(){
     return state.streamBanis.filter(function(id){ return !!contentEl.querySelector('section.stream-sec[data-bani="' + id + '"]'); });
   }
@@ -1720,20 +2155,34 @@
   }, {rootMargin: "200% 0px 200% 0px"}) : {observe:function(){}, unobserve:function(){}, disconnect:function(){}};
   var baniTailObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
     if(!entries.some(function(e){ return e.isIntersecting; })) return;
-    if(state.mode !== "bani" || !autoScrollOn || state.appendingBani) return;
+    if(state.mode !== "bani" || state.appendingBani || state.prependingBani) return;
     var last = state.streamBanis[state.streamBanis.length - 1];
     var nx = last ? chainNext(last) : null;
     if(nx) appendBani(nx, {});
   }, {rootMargin: "0px 0px 150% 0px"}) : {observe:function(){}, disconnect:function(){}};
+  var baniHeadObserver = ("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+    if(!entries.some(function(e){ return e.isIntersecting; })) return;
+    if(state.mode !== "bani" || state.appendingBani || state.prependingBani) return;
+    var first = state.streamBanis[0];
+    var pv = first ? chainPrev(first) : null;
+    if(pv) prependBani(pv);
+  }, {rootMargin: "150% 0px 0px 0px"}) : {observe:function(){}, disconnect:function(){}};
   function observeBaniTail(){
-    if(!baniTailObserver.observe) return;
-    baniTailObserver.disconnect();
-    var secs = contentEl.querySelectorAll("section[data-bani]");
-    if(secs.length) baniTailObserver.observe(secs[secs.length - 1]);
+    if(baniTailObserver.observe){
+      baniTailObserver.disconnect();
+      var secs = contentEl.querySelectorAll("section[data-bani]");
+      if(secs.length) baniTailObserver.observe(secs[secs.length - 1]);
+    }
+    if(baniHeadObserver.observe){
+      baniHeadObserver.disconnect();
+      var firstEl = contentEl.querySelector('section[data-bani], .ang-spacer');
+      if(firstEl) baniHeadObserver.observe(firstEl);
+    }
   }
   setInterval(function(){ pruneStream(); pruneBaniStream(); }, 1500);
 
   function loadAng(ang, autoplay){
+    navSettleUntil = Date.now() + 2000;
     var token = ++state.loadToken;
     state.mode = "ang"; state.ang = ang; state.id = null;
     var paTitle = "ਅੰਗ " + paNum(ang);
@@ -1848,7 +2297,7 @@
     }
     setPlayIcon(false); showBars(); clearHighlight();
   });
-  audio.addEventListener("play", function(){ applySpeed(); clearFocusMark(); });
+  audio.addEventListener("play", function(){ applySpeed(); clearFocusMark(); hideOrb(); });
   audio.addEventListener("loadedmetadata", function(){
     applySpeed();
     tDur.textContent = fmt(audio.duration || state.duration || 0);
@@ -2024,6 +2473,7 @@
     trackRAF = requestAnimationFrame(trackStep);
     var dt = trackLastTs ? Math.min(0.05, Math.max(0.001, (ts - trackLastTs) / 1000)) : 0.016;
     trackLastTs = ts;
+    if(Date.now() < resizeSettleUntil) return; /* reflow settling — stand down, the resize handler re-anchors */
     if(manualHold){ trackMoving = false; autoScrolling = false; return; }
     var found = currentLineEl();
     if(!found){ trackMoving = false; autoScrolling = false; return; }
