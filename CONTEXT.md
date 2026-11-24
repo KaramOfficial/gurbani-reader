@@ -147,23 +147,38 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
 
 ## 6. Auto-scroll — the tracker
 
-- A `requestAnimationFrame` tracker keys on the **spoken word**, not the
-  line (redesigned Nov 24 after a design jury; the line-change trigger
-  broke at large fonts, where a pankti spans 5–6 rows). A **focus zone**
-  sits around the anchor (35% of viewport height): top = anchor −
-  max(½ line-height, 4% of height), bottom = min(anchor + max(2
-  line-heights, 16% of height), height − 72px), floored at anchor +
-  1.2 line-heights. While the spoken word's rect is inside the zone the
-  page is **still** — however many words go by; only when the word exits
-  the zone does the tracker glide, landing the word's top back on the
-  anchor (settle ~6px, time-normalised easing, 130px/frame cap). The
-  zone replaces both the old fixed 46px deadband and paragraph mode's
-  30–45% band — one model for lines and paragraphs, every font size and
-  orientation. The sentence highlight still paints the **full pankti**;
-  only the scroll trigger is word-based, so a giant pankti's later words
-  never sink below the screen waiting for a line change. If the spoken
-  word's element is not in the DOM (spacer-swapped section), the tracker
-  falls back to the legacy line behaviour for that frame.
+- A `requestAnimationFrame` tracker keys on the **spoken word**, never
+  on line change (a pankti can span 5–6 rows at large fonts; the
+  sentence highlight still paints the **full pankti**, but the scroll
+  never waits for it). It serves the **focus section**: a fixed band
+  of the *screen* — not of the text — in the upper-centre of the
+  viewport. The section is anchored to the screen; lines are anchored
+  to the section.
+  - **Size — a whole number of lines, auto-determined.** From the
+    measured line height (which carries the font size) and a height
+    budget that depends on the viewport's shape: portrait phone 34%
+    of height, short landscape 46%, desktop (≥1024 wide, ≥700 tall)
+    36% — the line count is `clamp(floor(budget / line-height), 2, 4)`.
+    So the section holds 2, 3 or 4 lines depending on the device, the
+    orientation, the font size and the layout (lines or paragraph —
+    the measured line height is the row height in both).
+  - **Position — upper-centre, fixed fractions.** Top edge at 26% of
+    height (portrait), 18% (short landscape), 24% (desktop); bottom
+    capped at height − 120px (clear of the player), floored at
+    top + 1.2 line-heights.
+  - **Motion — anticipatory.** The page is **still** while the spoken
+    word *and the word after it* are both inside the section. The
+    moment the spoken word is the **last word in the section**, the
+    tracker glides (time-normalised easing, 130px/frame cap, settle
+    ~6px), landing that word's top at the section's top — so the next
+    words flow in beneath it and are already in view when their turn
+    comes. The reader's eyes never leave the section, and no spoken
+    word sinks toward the bottom of the screen waiting to be rescued.
+    Recenter, the restore landing and the rotation re-anchor all land
+    their pankti's first word at the same section top.
+  - If the spoken word's element is not in the DOM (spacer-swapped
+    section), the tracker falls back to legacy line behaviour for
+    that frame.
 - Rollover between Angs must not slam the new first line to the top —
   the tracker carries it to the anchor like any other line.
 - **The manual hold (Maps model, §9 Recenter):** the moment the reader
@@ -173,15 +188,17 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   was rejected.) The hold releases only when: the reader scrolls back
   so the audio's pankti is within the anchor band again, taps Recenter,
   presses play, taps a word/line to play from there, or the item
-  changes. (Since the Nov 24 zone redesign, "back in place" for the
-  hold and for the Recenter pill means the spoken/focus word is inside
-  the focus zone, not the old 46px line band.) The audio itself is never paused or moved by any of this.
+  changes. ("Back in place" for the hold and for the Recenter pill
+  means the spoken/focus word is inside the focus section.) The audio itself is never paused or moved by any of this.
 - **Rotation is a non-event:** rotating the phone mid-playback must not
   chase-scroll, flash the pill, or change the bars' state. On resize
   the tracker stands down for a short settle window (~400ms), then the
-  spoken line is placed at the new anchor in ONE instant jump and the
-  tracker resumes; fullscreen is the browser's to keep and is never
-  touched. (The pre-fix behaviour — the tracker easing across the whole
+  spoken word is placed at the new section's top in ONE instant jump
+  and the tracker resumes; the focus section itself is re-derived
+  from the new orientation's dimensions at the same moment (its cache
+  keys on width as well as height, font and layout), so a landscape
+  section and a portrait section are each sized for their own screen.
+  Fullscreen is the browser's to keep and is never touched. (The pre-fix behaviour — the tracker easing across the whole
   distance at full speed after every rotation — read as a fast,
   wrong-feeling scroll.)
 
@@ -548,8 +565,8 @@ accent inline, or its own centred line when the header setting says Own
 line), after a ਰਹਾਉ pankti, and after 5 panktis at the next verse-end;
 never across a section/Ang. Word + ॥ + verse number are one unbreakable
 unit (`joinParts` glues punctuation-only parts with NBSP in para mode).
-Auto-scroll/Recenter anchor the pankti's FIRST WORD at 35%; the tracker
-eases only outside a 30–45% tolerance band. Menu → Display: **Layout**
+Auto-scroll and Recenter work exactly as in lines mode — the focus
+section (§6) measures its line height from the wrapped rows. Menu → Display: **Layout**
 (Lines/Paragraphs) + **Paragraph headers** (Inline/Own line). Layout is
 stored PER SIZE CLASS (`layout-wide-v1` / `layout-narrow-v1`; wide =
 ≥761px wide and ≥500px tall), defaults Paragraphs-wide / Lines-narrow, is
@@ -623,120 +640,14 @@ special place comes from standing alone, never inline with the rest —
 in paragraph/print flow too, where it is a forced block that breaks
 the flow before and after.
 
-## 11. Revision history (74 commits, 2026-11-21 → 2026-11-24)
+## 11. History
 
-The git log is the full record — commit messages are written to be read
-as the changelog. The arc, by theme:
-
-- **Foundations (Nov 21):** from-scratch reading UI; no moving highlight
-  (Checker-only); bars hide on forward scroll; tap highlight expires at
-  the word/line end; Wake Lock; first auto-scroll (middle band, pause on
-  manual scroll); auto-scroll toggle; bars auto-hide ~3s into playback.
-- **Text correctness (Nov 21–22):** dandi fix — render from `line.text`
-  (readgurbani-verified); vishraams coloured, then corrected to
-  symbols-hidden/word-coloured in readgurbani colours.
-- **Continuity (Nov 21–22):** saved place in localStorage; anchor moved
-  to 35%; continuous Sehaj Paath (Ang rolls into Ang); infinite Ang
-  stream with separators, windowing, preload; Bani chain stream;
-  `?ang=N` deep links (consumed once, then stripped).
-- **Design passes (Nov 22):** designed top bar + Menu; fullscreen icon
-  family; auto-fullscreen once flowing; player row balance; two-step
-  compact Menu; catch-up flash rules + timing fix; follow-along becomes
-  the 3-way Off/Sentence/Word setting; a misplaced-block bug that broke
-  highlight expiry, found and fixed.
-- **Smoothness & navigation (Nov 23):** continuous rAF tracker replaces
-  burst scrolling; seamless Ang switches (bars stay away, next item
-  prefetched from 45s out, stale `?ang=` refresh loop fixed); top-bar
-  pager (labelled pills → minimal chevron-only); switcher popup +
-  Library rework + island (Cook pass, 8/10); island/view tracking goes
-  per-frame and works during auto-scroll too; steppers corrected to
-  −1/+1; one tap model for sentences and words, with the self-fading
-  lite wash.
-- **Memory & focus (Nov 23):** font size + speed persistence (they were
-  never saved); the saved place gains the focused pankti (`fl`), then
-  the main-position rule (anchor line while browsing), then restore by
-  deriving the pankti from the saved audio position with **direct
-  landing**, plus the soft landing highlight.
-- **Speed & Recenter (Nov 23):** playbackRate held across automatic
-  track changes (re-apply on metadata/play); Recenter pill added, then
-  reworked onto the manual-hold model so it can never pop up during
-  auto-scroll, with manual scroll suspending auto-scroll until return
-  or recenter.
-- **Global focus (Nov 23):** the global last focus record (follows the
-  audio, survives refresh/click-away/scroll) with Recenter reworked
-  around it — including the cross-item return — and the held focus
-  mark on landings; text sizes extended to 48px.
-- **Rollover pill flash (Nov 23):** the following-exemption drops its
-  item match and the focus-save throttle becomes per-item, so the
-  Recenter pill never flashes at an Ang change during auto-scroll.
-- **Exact refresh landing (Nov 23):** view restores bring back the
-  whole screen (saved pixel position, verified, with line fallback);
-  `focusedLine()` derives the spoken line from the audio clock (the
-  `CurLine` trap's second bite); a view restore never rewinds the
-  audio past the viewed pankti.
-- **Two-way stream, rotation, orb, landscape, Paaths (Nov 23):** the
-  stream prepends as well as appends (scroll-up infinite, compensated,
-  same memory window); a same-item refresh adopts the landed pankti as
-  the focus; rotation re-anchors in one instant step inside a settle
-  window instead of chase-scrolling; place saves stand down during
-  transient layouts (a stale-anchor save had been bouncing refreshes
-  back to the previous Ang); immersive taps raise a small orb instead
-  of the full chrome; landscape gets one-row merged chrome (Cook jury
-  6.5/10 → fixes applied: centred pager, seek widened, 44px targets,
-  orb/Recenter mutually exclusive); Sehaj Paath trackers land as
-  snapshot worlds in a Library/switcher expandable.
-- **Preview, rename fix, tap-to-dismiss, sign-in (Nov 23, later):**
-  Paath rows preview their focus pankti; the popup-surface rename
-  bug is fixed (it read the other surface's input and silently
-  saved the old value); a tap on empty space dismisses showing
-  bars; optional Google sign-in syncs place/Paaths/settings via
-  the Tracker's Firebase project.
-- **Normal-speed preview (Nov 24):** triple-tap a word (a
-  long-press at first — it fought text selection, so the owner
-  moved it) to hear it and the next few at 1× under a floating
-  pill, then the reader's own speed resumes from that spot; the
-  speed control is never touched.
-- **Quick cluster (Nov 24):** the immersive orb grew into a
-  three-part cluster — play/pause, a tap-to-cycle speed pill, and
-  the sliders orb — same tap trigger, same 5s fade; Cook jury Day
-  7.5/10, Night 8/10, fixes applied.
-- **Default (free) reading + Paath popup (Nov 24, later):** the
-  detour generalised into a standing Default mode (mode-v1), the
-  named go-to-Paath pill replaced by icon buttons flanking a
-  centred Recenter, a Paath popup (go / assign modes), and
-  set-any-Paath-to-this-pankti. See §9.
-- **Deep-link detour (Nov 24):** ?ang=N&line=L from Pankti Voice
-  Search lands on the exact pankti as a visit with its own
-  persisted place/focus (detour-v1) — it survives refreshes, never
-  writes the saved place/focus or any Sehaj Paath snapshot.
-  Recenter stays normal inside it (detour's own focus); a second
-  floating pill beside Recenter — book glyph + the remembered
-  active Paath's name — is the exit back to that Paath.
-- **Night deepened (Nov 24):** night text #968b76 → washed warm
-  grey #6e6759, whole scale in proportion (Cook jury 9/10).
-- **Cluster column (Nov 24):** the quick cluster is a vertical
-  column along the right edge, not a bottom row; it also carries
-  the font A− / A+ pair (driving the Menu's own buttons), ordered
-  play/pause, speed, A−, A+, settings.
-- **Advanced mode (Nov 24):** a Menu → Reading Off/On seg unlocks
-  speeds 2.25×–3×; off, the ladder is the classic five.
-- **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
-  Night (true black, washed-out, least light) — Menu seg plus a
-  cycling top-bar button beside Full screen; Cook jury Night 8/10,
-  Day 6.5/10, fixes applied.
-- **Large screens + paragraph mode (Nov 24):** unified 700px caps,
-  centred Menu panel and column-anchored cluster at desktop widths;
-  print-style paragraph flow (readgurbani-like) with per-size-class
-  Layout setting.
-- **Word-exit auto-scroll (Nov 24):** the tracker redesign in §6.
-- **Lines-mode crash fix (Nov 24):** paragraph mode's `joinParts`
-  shipped an infinitely recursive non-paragraph branch
-  (`return joinParts(parts)`), so every lines-mode load died with a
-  stack overflow behind the fetch-error state. Fixed to a plain join;
-  caught by harness bisect (para loads fine, lines loads dead).
-- **Mool Mantar own line (Nov 24):** see §10 (a framed version
-  shipped first; the owner replaced it with the frameless standalone
-  line the same day).
+This document describes the solution **in its final state only** — it
+is a solution architecture document, not a changelog. When a design
+changes, the relevant section above is rewritten to the new final
+state; nothing historical accumulates here. The full record of how
+the design evolved is the git log of this repository, whose commit
+messages are written to be read as the changelog.
 
 ## 12. Rebuild checklist (any platform)
 
@@ -748,8 +659,11 @@ as the changelog. The arc, by theme:
    end; **hold the playback rate across track loads** (§5).
 4. Continuous stream with windowing for both Angs and the Bani chain
    (§4); Rehraas/Sohila standalone.
-5. Auto-scroll: continuous easing to a 35% anchor, 46px calm band, and
-   the **manual-hold suspension** — never a timed yank-back (§6).
+5. Auto-scroll: the focus section — screen-anchored in the
+   upper-centre, sized in whole lines (2–4) from line height and
+   viewport shape, anticipatory glides that begin when the spoken
+   word is the section's last word — and the **manual-hold
+   suspension**, never a timed yank-back (§6).
 6. Derive the current pankti from clock + timestamps for every feature
    that needs it; never key features off highlight state (§7).
 7. Persist **every** setting and the place record with `fl.src`
