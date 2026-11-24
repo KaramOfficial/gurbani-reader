@@ -106,6 +106,17 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
 - **Windowing:** far sections collapse to measured-height spacers and
   rehydrate on approach (IntersectionObserver sentinels), so a 1430-Ang
   stream stays memory-safe. Section heights are measured and remembered.
+- **Bidirectional:** the stream is infinite in BOTH directions. Landing
+  on any Ang also loads the Angs before it (head sentinels mirror the
+  tail ones), so the reader can scroll up across separators exactly as
+  they scroll down; the same applies along the Bani chain (a previous
+  link exists for every chain Bani except the first). Prepending inserts
+  the sections above and compensates the scroll position by their exact
+  height in the same gesture, so the pankti under the reader's eye never
+  moves. New sections' lines join the same flat line list — every lookup
+  goes through the per-item first-line maps, never DOM order — and the
+  pruning window is unchanged, so memory stays bounded no matter how
+  far the reader travels in either direction.
 - **Prefetch:** when playback comes within ~45 seconds of an item's end,
   the next item's audio *and* text chunk start loading, so the switch
   plays like one connected stream.
@@ -150,6 +161,14 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   so the audio's pankti is within the anchor band again, taps Recenter,
   presses play, taps a word/line to play from there, or the item
   changes. The audio itself is never paused or moved by any of this.
+- **Rotation is a non-event:** rotating the phone mid-playback must not
+  chase-scroll, flash the pill, or change the bars' state. On resize
+  the tracker stands down for a short settle window (~400ms), then the
+  spoken line is placed at the new anchor in ONE instant jump and the
+  tracker resumes; fullscreen is the browser's to keep and is never
+  touched. (The pre-fix behaviour — the tracker easing across the whole
+  distance at full speed after every rotation — read as a fast,
+  wrong-feeling scroll.)
 
 ## 7. The focus pankti — one source of truth
 
@@ -179,6 +198,9 @@ this derivation.
 | `gurbani-reader:hlmode-v1` | Follow-along mode: off / sentence / word |
 | `gurbani-reader:autoscroll-v1` | Auto-scroll on/off |
 | `gurbani-reader:nitnem-open` | Nitnem section expanded in switcher/Library |
+| `gurbani-reader:paaths-v1` | Sehaj Paath trackers: the list, the current one, the Default's custom name |
+| `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` (`ctx-default` for the Default) |
+| `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 
 Font sizes: `[20, 22, 24, 26, 29, 32, 36, 40, 44, 48]px`, default
 index 2 (24px). New sizes are only ever **appended** — a saved index
@@ -187,7 +209,14 @@ saved** (reset every visit) — the owner caught this; every
 user-facing setting must persist.
 
 **The saved place** is written on scroll (debounced), on page hide, on
-item switches, and on tap-to-play. Shape:
+item switches, and on tap-to-play. One guard matters: saves stand down
+during transient layouts — the ~2s after a load begins (state already
+names the new item while the screen still shows the old one), during a
+prepend compensation, and mid-prepend. A save sampled in those windows
+reads the anchor line off the *previous* item's layout and writes a
+place whose `fl` points at the wrong Ang; the next refresh then
+bounces back to it. Render's own post-landing save is exempt (it forces)
+because by then the new layout is the truth. Shape:
 `{ mode, id, ang, y, t, ts, fl }` where `t` is the audio position and
 `fl` is the **focused pankti**: `{ item, idx, start, src }` — the item,
 the line's index within it, its audio start, and where the focus came
@@ -220,7 +249,16 @@ the line at the 35% anchor, is the one saved, not a stale spoken line).
    open-at-the-top-then-jump. Later settle passes (≈450ms, ≈1200ms, and
    when webfonts finish) correct for layout shift, and the browser's own
    scroll restoration is disabled so it cannot fight the placement.
-6. **The focus mark:** the landed pankti is marked with the app's soft
+6. **Refresh adopts the landed pankti as the focus:** when a restore
+   lands on the SAME item the global focus already belongs to (the
+   ordinary refresh), the landed pankti *becomes* the global focus —
+   the reader refreshed while reading there, so that pankti is now
+   "the one". Without this the pill kept offering a return to the
+   older audio pankti and sat over a perfectly good landing. A restore
+   onto a DIFFERENT item (he had clicked away before refreshing) does
+   not adopt: the focus stays where it was and the pill keeps offering
+   the way back.
+7. **The focus mark:** the landed pankti is marked with the app's soft
    "lite" wash (§9 tap model) — but HELD, not faded: it stays for as
    long as the app sits idle at that focus, so anyone picking the
    phone up sees "this was the one". It clears the moment reading
@@ -259,9 +297,9 @@ audio item.
 A−/A+ with live preview on the page behind; Reading — follow-along
 switch; a Library row), and Library extends on the second step with a
 back row. Inside Library, the same pattern as the popup: Ang switcher
-first, Nitnem expandable below, and the audio credit ("Sehaj Paath audio
-by Bhagat Jaswant Singh Ji.") as the panel footer. The sheet title
-follows the panel (Menu / Library).
+first, Nitnem expandable below, then the Sehaj Paath expandable, and
+the audio credit ("Sehaj Paath audio by Bhagat Jaswant Singh Ji.") as
+the panel footer. The sheet title follows the panel (Menu / Library).
 
 **The island.** While hand-browsing, a floating pill drops in at the top
 when the item on screen changes, showing that item (ਅੰਗ ੧੬੬ / Bani name).
@@ -335,6 +373,46 @@ line's end time passes.
 toggle right as an icon-only round button whose ON state is an accent
 **ring**, not a filled disc. Auto-scroll defaults ON and persists.
 
+**The orb (immersive interruption).** While audio plays with
+auto-scroll on and the bars hidden, a tap ANYWHERE — on a word, on a
+line, on empty space — raises only a small floating circular button
+(bottom-right, sliders glyph) instead of the whole chrome; a second
+tap dismisses it, and it fades on its own after ~5s. Tapping the orb
+calls the full bars. It never appears together with the Recenter pill
+(Recenter outranks it). Outside immersive playback, taps behave as
+they always did (a tap calls the bars). The point is a cheap, low-
+commitment interruption while reading is flowing: one tap to *maybe*
+interrupt, one more to actually open the UI.
+
+**Sehaj Paath trackers.** A Sehaj Paath is one whole read of Sri Guru
+Granth Sahib Ji — days to years — and a reader may keep several going
+at once. Below the Nitnem expandable (in BOTH the Library and the
+switcher popup, same pattern, shared persisted expand state) sits a
+ਸਹਜ ਪਾਠ expandable whose header note names the current context
+("Current · …"). Rows: the **Default** state (the untracked reading —
+the app's original behaviour) plus one row per journey, seeded with
+four ("Sehaj Paath ੧–੪", Gurmukhi numerals) and addable without limit
+via "+ New Sehaj Paath". Each journey is a complete snapshot world —
+its own saved place + its own global focus (`ctx-<id>`): switching
+stashes the live records under the old context, installs the target's,
+and lands through the ordinary restore machinery, so "continue" opens
+the journey's Ang on its pankti, marked, audio parked. A journey with
+no snapshot starts at ਅੰਗ ੧. Row sub-labels say the action: "Resume at
+ਅੰਗ ੧੬੫ · 12% complete" for a journey in progress ("ਅੰਗ … · % complete"
+for the current one), "Not started" otherwise; the Default row shows
+just its Ang. Every row — Default included — carries a pencil to
+rename it inline. Nothing in the reading/playback code knows trackers
+exist; the live records always belong to the current context.
+
+**Landscape phones.** In landscape (short height), the chrome merges
+to one row each: the top bar drops the wordmark to the ੴ mark alone so
+the pager (chevrons + current item) sits centred as one unit, the
+collection subtitle is dropped, and the player drops its now-playing
+block so the seek bar gets the width (~288px vs ~170px) — total chrome
+≈117px of a 412px height (was ~196px, nearly half the screen), with
+44px minimum touch targets. Rotating changes nothing else: bars
+hidden stays hidden, bars shown stays shown, fullscreen persists.
+
 ## 10. Design language
 
 Settled in a dedicated design pass (the "Cook" jury process — benchmark
@@ -349,7 +427,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (46 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (48 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -398,8 +476,19 @@ as the changelog. The arc, by theme:
 - **Exact refresh landing (Nov 23):** view restores bring back the
   whole screen (saved pixel position, verified, with line fallback);
   `focusedLine()` derives the spoken line from the audio clock (the
-  `curLine` trap's second bite); a view restore never rewinds the
+  `CurLine` trap's second bite); a view restore never rewinds the
   audio past the viewed pankti.
+- **Two-way stream, rotation, orb, landscape, Paaths (Nov 23):** the
+  stream prepends as well as appends (scroll-up infinite, compensated,
+  same memory window); a same-item refresh adopts the landed pankti as
+  the focus; rotation re-anchors in one instant step inside a settle
+  window instead of chase-scrolling; place saves stand down during
+  transient layouts (a stale-anchor save had been bouncing refreshes
+  back to the previous Ang); immersive taps raise a small orb instead
+  of the full chrome; landscape gets one-row merged chrome (Cook jury
+  6.5/10 → fixes applied: centred pager, seek widened, 44px targets,
+  orb/Recenter mutually exclusive); Sehaj Paath trackers land as
+  snapshot worlds in a Library/switcher expandable.
 
 ## 12. Rebuild checklist (any platform)
 
