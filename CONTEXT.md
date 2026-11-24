@@ -600,16 +600,15 @@ design reset.
 
 **Mool Mantar (Nov 24).** The opening pankti of Japji Sahib and of
 Ang 1 (ੴ ਸਤਿਨਾਮੁ … ਗੁਰਪ੍ਰਸਾਦਿ ॥ — detected by content in all three line
-builders; it occurs nowhere else in this form) is always presented in
-the printed-Gutka page-1 frame: a double rule (1.5px `--accent` outer
-border + `--hairline` inner rule via inset box-shadow on `--paper`),
-centred text at 1.12× the reader font size, and ੴ — still the line's
-first word, with its own timing/tap/highlight — at 1.45× in
-`--accent-strong`. No shadow, no fill colour, palette variables only,
-so Day/Auto/Night inherit. In paragraph mode the frame is a forced
-block. (Cook jury: Gutka frame 8.7/10 over invocation-rules 7.2 and
-plaque-panel 5.4; references were printed Gutka page 1 and Mool Mantar
-calligraphy plaques.)
+builders; it occurs nowhere else in this form) always stands on **its
+own ceremonial line**: a centred block at 1.12× the reader font size
+with generous air above and below, and ੴ — still the line's first
+word, with its own timing/tap/highlight — at 1.45× in
+`--accent-strong`. **No frame and no special background** (a framed
+version shipped first and the owner rejected it the same day): the
+special place comes from standing alone, never inline with the rest —
+in paragraph/print flow too, where it is a forced block that breaks
+the flow before and after.
 
 ## 11. Revision history (74 commits, 2026-11-21 → 2026-11-24)
 
@@ -717,7 +716,9 @@ as the changelog. The arc, by theme:
   (`return joinParts(parts)`), so every lines-mode load died with a
   stack overflow behind the fetch-error state. Fixed to a plain join;
   caught by harness bisect (para loads fine, lines loads dead).
-- **Mool Mantar Gutka frame (Nov 24):** see §10.
+- **Mool Mantar own line (Nov 24):** see §10 (a framed version
+  shipped first; the owner replaced it with the frameless standalone
+  line the same day).
 
 ## 12. Rebuild checklist (any platform)
 
