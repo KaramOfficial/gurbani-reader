@@ -395,8 +395,8 @@ double-tap keeps meaning ONLY play-from-that-sentence — it never
 opens the UI; its second tap calls the bars back via the play path,
 as it always did.
 
-**Hold a word — normal-speed preview.** A long-press (~0.5s,
-unmoved) on any word plays that word and the next few (up to five
+**Triple-tap a word — normal-speed preview.** Three quick taps
+on a word play that word and the next few (up to five
 words total, never crossing into the next track) at 1×, under a
 floating "Normal speed preview · 1×" pill; when the segment ends,
 the reader's own speed resumes from that same spot — hear a section
@@ -404,10 +404,13 @@ clearly without breaking the flow. The speed control and its stored
 value are never touched: the preview sets the element's rate
 directly, re-asserts it against the app's own play/metadata rate
 resets, and applySpeed() restores the reader's rate at the end. The
-click that follows a hold is swallowed before any other handler, so
-it can't reach the tap model or the bars. Pausing, seeking out of
-the segment, or the track ending cancels the preview (rate
-restored).
+third tap is counted ahead of the tap model and marked, so the
+bars/orb handler ignores it entirely (the second tap still plays
+from the word, as always — the preview then takes over from that
+same word). A long-press was the original trigger; it fought the
+browser's text selection, so the owner moved it to triple-tap.
+Pausing, seeking out of the segment, or the track ending cancels
+the preview (rate restored).
 
 **Appearance — Day / Auto / Night.** A Display setting (seg in the
 Menu, and a top-bar button beside Full screen that cycles Day →
@@ -498,7 +501,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (53 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (54 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:
@@ -566,9 +569,11 @@ as the changelog. The arc, by theme:
   saved the old value); a tap on empty space dismisses showing
   bars; optional Google sign-in syncs place/Paaths/settings via
   the Tracker's Firebase project.
-- **Normal-speed preview (Nov 24):** hold a word to hear it and the
-  next few at 1× under a floating pill, then the reader's own speed
-  resumes from that spot; the speed control is never touched.
+- **Normal-speed preview (Nov 24):** triple-tap a word (a
+  long-press at first — it fought text selection, so the owner
+  moved it) to hear it and the next few at 1× under a floating
+  pill, then the reader's own speed resumes from that spot; the
+  speed control is never touched.
 - **Appearance modes (Nov 24):** Day (bright, outdoors) / Auto /
   Night (true black, washed-out, least light) — Menu seg plus a
   cycling top-bar button beside Full screen; Cook jury Night 8/10,

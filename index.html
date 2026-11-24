@@ -321,7 +321,6 @@
     transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1);
   }
   .pv-toast.show{transform:translate(-50%,0);opacity:1}
-  .w{-webkit-touch-callout:none}
   .recenter{
     position:fixed;bottom:150px;left:50%;z-index:45;
     transform:translate(-50%,16px);opacity:0;pointer-events:none;
@@ -1507,6 +1506,8 @@
   window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); }, {passive:true});
   document.addEventListener("click", function(e){
     if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#orbBtn") || e.target.closest("#recenterBtn") || e.target.closest("#angPop") || e.target.closest(".ang-island")) return;
+    /* the third tap of a preview triple-tap belongs to the preview */
+    if(pvClickMark && e.timeStamp === pvClickMark){ pvClickMark = 0; return; }
     /* immersive playback (audio playing, auto-scroll on, bars hidden):
        a tap anywhere — on a word, on a line, on empty space — raises only
        the small floating button, never the whole chrome; a second tap
@@ -1761,6 +1762,7 @@
   /* word tap: single = light highlight only · double = full highlight + play from word
      (a single tap must never jump the audio — too sensitive) */
   var pendingTap = null, pendingLineTap = null, liteTimer = null;
+  var pvStreak = null, pvClickMark = 0;   /* triple-tap preview counting (see the preview module) */
   /* single-tap feedback: a soft wash that fades away on its own if no
      second tap turns it into a play action */
   function armLiteFade(){
@@ -1805,6 +1807,22 @@
   contentEl.addEventListener("click", function(e){
     var w = e.target.closest(".w");
     if(w){
+      /* triple-tap on a word = normal-speed preview (the preview
+         module below). Counted ahead of the tap model; the third
+         tap is marked so the bars/orb handler ignores it entirely.
+         (A long-press was the first trigger — it fought the
+         browser's text selection, so the owner moved it here.) */
+      var nowT = Date.now();
+      if(pvStreak && pvStreak.el === w && nowT - pvStreak.firstAt < 750) pvStreak.count++;
+      else pvStreak = { el: w, count: 1, firstAt: nowT };
+      if(pvStreak.count >= 3){
+        pvStreak = null;
+        if(pendingTap){ clearTimeout(pendingTap.timer); pendingTap = null; }
+        if(pendingLineTap){ clearTimeout(pendingLineTap.timer); pendingLineTap = null; }
+        pvClickMark = e.timeStamp;
+        pvStart(w);
+        return;
+      }
       if(pendingLineTap){ clearTimeout(pendingLineTap.timer); pendingLineTap = null; }
       if(pendingTap && pendingTap.el === w){
         clearTimeout(pendingTap.timer); pendingTap = null;
@@ -2964,8 +2982,8 @@
     });
   })();
 
-  /* ---------- hold a word: normal-speed preview ----------
-     A long-press on any word plays that word and the next few at 1x —
+  /* ---------- triple-tap a word: normal-speed preview ----------
+     Three quick taps on a word play that word and the next few at 1x —
      a clear listen without breaking the flow — then the reader's own
      speed resumes from that same spot. The speed control and its
      stored value are never touched: the preview sets the element's
@@ -2973,7 +2991,6 @@
      again when the segment ends. A small floating pill names what
      is happening while it runs. */
   var pvState = null;   /* { from, end, dur, timer, armed } */
-  var pvHoldFiredAt = 0;
   function pvFinish(){
     if(!pvState) return;
     clearTimeout(pvState.timer); pvState = null;
@@ -3023,27 +3040,6 @@
   audio.addEventListener("seeking", function(){
     if(pvState && (audio.currentTime < pvState.from - 0.6 || audio.currentTime > pvState.end + 0.05)) pvFinish();
   });
-  /* long-press detection: still, unmoved pressure on a word */
-  var pvPress = null;
-  contentEl.addEventListener("pointerdown", function(e){
-    var w = e.target.closest && e.target.closest(".w");
-    if(!w) return;
-    pvPress = { el: w, x: e.clientX, y: e.clientY, timer: setTimeout(function(){
-      pvPress = null; pvHoldFiredAt = Date.now(); pvStart(w);
-    }, 480) };
-  });
-  function pvCancelPress(){ if(pvPress){ clearTimeout(pvPress.timer); pvPress = null; } }
-  contentEl.addEventListener("pointermove", function(e){
-    if(pvPress && (Math.abs(e.clientX - pvPress.x) > 10 || Math.abs(e.clientY - pvPress.y) > 10)) pvCancelPress();
-  });
-  contentEl.addEventListener("pointerup", pvCancelPress);
-  contentEl.addEventListener("pointercancel", pvCancelPress);
-  contentEl.addEventListener("contextmenu", function(e){ if(e.target.closest && e.target.closest(".w")) e.preventDefault(); });
-  /* the click that follows a hold belongs to the hold, not to the tap
-     model or the bars — swallow it before any other handler sees it */
-  document.addEventListener("click", function(e){
-    if(pvHoldFiredAt && Date.now() - pvHoldFiredAt < 700){ e.stopImmediatePropagation(); e.preventDefault(); }
-  }, true);
 })();
 </script>
 </body>
