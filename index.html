@@ -1813,8 +1813,11 @@
          (A long-press was the first trigger — it fought the
          browser's text selection, so the owner moved it here.) */
       var nowT = Date.now();
-      if(pvStreak && pvStreak.el === w && nowT - pvStreak.firstAt < 750) pvStreak.count++;
-      else pvStreak = { el: w, count: 1, firstAt: nowT };
+      /* same word, or any word on the same line: during playback the
+         page eases with the speech, so a word can drift a few px
+         between taps — the line is the stable target */
+      if(pvStreak && nowT - pvStreak.firstAt < 750 && (pvStreak.el === w || pvStreak.line === w.closest(".line"))) pvStreak.count++;
+      else pvStreak = { el: w, line: w.closest(".line"), count: 1, firstAt: nowT };
       if(pvStreak.count >= 3){
         pvStreak = null;
         if(pendingTap){ clearTimeout(pendingTap.timer); pendingTap = null; }
@@ -2983,7 +2986,9 @@
   })();
 
   /* ---------- triple-tap a word: normal-speed preview ----------
-     Three quick taps on a word play that word and the next few at 1x —
+     Three quick taps on a word play that word and the next few one
+     notch clearer than the current speed — at 1x when listening
+     faster than 1x, at 0.75x when already at 1x (0.5x from 0.75x) —
      a clear listen without breaking the flow — then the reader's own
      speed resumes from that same spot. The speed control and its
      stored value are never touched: the preview sets the element's
@@ -3000,7 +3005,7 @@
   function pvArm(){
     if(!pvState || pvState.armed) return;
     pvState.armed = true;
-    pvState.timer = setTimeout(pvFinish, Math.max(60, pvState.dur * 1000 + 80));
+    pvState.timer = setTimeout(pvFinish, Math.max(60, pvState.dur / pvState.rate * 1000 + 80));
   }
   function pvStart(wordEl){
     var wi = Number(wordEl.getAttribute("data-wi"));
@@ -3016,7 +3021,8 @@
       last = nx; k++; count++;
     }
     pvFinish();
-    pvState = { from: rec.start, end: last.end, dur: Math.max(0.2, last.end - rec.start), timer: null, armed: false };
+    var pvRate = speedRate > 1 ? 1 : (speedRate === 1 ? 0.75 : 0.5);
+    pvState = { from: rec.start, end: last.end, dur: Math.max(0.2, last.end - rec.start), rate: pvRate, timer: null, armed: false };
     /* start exactly like a double-tap on the word (same switch, seek
        and focus behaviour) — minus calling the bars up */
     clearHighlight(); wordEl.classList.add("now");
@@ -3024,16 +3030,17 @@
     else if(state.mode === "bani" && item && item !== state.id){ pendingSeek = rec.start; switchAudioToBani(item, false); }
     else { seekTo(rec.start); pvArm(); }
     playAudio();
-    try{ audio.playbackRate = 1; }catch(e){}
+    try{ audio.playbackRate = pvRate; }catch(e){}
     manualScrollAt = 0; manualHold = false; savePlace(); saveFocusLine(rec.line);
-    var t = $("pvToast"); if(t) t.classList.add("show");
+    var t = $("pvToast");
+    if(t){ t.textContent = pvRate === 1 ? "Normal speed preview · 1×" : "Slow preview · " + pvRate + "×"; t.classList.add("show"); }
     try{ if(navigator.vibrate) navigator.vibrate(8); }catch(e){}
   }
   /* the app re-asserts the reader's rate on play/metadata; while a
      preview runs, hold 1x instead (registered after the app's own
      listeners, so these run last) */
-  audio.addEventListener("play", function(){ if(pvState){ try{ audio.playbackRate = 1; }catch(e){} pvArm(); } });
-  audio.addEventListener("loadedmetadata", function(){ if(pvState){ try{ audio.playbackRate = 1; }catch(e){} } });
+  audio.addEventListener("play", function(){ if(pvState){ try{ audio.playbackRate = pvState.rate; }catch(e){} pvArm(); } });
+  audio.addEventListener("loadedmetadata", function(){ if(pvState){ try{ audio.playbackRate = pvState.rate; }catch(e){} } });
   audio.addEventListener("timeupdate", function(){ if(pvState && audio.currentTime >= pvState.end) pvFinish(); });
   audio.addEventListener("pause", function(){ if(pvState) pvFinish(); });
   audio.addEventListener("ended", function(){ if(pvState) pvFinish(); });
