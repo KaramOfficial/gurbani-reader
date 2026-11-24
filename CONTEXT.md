@@ -449,10 +449,13 @@ detour's own focus (seeded from the link pankti, afterwards moved
 only by the audio and tap-to-play, never by the view). The exit
 has its own floating pill that appears beside Recenter whenever
 Recenter shows (and also when there is no detour focus yet):
-a book glyph + the name of the Sehaj Paath that was active when
-the visit began — the detour slot remembers it (paath) — and
-tapping it exits and restores that Paath's saved place (picking a
-Sehaj Paath in the Library/switcher does the same). A stored
+a book glyph + the name of the last active Sehaj Paath. That
+target is ordinary, always-live app state (paaths-v1's current),
+read at tap time — never snapshotted into the detour, the owner's
+ruling — so if the state has moved (e.g. a sync apply from another
+device), the exit follows the state. Tapping it exits and restores
+that Paath's saved place (picking a Sehaj Paath in the
+Library/switcher does the same). A stored
 detour resumes ahead of the Paath's place at boot. A plain
 ?ang=N link (no line) keeps the older behaviour.
 
@@ -551,7 +554,7 @@ concept, one name ("Go to Ang"), on both the popup and the Library.
 When simplifying, keep these decisions — minimal is a text diet, not a
 design reset.
 
-## 11. Revision history (61 commits, 2026-11-21 → 2026-11-23)
+## 11. Revision history (62 commits, 2026-11-21 → 2026-11-23)
 
 The git log is the full record — commit messages are written to be read
 as the changelog. The arc, by theme:

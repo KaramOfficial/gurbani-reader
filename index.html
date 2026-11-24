@@ -871,9 +871,11 @@
     if(!detour) return glf;
     return detourGlf || null;
   }
+  /* the last active Sehaj Paath is ordinary, always-live app state
+     (paaths-v1's current) — the detour never snapshots it; wherever
+     the state points when the reader asks to go back is the target */
   function paathTargetName(){
-    var ds = readDetourStore();
-    var target = (ds && typeof ds.paath !== "undefined") ? ds.paath : paathData.current;
+    var target = paathData.current;
     if(target == null) return paathData.defName || "Default";
     var rec = paathById(target);
     return rec ? rec.name : (paathData.defName || "Default");
@@ -1180,10 +1182,8 @@
      the snapshot-free exit and restores that Paath's saved place */
   $("paathBtn").addEventListener("click", function(){
     if(!detour) return;
-    var ds = readDetourStore();
-    var target = (ds && typeof ds.paath !== "undefined") ? ds.paath : paathData.current;
     $("paathBtn").classList.remove("show");
-    switchPaath(target);
+    switchPaath(paathData.current);   /* the last active Paath, read from live state */
   });
   /* keep the pill floating just above the player bar, whatever its height */
   function placeRecenter(){
@@ -3010,7 +3010,7 @@
         detour = { ang: linkAng, idx: linkLine };
         detourGlf = { mode: "ang", item: linkAng, idx: linkLine, start: null, t: 0, ts: Date.now(), pv: null };
         writeDetourStore({ place: { mode: "ang", id: null, ang: linkAng, y: 0, t: 0, ts: Date.now(),
-          fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: detourGlf, paath: paathData.current });
+          fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: detourGlf });
         pendingRestore = { mode: "ang", ang: linkAng, id: null, y: 0, t: 0,
           fl: { item: linkAng, idx: linkLine, src: "view" } };
       }
