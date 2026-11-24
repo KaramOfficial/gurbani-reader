@@ -2570,7 +2570,25 @@
   function seekTo(t){
     if(!isFinite(t)) return;
     try{ audio.currentTime = Math.max(0, t); }catch(e){}
+    armSeekFix(Math.max(0, t));
   }
+  /* Seek auto-correct: Firefox/Android MP3 seeks can land 0.1-0.3s late
+     (byte-offset estimation), starting playback inside the tapped word.
+     After a seek settles, compare the landed position with where playback
+     should be (target + advance while playing); if off by >0.09s, re-seek
+     to that expected position - at most twice. Design reviewed w/ Gemini. */
+  var seekFix = null;
+  function armSeekFix(t){ seekFix = { target: t, at: performance.now(), tries: 0 }; }
+  audio.addEventListener("seeked", function(){
+    if(!seekFix) return;
+    var elapsed = (performance.now() - seekFix.at) / 1000;
+    var expected = audio.paused ? seekFix.target : seekFix.target + elapsed * (audio.playbackRate || 1);
+    var err = audio.currentTime - expected;
+    if(Math.abs(err) > 0.09 && seekFix.tries < 2 && audio.readyState >= 2){
+      seekFix.tries++; seekFix.target = expected; seekFix.at = performance.now();
+      try{ audio.currentTime = Math.max(0, expected); }catch(e){}
+    } else seekFix = null;
+  });
   function resetProgress(){
     seekEl.value = 0; seekEl.style.setProperty("--fill","0%");
     tCur.textContent = "0:00";
@@ -2708,7 +2726,7 @@
   audio.addEventListener("loadedmetadata", function(){
     applySpeed();
     tDur.textContent = fmt(audio.duration || state.duration || 0);
-    if(pendingSeek > 0){ try{ audio.currentTime = pendingSeek; }catch(e){} pendingSeek = 0; }
+    if(pendingSeek > 0){ var ps = pendingSeek; try{ audio.currentTime = ps; }catch(e){} pendingSeek = 0; armSeekFix(ps); }
   });
   audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
   /* Cache what comes next while there is still time: when playback gets within
