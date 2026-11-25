@@ -4525,7 +4525,7 @@
         }
         applyRecord(recId, data, at);
       });
-      if(user){ if(snap.metadata && snap.metadata.hasPendingWrites) setNote("Syncing\u2026"); else syncedNote(); }
+      if(user){ if(doc.metadata && doc.metadata.hasPendingWrites) setNote("Syncing\u2026"); else syncedNote(); }
       schedulePush();
     }
 
