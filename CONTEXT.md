@@ -814,7 +814,16 @@ underneath whatever is on screen.
 
 Sign-in merges **per record** — it never erases local data and
 never reloads. With no baseline for a record, bootstrap decides:
-Paath records by their content's own reading time, the list by
+Paath records by their content's own reading time — a position's
+`ts` is when that position was SET, never when it was re-saved:
+opening the app, landing, resizing or settling re-saves a place
+without minting a new reading time (same rule for the focus
+record), so a stale line on a freshly opened device can never
+out-rank a genuinely newer reading from another device. The
+Library's Paath label/preview read the live records only while
+actually in that Paath; in free reading they read the synced
+snapshot. While audio plays, the focus is saved continuously
+(throttled), and a real pause saves place as well as focus. The list by
 customised-beats-default (a renamed list beats a default-named
 one), settings from the cloud. After bootstrap, only server order
 speaks. Snapshots with pending local writes or cache origin are

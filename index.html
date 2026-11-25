@@ -149,6 +149,11 @@
   .seg{display:flex;background:var(--bg);border:1px solid var(--hairline);border-radius:999px;padding:3px;gap:2px;flex:none}
   .seg button{border:0;background:transparent;padding:6px 9px;border-radius:999px;font:600 12px/1 "Inter",sans-serif;color:var(--muted);cursor:pointer}
   .seg button.active{background:var(--accent);color:#fff}
+  .seg button:disabled{opacity:.38;cursor:default}
+  #layoutSeg{display:grid;grid-template-columns:1fr 1fr;border-radius:16px}
+  #layoutSeg button{padding:8px 9px}
+  body.book-open .scrim{z-index:259}
+  body.book-open .sheet{z-index:260}
   @media (prefers-color-scheme: dark){.seg button.active{color:#1c1406}}
   .menu-navrow{display:flex;align-items:center;gap:11px;width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--hairline);border-radius:14px;background:var(--bg);color:var(--ink);cursor:pointer;text-align:left}
   .menu-navrow svg{width:21px;height:21px;flex:none;color:var(--accent-strong)}
@@ -742,6 +747,9 @@
     <span class="book-title">Book</span>
     <span class="book-range" id="bookRange"></span>
     <span class="menu-spacer"></span>
+    <button class="fbtn" id="bookMenuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.2" fill="var(--surface)"/><circle cx="15" cy="16" r="2.2" fill="var(--surface)"/></svg>
+    </button>
     <button class="fbtn" id="bookZoomOut" aria-label="Zoom out">&minus;</button>
     <span class="book-zoomval" id="bookZoomVal">100%</span>
     <button class="fbtn" id="bookZoomIn" aria-label="Zoom in">+</button>
@@ -797,15 +805,8 @@
         <button data-layout="lines">Lines</button>
         <button data-layout="para">Paragraphs</button>
         <button data-layout="print">Print</button>
+        <button data-layout="book">Book</button>
       </div>
-    </div>
-    <div class="menu-row" id="bookRow" style="display:none">
-      <div>
-        <span class="menu-label">Book mode</span>
-        <p class="menu-note">Two pages, like a book. Landscape only.</p>
-      </div>
-      <span class="menu-spacer"></span>
-      <button class="fbtn" id="bookOpenBtn">Open</button>
     </div>
     <div class="menu-row" id="paraHdrRow">
       <div>
@@ -1141,10 +1142,19 @@
        those windows; render's own post-landing save passes force. */
     if(!force && (Date.now() < navSettleUntil || Date.now() < resizeSettleUntil || state.prepending || state.prependingBani)) return;
     try{
+      /* ts is the READING time of this position (sync's bootstrap orders
+         by it): re-saving an unchanged position — a boot landing, a
+         resize, a scroll settle — must keep the original ts, or merely
+         opening the app on another device would make its stale line
+         look like the newest reading and win the merge */
+      var flNow = focusedLine();
+      var prevPlace = detour ? (readDetourStore() || {}).place : readPlace();
+      var samePos = !!(prevPlace && prevPlace.mode === state.mode && prevPlace.id === state.id && prevPlace.ang === state.ang
+        && ((prevPlace.fl == null && flNow == null) || (prevPlace.fl && flNow && prevPlace.fl.item === flNow.item && prevPlace.fl.idx === flNow.idx)));
       var placeRec = {
         mode: state.mode, id: state.id, ang: state.ang,
-        y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: Date.now(),
-        fl: focusedLine()
+        y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: (samePos && prevPlace.ts) ? prevPlace.ts : Date.now(),
+        fl: flNow
       };
       if(detour){ var dsp = readDetourStore() || {}; dsp.place = placeRec; writeDetourStore(dsp); }
       else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
@@ -1204,7 +1214,9 @@
     if(item == null || typeof idx !== "number") return;
     var pv = previewText(lineTextAt(item, idx));
     if(!pv && glf && glf.item === item && glf.idx === idx) pv = glf.pv || null;
-    var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: Date.now(), pv: pv };
+    var prevF = detour ? detourGlf : glf;
+    var sameF = !!(prevF && prevF.mode === state.mode && prevF.item === item && prevF.idx === idx);
+    var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
     if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); return; }
     glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
@@ -1734,7 +1746,7 @@
       btns[i].classList.toggle("active", state.mode==="bani" && btns[i].getAttribute("data-bani")===state.id);
     }
   }
-  function openSheet(){ islandHide(); buildPaathLists(); paintBookRow(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function openSheet(){ islandHide(); buildPaathLists(); paintLayoutSegs(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
   function showMenuPanel(which){
     var st = $("sheetTitle"); if(st) st.textContent = which === "library" ? "Library" : "Menu";
     var main = $("menuMain"), lib = $("menuLibrary");
@@ -1878,16 +1890,16 @@
   var pheads = document.querySelectorAll("[data-paath-head]");
   for(var ph=0;ph<pheads.length;ph++) pheads[ph].addEventListener("click", function(){ setPaathsOpen(!paathsOpen); });
   function paathPlaceLabel(id){
-    var place = (paathData.current === id) ? readPlace() : (readCtx(id) || {}).place;
+    var place = (paathData.current === id && !detour) ? readPlace() : (readCtx(id) || {}).place;
     if(!place) return "Not started";
     if(place.mode === "bani") return "Not started";   /* a Paath tracks Ang reading only — a Bani place is never its label */
     var a = (place.fl && place.fl.item) || place.ang;
     if(!a) return "Not started";
-    if(paathData.current === id) return "ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
+    if(paathData.current === id && !detour) return "ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
     return "Resume at ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
   }
   function paathGlf(id){
-    if(paathData.current === id) return glf;
+    if(paathData.current === id && !detour) return glf;
     var snap = readCtx(id);
     return snap && snap.glf ? snap.glf : null;
   }
@@ -3329,6 +3341,7 @@
     var dur = audio.duration || state.duration || 0;
     if(audioSwitching || audio.ended || (dur && (audio.currentTime || 0) >= dur - 0.35) || Date.now() - audioSwitchAt < 1200) return;
     saveFocus(true);
+    savePlace(true);
     updateRecenter();
     /* a pause from the quick cluster is not a call for the UI — the
        cluster simply becomes the play button and stays */
@@ -3389,7 +3402,7 @@
       if(nb) preloadBaniAudio(nb);
     }
   }
-  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); updateWordFollow(); maybePrefetch(); } }, 300);
+  setInterval(function(){ if(!audio.paused) { syncProgress(); clearExpiredHighlight(); autoScrollToCurrentLine(); updateWordFollow(); maybePrefetch(); saveFocus(); } }, 300);
 
   function syncProgress(){
     updateRecenter();
@@ -3449,7 +3462,11 @@
   /* ---------- layout wiring (Lines / Paragraphs + header style) ---------- */
   function paintLayoutSegs(){
     var ls = $("layoutSeg");
-    if(ls) ls.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-layout") === (printOn ? "print" : paraOn ? "para" : "lines")); });
+    if(ls) ls.querySelectorAll("button").forEach(function(b){
+      var m = b.getAttribute("data-layout");
+      if(m === "book"){ b.classList.toggle("active", typeof bookIsOpen !== "undefined" && bookIsOpen); b.disabled = !(typeof bookEligible === "function" && bookEligible() && state.mode === "ang"); }
+      else b.classList.toggle("active", m === (printOn ? "print" : paraOn ? "para" : "lines"));
+    });
     var hs = $("paraHdrSeg");
     if(hs) hs.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-phdr") === "own") === paraHdrOwn); });
     var row = $("paraHdrRow");
@@ -3509,7 +3526,12 @@
     applyLayoutClass();   /* pure CSS switch — the hdr class is always emitted */
   }
   var layoutSeg = $("layoutSeg");
-  if(layoutSeg) layoutSeg.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){ setLayout(b.getAttribute("data-layout")); }); });
+  if(layoutSeg) layoutSeg.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){
+    var m = b.getAttribute("data-layout");
+    if(m === "book"){ openBook(); return; }
+    setLayout(m);
+    if(typeof bookIsOpen !== "undefined" && bookIsOpen) closeBook();
+  }); });
   var paraHdrSegEl = $("paraHdrSeg");
   if(paraHdrSegEl) paraHdrSegEl.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){ setParaHdr(b.getAttribute("data-phdr") === "own"); }); });
   var advSeg = $("advSeg");
@@ -4657,7 +4679,6 @@
      returns the reader to the spread's left Ang in the stream. */
   var bookViewEl = $("bookView"), bookLeft = 1, bookZoom = 1, bookCache = {}, bookIsOpen = false, bookFitTimer = null;
   function bookEligible(){ return window.innerWidth >= 1024 && window.innerWidth > window.innerHeight; }
-  function paintBookRow(){ var r = $("bookRow"); if(r) r.style.display = (bookEligible() && state.mode === "ang") ? "" : "none"; }
   function bookFetchLines(ang){
     if(bookCache[ang]) return bookCache[ang];
     var c = chunkFor(ang);
@@ -4725,10 +4746,13 @@
   function setBookZoom(z){ bookZoom = Math.max(0.5, Math.min(2, Math.round(z * 20) / 20)); applyBookZoom(); }
   function openBook(){
     if(!bookEligible() || state.mode !== "ang") return;
+    paintLayoutSegs();
     closeSheet();
     var ss = $("searchSheet"); if(ss) ss.classList.remove("open");
     bookIsOpen = true;
     bookViewEl.hidden = false;
+    document.body.classList.add("book-open");
+    paintLayoutSegs();
     document.body.style.overflow = "hidden";
     if(!audio.paused) audio.pause();
     bookZoom = 1; applyBookZoom();
@@ -4739,10 +4763,12 @@
     if(!bookIsOpen) return;
     bookIsOpen = false;
     bookViewEl.hidden = true;
+    document.body.classList.remove("book-open");
+    paintLayoutSegs();
     document.body.style.overflow = "";
     if(state.mode === "ang" && bookLeft !== state.ang) loadAng(bookLeft);
   }
-  if($("bookOpenBtn")) $("bookOpenBtn").addEventListener("click", openBook);
+  if($("bookMenuBtn")) $("bookMenuBtn").addEventListener("click", function(){ openSheet(); });
   if($("bookClose")) $("bookClose").addEventListener("click", closeBook);
   if($("bookPrev")) $("bookPrev").addEventListener("click", function(){ showSpread(bookLeft - 2); });
   if($("bookNext")) $("bookNext").addEventListener("click", function(){ showSpread(bookLeft + 2); });
@@ -4765,7 +4791,7 @@
     $("bookStage").addEventListener("wheel", function(e){ if(e.ctrlKey){ e.preventDefault(); setBookZoom(bookZoom + (e.deltaY < 0 ? 0.1 : -0.1)); } }, { passive: false });
   }
   window.addEventListener("resize", function(){
-    paintBookRow();
+    paintLayoutSegs();
     if(!bookIsOpen) return;
     if(!bookEligible()){ closeBook(); return; }
     clearTimeout(bookFitTimer); bookFitTimer = setTimeout(fitBookText, 180);
