@@ -725,6 +725,18 @@ standalone Pankti Search tool. The engine is that tool's matcher
 served from the Pankti Search site. A result tap opens the pankti in
 the Reader as a free-reading detour — the same landing as a Pankti
 Search link — so no Sehaj Paath is ever disturbed by a search.
+**Matcher sync rule (do not break):** `search-matcher.js` and
+`search-transliterate.js` are VENDORED COPIES of the Pankti Search
+repo's `src/matcher.js` / `src/transliterate.js`, which are the single
+source of truth. Never edit the vendored copies directly — edit in
+KaramOfficial/gurbani-voice-search, run its four test suites
+(test_matcher, test_stress, test_gemini, test_resilience), copy the
+files over, and verify md5 equality before deploying. Scoring is
+resilience-first (IDF word-set overlap primary, alignment as a bonus —
+extra words, wrapped/rotated starts, and kirtan word order are all
+tolerated; see that repo's docs/RESILIENCE-FIX.md). The search sheet's
+low-confidence threshold is 0.50, matched to that scoring — keep it in
+step with the standalone tool's `app.js`.
 
 **Top-bar context line.** The line under "Gurbani Reader" always says
 where the reader is: a Bani shows its own name; an Ang in free

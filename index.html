@@ -4649,7 +4649,7 @@
       resultsEl.innerHTML = "";
       if(!groups.length){ setStatus("No match yet — try a few more words of the line."); return; }
       var top = groups[0].best.score;
-      setStatus((foldedChars < 8 || top < 0.55) ? "Best guesses — a few more words would sharpen it:" : groups.length + (groups.length === 1 ? " match" : " matches"));
+      setStatus((foldedChars < 8 || top < 0.50) ? "Best guesses — a few more words would sharpen it:" : groups.length + (groups.length === 1 ? " match" : " matches"));
       groups.forEach(function(g){
         var p = panktis[g.best.id]; if(!p) return;
         var b = document.createElement("button");
