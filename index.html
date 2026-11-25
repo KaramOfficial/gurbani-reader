@@ -1132,6 +1132,11 @@
      installed (their canonical form is unchanged either way — this
      keeps the stored records byte-faithful to the winning state) */
   var syncMute = { on: false };
+  /* sync lives in its own closure: saves announce dirtiness and the
+     sync layer pushes at once — a save must not wait for the 2.5s poll
+     tick (hidden tabs throttle timers hard, and a position that reaches
+     the cloud minutes late reads as data loss on the other device) */
+  function syncDirty(){ try{ document.dispatchEvent(new CustomEvent("reader-dirty")); }catch(e){} }
   function savePlace(force){
     if(syncMute.on) return;
     /* transient layouts lie: during a load (state already names the new
@@ -1159,6 +1164,7 @@
       if(detour){ var dsp = readDetourStore() || {}; dsp.place = placeRec; writeDetourStore(dsp); }
       else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
       if(audio && !audio.paused) saveFocus();
+      syncDirty();
     }catch(e){}
   }
   function readPlace(){
@@ -1217,9 +1223,10 @@
     var prevF = detour ? detourGlf : glf;
     var sameF = !!(prevF && prevF.mode === state.mode && prevF.item === item && prevF.idx === idx);
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
-    if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); return; }
+    if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); syncDirty(); return; }
     glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
+    syncDirty();
   }
   function saveFocus(force){
     var found = currentLineEl(); if(!found) return;
@@ -1797,7 +1804,7 @@
   var PAATHS_KEY = "gurbani-reader:paaths-v1";
   var paathData = { list: [], current: null };
   try{ var pd0 = JSON.parse(localStorage.getItem(PAATHS_KEY) || "null"); if(pd0 && Array.isArray(pd0.list)) paathData = { list: pd0.list, current: pd0.current || null, defName: pd0.defName || null }; }catch(e){}
-  function savePaathData(){ try{ localStorage.setItem(PAATHS_KEY, JSON.stringify(paathData)); }catch(e){} }
+  function savePaathData(){ try{ localStorage.setItem(PAATHS_KEY, JSON.stringify(paathData)); }catch(e){} syncDirty(); }
   if(!paathData.list.length){
     paathData.list = [1,2,3,4].map(function(n){ return { id: "p" + n, name: "Sehaj Paath " + paNum(n) }; });
     savePaathData();
@@ -4359,6 +4366,7 @@
           pushRetries = 0;
           dirty.forEach(function(d){ setRecMeta(d.recId, { s: d.canon }); });
           syncedNote();
+          maybePush();   /* drain: anything saved during the flight goes now, not at the next tick */
         })
         .catch(function(e){
           if(user) failNote("push", e);
@@ -4374,6 +4382,17 @@
        writes and restore re-saves can never dirty a record */
     setInterval(function(){ maybePush(); }, 2500);
     window.addEventListener("pagehide", function(){ maybePush(); });
+    /* saves announce themselves: push within a breath of the save,
+       coalescing bursts (scroll settles fire several) into one write */
+    var dirtyQueued = false;
+    document.addEventListener("reader-dirty", function(){
+      if(dirtyQueued) return; dirtyQueued = true;
+      setTimeout(function(){ dirtyQueued = false; maybePush(); }, 300);
+    });
+    /* a hidden tab's timers and sockets stall: on return, flush
+       whatever is still dirty and re-check the doc's word */
+    document.addEventListener("visibilitychange", function(){ if(!document.hidden) maybePush(); });
+    window.addEventListener("focus", function(){ maybePush(); });
 
     /* ---------- apply: per record, in place, never a reload ---------- */
     function rehydrateSettings(){

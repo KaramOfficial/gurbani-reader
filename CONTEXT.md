@@ -793,8 +793,13 @@ canonical (volatile `ts`/`y`/`t` in place records and `ts` in focus
 records stripped), and per-record baselines (last pushed / last
 applied canonical form + last seen server stamp) persist in
 `sync-v1`, so decisions survive reloads. Changed records batch into
-one merge write; the 2.5s poll only *triggers* pushes of records
-whose canonical form actually changed — it stamps nothing, so boot
+one merge write. Pushes fire **on the save itself**: place, focus and
+Paath-list saves announce a `reader-dirty` event, and the sync layer
+pushes within ~300 ms (bursts coalesced); a completed push drains —
+anything saved during its flight pushes immediately after — and
+returning to the tab (visible / focus) flushes whatever is still
+dirty. The 2.5 s poll remains only as a backstop trigger; it stamps
+nothing, so boot
 and restore writes can never mint a "new state". That discipline is
 what makes the old refresh loop impossible by construction: there
 is no client stamp to advance, no fingerprint for a boot write to
