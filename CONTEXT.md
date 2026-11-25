@@ -697,9 +697,17 @@ stay calm and empty by intent). First run on a ≥1280px screen with no
 saved font size starts one step up (26px); a saved choice always wins.
 The Menu follows the same per-size intent: a full-width top sheet on
 phone, a **centred 700px panel at 761–1023px**, and at **≥1024px a
-compact 400px panel in the top-right corner** (top 64px, right 20px,
-max-height calc(100dvh − 84px), internal scroll, fade/slide in) — the
-Library and settings live inside it unchanged. The quick cluster anchors
+full-height 400px dock on the right edge** — the Menu/Library/Search
+sheets all dock (owner, Nov 25: panels belong on the sides on
+desktop; the earlier floating corner panel was a patch, not a
+design). The dock is **non-modal**: no scrim dim, the reading
+underneath stays live, and it closes from its own close button, its
+toggle, or Esc. While a dock is open (`body.dock`, kept by
+`paintDock`), the reading column, top bar, pager, player and quick
+cluster **re-centre in the space that remains** (a −200px translate,
+animated), and the book spread resizes into that space the same way
+(its fit pass re-runs on the dock's transition). The Library and
+settings live inside the Menu unchanged. The quick cluster anchors
 to the reading column's right edge (`right: calc(50% - 462px)` at the
 800px measure, −482px at 840px). The Paath popup at ≥1024px anchors
 above the floating pair at the column's right edge (360px wide) instead

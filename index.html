@@ -429,21 +429,33 @@
     .sheet{left:50%;right:auto;width:min(700px,100%);transform:translate(-50%,-106%);border-left:1px solid var(--hairline);border-right:1px solid var(--hairline)}
     .sheet.open{transform:translate(-50%,0)}
   }
-  /* desktop: the reading measure widens (800px) and the Menu becomes a
-     compact panel in the top-right corner — desktop intent, not the
-     phone sheet scaled up. The quick cluster and the Paath popup anchor
-     to the reading column's right edge; toasts sit bottom-right, clear
-     of the centred player. */
+  /* desktop: the reading measure widens (800px) and the sheets dock
+     to the right edge (below) — desktop intent, not the phone sheet
+     scaled up. The quick cluster and the Paath popup anchor to the
+     reading column's right edge; toasts sit bottom-right, clear of
+     the centred player. */
   @media (min-width:1024px){
     main{max-width:800px}
     .topbar-in{max-width:800px}
     .pager{max-width:800px}
-    .sheet{left:auto;right:20px;top:64px;width:400px;max-height:calc(100dvh - 84px);
-      transform:translateY(-10px);opacity:0;pointer-events:none;
-      border:1px solid var(--hairline);border-radius:22px;
-      transition:transform .22s cubic-bezier(.32,.72,.24,1),opacity .22s}
-    .sheet.open{transform:none;opacity:1;pointer-events:auto}
+    /* desktop dock (owner, Nov 25): the sheets are a full-height
+       panel docked to the right edge — not a floating corner card —
+       and the dock is non-modal: no dim, the reading underneath
+       stays live. The reading column and every centred bar
+       re-centre in the space that remains (body.dock, set by
+       paintDock), and the book spread resizes the same way. */
+    .sheet{left:auto;right:0;top:0;bottom:0;width:400px;height:100dvh;max-height:none;
+      transform:translateX(106%);opacity:1;pointer-events:none;
+      border:0;border-left:1px solid var(--hairline);border-radius:0;
+      transition:transform .32s cubic-bezier(.32,.72,.24,1)}
+    .sheet.open{transform:none;pointer-events:auto}
     .sheet-in{max-width:none}
+    .scrim.open{opacity:0;pointer-events:none}
+    main,.topbar-in,.pager{transition:translate .32s cubic-bezier(.32,.72,.24,1)}
+    .player{transition:transform .34s cubic-bezier(.4,0,.2,1),opacity .3s,translate .32s cubic-bezier(.32,.72,.24,1)}
+    .quick{transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1),translate .32s cubic-bezier(.32,.72,.24,1)}
+    body.dock main,body.dock .topbar-in,body.dock .pager,body.dock .player,body.dock .quick{translate:-200px 0}
+    body.dock .book-view{right:400px}
     .quick{right:calc(50% - 462px)}
     #angPop .ang-pop-card{max-width:560px}
     #paathPop{place-items:end end;padding:14px calc(50% - 462px) 104px 14px}
@@ -1753,14 +1765,24 @@
       btns[i].classList.toggle("active", state.mode==="bani" && btns[i].getAttribute("data-bani")===state.id);
     }
   }
-  function openSheet(){ islandHide(); buildPaathLists(); paintLayoutSegs(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function paintDock(){
+    var ss = $("searchSheet");
+    var open = sheet.classList.contains("open") || (ss && ss.classList.contains("open"));
+    var was = document.body.classList.contains("dock");
+    document.body.classList.toggle("dock", open);
+    if(open && !was && typeof bookIsOpen !== "undefined" && bookIsOpen){
+      /* the spread resizes into the remaining space; let it refit */
+      setTimeout(function(){ try{ window.dispatchEvent(new Event("resize")); }catch(e){} }, 340);
+    }
+  }
+  function openSheet(){ islandHide(); buildPaathLists(); paintLayoutSegs(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); paintDock(); }
   function showMenuPanel(which){
     var st = $("sheetTitle"); if(st) st.textContent = which === "library" ? "Library" : "Menu";
     var main = $("menuMain"), lib = $("menuLibrary");
     if(main) main.hidden = which !== "main";
     if(lib) lib.hidden = which !== "library";
   }
-  function closeSheet(){ sheet.classList.remove("open"); scrim.classList.remove("open"); $("libraryBtn").setAttribute("aria-expanded","false"); }
+  function closeSheet(){ sheet.classList.remove("open"); scrim.classList.remove("open"); $("libraryBtn").setAttribute("aria-expanded","false"); paintDock(); }
   $("libraryBtn").addEventListener("click", function(){ sheet.classList.contains("open") ? closeSheet() : openSheet(); });
   var libNav = $("libraryNav"); if(libNav) libNav.addEventListener("click", function(){ showMenuPanel("library"); });
   var libBack = $("libraryBack"); if(libBack) libBack.addEventListener("click", function(){ showMenuPanel("main"); });
@@ -4870,12 +4892,13 @@
     function openSearch(){
       closeSheet(); closeAngPop(); closePaathPop(); islandHide();
       sheetEl.classList.add("open"); scrim.classList.add("open");
-      showBars(); ensureIndex();
+      showBars(); ensureIndex(); paintDock();
       setTimeout(function(){ try{ input.focus({ preventScroll: true }); }catch(e){ try{ input.focus(); }catch(_){} } }, 380);
     }
     function closeSearch(){
       sheetEl.classList.remove("open");
       if(!sheet.classList.contains("open")) scrim.classList.remove("open");
+      paintDock();
       if(listening && recog){ try{ recog.stop(); }catch(e){} }
     }
     $("searchBtn").addEventListener("click", openSearch);
