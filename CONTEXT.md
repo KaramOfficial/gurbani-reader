@@ -503,7 +503,10 @@ from the word, as always — the preview then takes over from that
 same word). A long-press was the original trigger; it fought the
 browser's text selection, so the owner moved it to triple-tap.
 Pausing, seeking out of the segment, or the track ending cancels
-the preview (rate restored).
+the preview (rate restored). Position is NOT preview-temporary:
+the preview starts exactly like a double-tap (same switch, seek and
+focus behaviour), so the saved place/focus follow it — only the
+rate is temporary.
 
 **Two worlds: a Sehaj Paath, or Default (free) reading.** The
 reader is always in one of two worlds. Inside a Sehaj Paath, its
@@ -683,9 +686,20 @@ own place saves can otherwise clobber the synced place in the reload
 window). No push happens before the sign-in's initial cloud check
 settles, and pushes fire only when the key set actually changed
 (debounced, plus on pagehide) — an idle signed-in tab never
-overwrites another device. Cross-device clock skew is the known
-limit. Signed out, SDK blocked, or offline: local-only, exactly as
-before — sign-in is invisible unless wanted.
+overwrites another device. Three more guards keep newer-wins
+honest: a **near-pristine device** (no Paath snapshots, no real
+reading progress) never overwrites a **rich cloud** at sign-in,
+whatever the stamps say; inside a 10-minute stamp window the
+states' own reading times (`place.ts`) break the tie, which absorbs
+cross-device clock skew; and a push whose last cloud read is over a
+minute old re-reads first and applies a newer cloud instead of
+overwriting it. The apply-guard is bound to the account that wrote
+it — a guard from another account's session is discarded, never
+applied. A failed push or pull says so in the Account note
+("Couldn't sync — your reading is safe on this device and will
+retry.") instead of failing silently. Signed out, SDK blocked, or
+offline: local-only, exactly as before — sign-in is invisible
+unless wanted.
 
 ## 10. Design language
 

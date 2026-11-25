@@ -1342,7 +1342,7 @@
                                : "You are in Default — just reading, not in a Paath.")
       : "Current · " + (curRec ? curRec.name : "");
     $("paathPopCur").textContent = assign
-      ? ctxLine + "\nYou stay right here — the chosen Paath will resume at the pankti you are on."
+      ? ctxLine + "\nYou stay right here — the chosen Paath will resume at the pankti you are on." + ((assignRec && assignRec.pv) ? "\n" + assignRec.pv : "")
       : ctxLine;
     var html = "";
     var row = function(key, name, sub, pv, isCur){
@@ -1385,7 +1385,7 @@
      the audio / tap-to-play), else the pankti at the anchor */
   function currentFocusRec(){
     var f = effFocus();
-    if(f && f.item != null && typeof f.idx === "number") return { mode: f.mode, item: f.item, idx: f.idx, start: f.start, t: f.t || 0 };
+    if(f && f.item != null && typeof f.idx === "number") return { mode: f.mode, item: f.item, idx: f.idx, start: f.start, t: f.t || 0, pv: f.pv || previewText(lineTextAt(f.item, f.idx)) };
     var fl = focusedLine();
     if(fl && fl.item != null && typeof fl.idx === "number") return { mode: state.mode, item: fl.item, idx: fl.idx, start: fl.start, t: 0 };
     /* focusedLine samples the anchor by hit-testing, which the popup
@@ -3767,8 +3767,16 @@
       var guard = sessionStorage.getItem("gurbani-reader:apply-guard");
       if(guard){
         sessionStorage.removeItem("gurbani-reader:apply-guard");
-        var gk = (JSON.parse(guard) || {}).keys || {};
-        Object.keys(gk).forEach(function(k){ if(gk[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, gk[k]); });
+        var gobj = JSON.parse(guard) || {};
+        var gblob = gobj.blob || guard;   /* older guards stored the blob itself */
+        var guid = gobj.blob ? gobj.uid : null;
+        var gm = {}; try{ gm = JSON.parse(localStorage.getItem("gurbani-reader:sync-v1") || "null") || {}; }catch(e){}
+        /* a guard written under a different account is never applied */
+        if(!guid || !gm.lastUid || guid === gm.lastUid){
+          var gk = (JSON.parse(gblob) || {}).keys || {};
+          Object.keys(gk).forEach(function(k){ if(gk[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, gk[k]); });
+          if(guid && gm.lastUid !== guid){ gm.lastUid = guid; try{ localStorage.setItem("gurbani-reader:sync-v1", JSON.stringify(gm)); }catch(e){} }
+        }
       }
     }catch(e){}
     var btn = $("syncBtn"), note = $("syncNote");
@@ -3779,7 +3787,7 @@
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
     catch(e){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
     var META = "gurbani-reader:sync-v1";
-    var user = null, lastSent = null, applying = false, timer = null, syncReady = false, unsub = null, lastSeenJson = null;
+    var user = null, lastSent = null, applying = false, timer = null, syncReady = false, unsub = null, lastSeenJson = null, lastPullAt = 0;
     function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
     function collectKeys(){
       var keys = {};
@@ -3791,6 +3799,32 @@
       }catch(e){}
       return keys;
     }
+    function placeTsOf(keys){
+      var ts = 0, pl = null, dt = null;
+      try{ pl = JSON.parse(keys["gurbani-reader:last-v1"] || "null"); }catch(e){}
+      try{ dt = JSON.parse(keys["gurbani-reader:detour-v1"] || "null"); }catch(e){}
+      if(pl && pl.ts) ts = Math.max(ts, pl.ts);
+      if(dt && dt.place && dt.place.ts) ts = Math.max(ts, dt.place.ts);
+      return ts;
+    }
+    /* near-pristine: no Paath snapshots and no real reading progress —
+       a fresh device in this state must never overwrite a rich cloud */
+    function keysPristine(keys){
+      for(var k in keys){ if(k.indexOf("gurbani-reader:ctx-") === 0) return false; }
+      var pl = null, dt = null;
+      try{ pl = JSON.parse(keys["gurbani-reader:last-v1"] || "null"); }catch(e){}
+      try{ dt = JSON.parse(keys["gurbani-reader:detour-v1"] || "null"); }catch(e){}
+      var fresh = function(x){ return !x || ((x.t || 0) < 5 && (x.mode === "bani" || (x.ang || 1) <= 1)); };
+      return fresh(pl) && fresh(dt && dt.place);
+    }
+    function keysRich(keys){
+      for(var k in keys){ if(k.indexOf("gurbani-reader:ctx-") === 0) return true; }
+      var pl = null, dt = null;
+      try{ pl = JSON.parse(keys["gurbani-reader:last-v1"] || "null"); }catch(e){}
+      try{ dt = JSON.parse(keys["gurbani-reader:detour-v1"] || "null"); }catch(e){}
+      var deep = function(x){ return !!x && ((x.ang || 0) > 1 || (x.t || 0) >= 30); };
+      return deep(pl) || deep(dt && dt.place);
+    }
     function setNote(s){ if(note) note.textContent = s; }
     function paint(){
       if(user){ btn.textContent = "Sign out"; setNote("Signed in as " + (user.email || "") + " — place, Paaths & settings sync to your account."); }
@@ -3798,6 +3832,28 @@
     }
     function saveNow(){
       if(!user || applying || !syncReady) return;
+      var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
+      if(keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
+      /* stale-push guard: if the cloud has not been re-read in a while,
+         look before pushing — a newer cloud state applies instead of
+         being silently overwritten */
+      if(lastPullAt && Date.now() - lastPullAt > 60000){
+        lastPullAt = Date.now();
+        db.collection("progress").doc(user.uid).get().then(function(snap){
+          var c = snap.exists ? (snap.data().readerJson || null) : null, cj = null;
+          if(c){ try{ cj = JSON.parse(c); }catch(e){} }
+          var m2 = meta();
+          if(cj && cj.keys && (cj.savedAt || 0) > (m2.savedAt || 0) && (cj.savedAt || 0) > (m2.localAt || 0) && JSON.stringify(cj.keys) !== JSON.stringify(collectKeys())){
+            applyCloud(cj.keys, cj.savedAt, c); return;
+          }
+          doPush();
+        }).catch(function(){ doPush(); });
+        return;
+      }
+      doPush();
+    }
+    function doPush(){
+      if(!user || applying) return;
       var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
       if(keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
       /* the blob's stamp is the last CHANGE's time, not the push time —
@@ -3809,7 +3865,7 @@
       lastSent = stamped;
       db.collection("progress").doc(user.uid).set({ readerJson: stamped, readerAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
         .then(function(){ if(user) setNote("Synced ✓ — signed in as " + (user.email || "")); })
-        .catch(function(){ lastSent = null; });
+        .catch(function(){ lastSent = null; if(user) setNote("Couldn't sync — your reading is safe on this device and will retry."); });
     }
     /* the poll runs signed in or not: its first job is stamping this
        device's last local change (localAt) so a later sign-in can tell
@@ -3839,13 +3895,14 @@
         localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: cloudAt }));
       }catch(e){}
       lastSent = raw;
-      try{ sessionStorage.setItem("gurbani-reader:apply-guard", raw); }catch(e){}
+      try{ sessionStorage.setItem("gurbani-reader:apply-guard", JSON.stringify({ uid: user ? user.uid : null, blob: raw })); }catch(e){}
       setNote("Found your synced reading — refreshing…");
       setTimeout(function(){ location.reload(); }, 700);
     }
     auth.onAuthStateChanged(function(u){
       user = u;
       syncReady = false;
+      if(u){ var mu = meta(); if(mu.lastUid !== u.uid){ mu.lastUid = u.uid; try{ localStorage.setItem(META, JSON.stringify(mu)); }catch(e){} } }
       if(unsub){ unsub(); unsub = null; }
       if(!u){ paint(); lastSent = null; return; }
       paint();
@@ -3857,7 +3914,19 @@
         if(cloud){ try{ var cj = JSON.parse(cloud); cloudAt = cj.savedAt || 0; cloudKeys = cj.keys || null; }catch(e){} }
         var m = meta();
         syncReady = true;
-        if(cloudKeys && cloudAt > (m.localAt || 0) && JSON.stringify(cloudKeys) !== JSON.stringify(collectKeys())){
+        lastPullAt = Date.now();
+        var localKeys = collectKeys(), keysDiffer = !!cloudKeys && JSON.stringify(cloudKeys) !== JSON.stringify(localKeys);
+        /* whose reading wins: the cloud postdates this device's last
+           change — OR this device is near-pristine and the cloud is
+           rich (a fresh device never overwrites a seasoned library) —
+           OR the stamps sit inside the clock-skew window and the
+           cloud's own reading time is the later one */
+        var cloudWins = !!cloudKeys && keysDiffer && (
+          cloudAt > (m.localAt || 0) ||
+          (keysPristine(localKeys) && keysRich(cloudKeys)) ||
+          (Math.abs(cloudAt - (m.localAt || 0)) < 600000 && placeTsOf(cloudKeys) > placeTsOf(localKeys))
+        );
+        if(cloudWins){
           applyCloud(cloudKeys, cloudAt, cloud);
         } else {
           if(cloudKeys && JSON.stringify(cloudKeys) === JSON.stringify(collectKeys())){
@@ -3869,6 +3938,7 @@
         /* live pull: when another device pushes newer reading, it
            arrives here and applies the same way — no re-sign-in needed */
         unsub = ref.onSnapshot(function(snap2){
+          lastPullAt = Date.now();
           if(!user || applying) return;
           var c2 = snap2.exists ? (snap2.data().readerJson || null) : null;
           if(!c2 || c2 === lastSent) return;
@@ -3877,7 +3947,7 @@
           var m2 = meta();
           if((cj2.savedAt || 0) > (m2.savedAt || 0) && (cj2.savedAt || 0) > (m2.localAt || 0) && JSON.stringify(cj2.keys) !== JSON.stringify(collectKeys()))
             applyCloud(cj2.keys, cj2.savedAt, c2);
-        });
+        }, function(){ if(user) setNote("Couldn't sync — your reading is safe on this device and will retry."); });
       }).catch(function(){ syncReady = true; saveNow(); });
     });
   })();
