@@ -711,33 +711,32 @@ Nov 25). Portrait keeps the current chrome at every size — the top
 bar and pager above, the player below; a tablet in portrait is the
 phone design, larger. In **landscape** the reader stays centred and
 untouched — **the Bani column never moves or resizes for any
-panel** — and every control lives in the empty side space:
+panel** — and the chrome lives in the empty side space, **all of it
+on the right**; the left side stays empty on purpose, reserved for
+whatever comes next (meanings, notes):
 
 - **Phone landscape** (short height): the top bar becomes a slim
   60px icon rail down the left edge (ੴ mark, Search, fullscreen,
   Appearance, Menu; the pager stacked at its foot), the stream gains
   a matching left inset, and the player stays one compact row along
   the bottom, clear of the rail. The rail slides away with the bars.
-- **Tablet landscape / small laptops (1024–1399px)**: the top bar
-  becomes a floating card in the left margin (224px; brand, context
-  line, buttons, pager stacked), the measure narrows (592px, 648px
-  from 1200px) so the rails never touch the text, the player floats
-  as a card at the bottom right and still hides with the bars, and
-  the theme gets its own floating button at the top right.
-- **Desktop landscape (≥1400px)**: the left card widens to 264px,
-  the player becomes a card centred vertically in the right margin
-  and stays put when the bars hide, the floating pair (Paath /
-  Recenter / assign) sits at the bottom of the right margin, and
-  the quick cluster retires — its controls all live in the rails.
-
-In landscape ≥1024px the Menu/Library/Search sheets are **floating
-cards in the right margin** (below the theme button, max-height the
-viewport less margins, rounded, shadowed), non-modal with no scrim
-dim; they close from their own close button, their toggle, or Esc.
-The theme's floating button is the Appearance cycle (Day → Auto →
-Night), painted with the same state as the top bar's button. The
-Paath popup and Ang switcher keep their centred forms; toasts sit
-bottom-right.
+- **Landscape ≥1024px**: the top bar is a floating card in the
+  **top-right** margin (brand, context line, buttons, pager), and
+  the Menu/Library/Search sheets **expand below it, out of the same
+  corner** — a drop-down growth of that card, never a panel from
+  another side; non-modal, no scrim dim, closing from their own
+  button, their toggle, or Esc. The **audio bar stays the phone's
+  bar** — one compact flat bar along the bottom, centred on the
+  reading measure, hiding and showing with the bars. The **quick
+  cluster** stands in the right margin above the bar on the phone's
+  own tap-to-show cycle, and the **Recenter trio stands vertically**
+  in the right margin, coming and going exactly as on the phone.
+  At 1024–1399px the card is slimmer (224px), the measure narrows
+  (592px, 648px from 1200px) and the column centres in the space
+  left of the control side, the audio bar centred on the same axis;
+  at ≥1400px everything is window-centred with the card at 264px.
+  There is no separate theme button — Appearance lives in the top
+  bar's card, where it always was.
 
 **Book mode.** Menu → Display carries a Book row, shown only where a
 book fits: landscape and ≥1024px wide (desktops and tablets; never on
