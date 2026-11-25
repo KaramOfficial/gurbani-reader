@@ -702,11 +702,10 @@ sheets all dock (owner, Nov 25: panels belong on the sides on
 desktop; the earlier floating corner panel was a patch, not a
 design). The dock is **non-modal**: no scrim dim, the reading
 underneath stays live, and it closes from its own close button, its
-toggle, or Esc. While a dock is open (`body.dock`, kept by
-`paintDock`), the reading column, top bar, pager, player and quick
-cluster **re-centre in the space that remains** (a −200px translate,
-animated), and the book spread resizes into that space the same way
-(its fit pass re-runs on the dock's transition). The Library and
+toggle, or Esc. The dock **overlays** the right edge: the reading
+column, top bar, pager, player, quick cluster and the book spread
+**never move or resize** for it (owner, Nov 25: a side panel must
+not shove the Bani). The Library and
 settings live inside the Menu unchanged. The quick cluster anchors
 to the reading column's right edge (`right: calc(50% - 462px)` at the
 800px measure, −482px at 840px). The Paath popup at ≥1024px anchors
