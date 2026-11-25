@@ -156,6 +156,17 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   falls back to 2×; the cluster's speed pill cycles whatever ladder
   is currently offered. Skip ±5s buttons flank the
   transport. A seek bar reflects and controls position.
+- **Jump history — Undo / Redo** (owner, Nov 25): the player carries
+  Undo and Redo buttons (and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). The
+  model is the classic two-stack editor undo: a deliberate jump —
+  double-tap a word or line to play from there, or a seek-bar jump —
+  first pushes the position being left (item, second, playing or
+  paused) onto the undo stack and clears the redo stack; Undo and
+  Redo walk the stacks, restoring through the ordinary switch/seek
+  machinery so focus, highlight and auto-scroll follow. Three jumps
+  are kept. It tracks the *listening* position, so it behaves the
+  same in free reading and inside a Sehaj Paath; the ±5s nudges and
+  continuous playback never enter it.
 - Wake Lock is held while playing so the screen stays awake.
 - Fullscreen: attempted once playback is flowing and auto-scroll is
   carrying the reading (not on the bare play tap); exiting is manual.
@@ -695,32 +706,38 @@ One measure for the reading column, top bar, pager and player card:
 sizes 700px starves the line; full width would fatigue it — the margins
 stay calm and empty by intent). First run on a ≥1280px screen with no
 saved font size starts one step up (26px); a saved choice always wins.
-The Menu follows the same per-size intent: a full-width top sheet on
-phone, a **centred 700px panel at 761–1023px**, and at **≥1024px a
-full-height 400px dock on the right edge** — the Menu/Library/Search
-sheets all dock (owner, Nov 25: panels belong on the sides on
-desktop; the earlier floating corner panel was a patch, not a
-design). The dock is **non-modal**: no scrim dim, the reading
-underneath stays live, and it closes from its own close button, its
-toggle, or Esc. The dock **overlays** the right edge: the reading
-column, top bar, pager, player, quick cluster and the book spread
-**never move or resize** for it (owner, Nov 25: a side panel must
-not shove the Bani). The Library and
-settings live inside the Menu unchanged. The quick cluster anchors
-to the reading column's right edge (`right: calc(50% - 462px)` at the
-800px measure, −482px at 840px). The Paath popup at ≥1024px anchors
-above the floating pair at the column's right edge (360px wide) instead
-of centring; the Ang switcher card widens to 560px; toasts sit
-bottom-right, clear of the centred player. Phone CSS untouched.
+**Portrait = top and bottom, landscape = the sides** (owner,
+Nov 25). Portrait keeps the current chrome at every size — the top
+bar and pager above, the player below; a tablet in portrait is the
+phone design, larger. In **landscape** the reader stays centred and
+untouched — **the Bani column never moves or resizes for any
+panel** — and every control lives in the empty side space:
 
-**Landscape phones.** In landscape (short height), the chrome merges
-to one row each: the top bar drops the wordmark to the ੴ mark alone so
-the pager (chevrons + current item) sits centred as one unit, the
-collection subtitle is dropped, and the player drops its now-playing
-block so the seek bar gets the width (~288px vs ~170px) — total chrome
-≈117px of a 412px height (was ~196px, nearly half the screen), with
-44px minimum touch targets. Rotating changes nothing else: bars
-hidden stays hidden, bars shown stays shown, fullscreen persists.
+- **Phone landscape** (short height): the top bar becomes a slim
+  60px icon rail down the left edge (ੴ mark, Search, fullscreen,
+  Appearance, Menu; the pager stacked at its foot), the stream gains
+  a matching left inset, and the player stays one compact row along
+  the bottom, clear of the rail. The rail slides away with the bars.
+- **Tablet landscape / small laptops (1024–1399px)**: the top bar
+  becomes a floating card in the left margin (224px; brand, context
+  line, buttons, pager stacked), the measure narrows (592px, 648px
+  from 1200px) so the rails never touch the text, the player floats
+  as a card at the bottom right and still hides with the bars, and
+  the theme gets its own floating button at the top right.
+- **Desktop landscape (≥1400px)**: the left card widens to 264px,
+  the player becomes a card centred vertically in the right margin
+  and stays put when the bars hide, the floating pair (Paath /
+  Recenter / assign) sits at the bottom of the right margin, and
+  the quick cluster retires — its controls all live in the rails.
+
+In landscape ≥1024px the Menu/Library/Search sheets are **floating
+cards in the right margin** (below the theme button, max-height the
+viewport less margins, rounded, shadowed), non-modal with no scrim
+dim; they close from their own close button, their toggle, or Esc.
+The theme's floating button is the Appearance cycle (Day → Auto →
+Night), painted with the same state as the top bar's button. The
+Paath popup and Ang switcher keep their centred forms; toasts sit
+bottom-right.
 
 **Book mode.** Menu → Display carries a Book row, shown only where a
 book fits: landscape and ≥1024px wide (desktops and tablets; never on
