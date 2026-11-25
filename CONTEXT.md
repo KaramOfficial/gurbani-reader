@@ -710,6 +710,28 @@ block so the seek bar gets the width (~288px vs ~170px) — total chrome
 44px minimum touch targets. Rotating changes nothing else: bars
 hidden stays hidden, bars shown stays shown, fullscreen persists.
 
+**Pankti Search (in-Reader popup).** A search button sits in the top
+bar (beside Appearance) and in the floating quick cluster. It opens a
+sheet (the Menu sheet's shape and motion) holding one search field, a
+mic button, a one-line status, and the results — all inside the popup;
+the results list scrolls with the sheet. Typing works in English
+(roman) or Gurmukhi and is fuzzy; the mic recites in Punjabi
+(SpeechRecognition pa-IN where the browser offers it; the button
+hides where it does not). What was heard is NEVER displayed in the
+Reader — that readout is a debugging aid and lives only in the
+standalone Pankti Search tool. The engine is that tool's matcher
+(vendored `search-matcher.js` / `search-transliterate.js`); its index
+(vocab + trigrams + per-100-Ang shards, fetched lazily and cached) is
+served from the Pankti Search site. A result tap opens the pankti in
+the Reader as a free-reading detour — the same landing as a Pankti
+Search link — so no Sehaj Paath is ever disturbed by a search.
+
+**Top-bar context line.** The line under "Gurbani Reader" always says
+where the reader is: a Bani shows its own name; an Ang in free
+reading shows ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ; an Ang inside a Sehaj Paath
+shows "ਸਹਜ ਪਾਠ · <that Paath's name>" (ellipsis-truncated when long).
+It repaints on every world/Paath/rename change (via updateRecenter).
+
 **Account & cloud sync (optional).** The Menu carries a compact
 Account block: "Sign in with Google", or the signed-in email + Sign
 out. It uses the same Firebase project as the Nitnem Tracker

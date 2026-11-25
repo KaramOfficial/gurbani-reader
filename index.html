@@ -202,6 +202,29 @@
   .sheet.open{transform:translateY(0)}
   .sheet-in{max-width:680px;margin:0 auto}
   .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  /* ---------- pankti search popup ---------- */
+  .search-row{display:flex;gap:9px;align-items:stretch;margin:2px 0 4px}
+  .search-row input{
+    flex:1;min-width:0;font-size:16px;font-family:inherit;color:var(--ink);
+    background:var(--paper);border:1px solid var(--hairline);border-radius:14px;
+    padding:11px 14px;outline:none;
+  }
+  .search-row input:focus{border-color:var(--accent)}
+  .search-mic{
+    width:46px;flex:none;border-radius:14px;border:1px solid var(--hairline);
+    background:var(--paper);color:var(--ink-soft);display:grid;place-items:center;cursor:pointer;
+  }
+  .search-mic.listening{background:var(--accent);border-color:var(--accent);color:var(--paper);animation:micPulse 1.2s ease-in-out infinite}
+  @keyframes micPulse{50%{transform:scale(1.07)}}
+  .search-status{font-size:13px;color:var(--muted);margin:4px 2px 8px;min-height:17px}
+  .search-results{display:flex;flex-direction:column;gap:8px}
+  .search-hit{
+    text-align:left;width:100%;padding:11px 13px;border-radius:14px;cursor:pointer;
+    border:1px solid var(--hairline);background:var(--paper);color:var(--ink);
+  }
+  .search-hit:active{background:var(--accent-soft)}
+  .search-hit .sh-text{font-family:"Noto Serif Gurmukhi",serif;font-size:16.5px;line-height:1.55;display:block}
+  .search-hit .sh-meta{font-size:13px;color:var(--muted);display:block;margin-top:3px}
   .sheet-head h2{font-size:17px;margin:0;font-weight:700}
   .sheet h3{
     font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
@@ -663,6 +686,7 @@
         <p id="brandSub">ਜਪੁਜੀ ਸਾਹਿਬ</p>
       </div>
     </div>
+    <button class="fbtn" id="searchBtn" aria-label="Search a pankti" title="Search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.7 16.7"/></svg></button>
     <button class="fbtn" id="fsBtn" aria-label="Full screen" title="Full screen"><svg id="fsExpand" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg><svg id="fsCompress" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></button>
     <button class="fbtn" id="appBtn" aria-label="Appearance" title="Appearance"><svg id="appIcoDay" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg id="appIcoAuto" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18Z" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg><svg id="appIcoNight" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
     <button class="fbtn" id="libraryBtn" aria-haspopup="true" aria-expanded="false" aria-label="Menu" title="Menu">
@@ -685,8 +709,10 @@
   <button class="qc-speed" id="qcSpeed" aria-label="Playback speed">1×</button>
   <button class="orb qc-font" id="qcFontDown" aria-label="Smaller text">A−</button>
   <button class="orb qc-font" id="qcFontUp" aria-label="Larger text">A+</button>
+  <button class="orb" id="qcSearch" aria-label="Search a pankti"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.7 16.7"/></svg></button>
   <button class="orb" id="orbBtn" aria-label="Show the controls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg></button>
 </div>
+
 
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" aria-label="Choose what to read">
@@ -797,6 +823,26 @@
   </div>
 </section>
 
+<section class="sheet search-sheet" id="searchSheet" aria-label="Search a pankti">
+  <div class="sheet-in">
+    <div class="sheet-head">
+      <h2>Search</h2>
+      <button class="sheet-close" id="searchClose" aria-label="Close search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
+    </div>
+    <div class="search-row">
+      <input id="searchInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="Type a line — English or ਪੰਜਾਬੀ" aria-label="Type a line to search">
+      <button class="search-mic" id="searchMic" aria-label="Recite a pankti">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+    </div>
+    <p class="search-status" id="searchStatus">Type a few words, or tap the mic and recite.</p>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</section>
+
 <div class="ang-pop" id="paathPop" role="dialog" aria-modal="true" aria-label="Sehaj Paaths" hidden>
   <div class="ang-pop-card">
     <div class="ang-pop-head">
@@ -899,6 +945,8 @@
 <script src="firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="search-transliterate.js"></script>
+<script src="search-matcher.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1260,6 +1308,7 @@
      and the pill stays out of the way (an earlier version keyed off
      the audio clock alone and popped up at every line change). */
   function updateRecenter(){
+    paintBrandSub();
     var btn = $("recenterBtn"); if(!btn) return;
     /* the assign (bookmark) button exists only where assigning means
        something: an Ang pankti can become a Paath's place; a Bani is
@@ -1679,6 +1728,15 @@
   paathData.list.forEach(function(x){ var mm = /^Sehaj Paath (\d+)$/.exec(x.name); if(mm) x.name = "Sehaj Paath " + paNum(parseInt(mm[1], 10)); });
   savePaathData();
   function paathById(id){ for(var i=0;i<paathData.list.length;i++) if(paathData.list[i].id === id) return paathData.list[i]; return null; }
+  /* the top bar always says where the reader is: a Bani by its name, an
+     Ang by its world — free reading is Sri Guru Granth Sahib Ji, a Sehaj
+     Paath is named as one ("ਸਹਜ ਪਾਠ · <name>", ellipsis-truncated by CSS) */
+  function paintBrandSub(){
+    if(!brandSub) return;
+    if(state.mode === "bani"){ brandSub.textContent = state.titlePa || "ਨਿਤਨੇਮ"; return; }
+    if(!detour){ var r = paathById(paathData.current); if(r){ brandSub.textContent = "ਸਹਜ ਪਾਠ · " + r.name; return; } }
+    brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ";
+  }
   function ctxKey(id){ return "gurbani-reader:ctx-" + id; }
   function readCtx(id){ try{ return JSON.parse(localStorage.getItem(ctxKey(id)) || "null"); }catch(e){ return null; } }
   function writeCtx(id, snap){ try{ localStorage.setItem(ctxKey(id), JSON.stringify(snap)); }catch(e){} }
@@ -2170,7 +2228,7 @@
     if(pa) pa.addEventListener("click", function(){ loadAng(state.ang-1); });
     if(na) na.addEventListener("click", function(){ loadAng(state.ang+1); });
 
-    brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; resetView(); updatePager(); updateRecenter();
+    paintBrandSub(); resetView(); updatePager(); updateRecenter();
     nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(opts.titlePa) + "</span><small>Double-tap a word to listen from there</small>";
     markActiveBani();
     if(pendingRestore){
@@ -2590,7 +2648,7 @@
     state.ang = ang;
     state.titlePa = "ਅੰਗ " + paNum(ang); state.titleEn = "Ang " + ang;
     state.duration = state.angDur[ang] || 0;
-    brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"; resetView(); updatePager();
+    paintBrandSub(); resetView(); updatePager();
     nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(state.titlePa) + "</span><small>Double-tap a word to listen from there</small>";
     var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
     audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
@@ -2855,7 +2913,7 @@
     state.id = id;
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
-    brandSub.textContent = "ਨਿਤਨੇਮ"; resetView(); updatePager();
+    paintBrandSub(); resetView(); updatePager();
     nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(b.pa) + "</span><small>Double-tap a word to listen from there</small>";
     audio.src = baniAudioUrl(b);
     applySpeed();
@@ -4522,6 +4580,166 @@
   audio.addEventListener("seeking", function(){
     if(pvState && (audio.currentTime < pvState.from - 0.6 || audio.currentTime > pvState.end + 0.05)) pvFinish();
   });
+  /* ---------- Pankti Search popup ----------
+     One search for the whole SGGS, living in the Reader: type a line in
+     English or Gurmukhi (fuzzy — the Pankti Search matcher, vendored as
+     search-matcher.js / search-transliterate.js), or tap the mic and
+     recite. The index (vocab + trigrams + lazy shards) is fetched from
+     the Pankti Search site on first open and cached shard by shard.
+     What was heard is NEVER shown here — that readout is a debugging
+     aid and stays in the standalone Pankti Search tool. A result tap
+     opens the pankti in the Reader as a free-reading detour, exactly
+     like a Pankti Search link: no Paath is disturbed. */
+  (function(){
+    var VS_BASE = "https://karamofficial.github.io/gurbani-voice-search/data/";
+    var sheetEl = $("searchSheet"), input = $("searchInput"), micBtn = $("searchMic"),
+        statusEl = $("searchStatus"), resultsEl = $("searchResults");
+    if(!sheetEl || !input) return;
+    var matcher = null, panktis = [], shardRanges = [], shardLoaded = {}, shardPromises = {}, initPromise = null;
+
+    function setStatus(msg){ statusEl.textContent = msg || ""; }
+    function fetchJSON(url){ return fetch(url).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); }); }
+    function ensureIndex(){
+      if(matcher) return Promise.resolve();
+      if(initPromise) return initPromise;
+      setStatus("Loading search…");
+      initPromise = Promise.all([fetchJSON(VS_BASE + "manifest.json"), fetchJSON(VS_BASE + "vocab.json"), fetchJSON(VS_BASE + "trigrams.json")])
+        .then(function(parts){
+          var manifest = parts[0], next = 0;
+          manifest.shards.forEach(function(sh){ shardRanges.push({ file: sh.file, fromId: next, toId: next + sh.panktis - 1 }); next += sh.panktis; });
+          matcher = new window.PanktiMatcher.Matcher(parts[1], panktis, parts[2]);
+          setStatus("Type a few words, or tap the mic and recite.");
+        })
+        .catch(function(){ initPromise = null; setStatus("Search couldn't load — check your connection and try again."); });
+      return initPromise;
+    }
+    function shardForId(id){ for(var i = 0; i < shardRanges.length; i++){ if(id >= shardRanges[i].fromId && id <= shardRanges[i].toId) return shardRanges[i]; } return null; }
+    function loadShard(file){
+      if(shardLoaded[file]) return Promise.resolve();
+      if(shardPromises[file]) return shardPromises[file];
+      shardPromises[file] = fetchJSON(VS_BASE + file).then(function(rows){ rows.forEach(function(r){ panktis[r.id] = r; }); shardLoaded[file] = true; });
+      return shardPromises[file];
+    }
+    function groupResults(raw){
+      var byKey = {}, order = [];
+      raw.forEach(function(r){
+        var p = panktis[r.id]; var key = p ? p.t : String(r.id);
+        if(!byKey[key]){ byKey[key] = { best: r, angs: [] }; order.push(key); }
+        var g = byKey[key];
+        if(r.score > g.best.score) g.best = r;
+        if(g.angs.indexOf(r.ang) === -1) g.angs.push(r.ang);
+      });
+      return order.map(function(k){ return byKey[k]; }).sort(function(a, b){ return b.best.score - a.best.score; }).slice(0, 10);
+    }
+    function cleanText(t){
+      return String(t || "").split(/\s+/).map(function(tok){ return tok.replace(/[;.,]/g, ""); }).filter(Boolean).join(" ");
+    }
+    function openHit(ang, line){
+      closeSearch();
+      detour = { ang: ang, idx: line };
+      setMode("free");
+      detourGlf = { mode: "ang", item: ang, idx: line, start: null, t: 0, ts: Date.now(), pv: null };
+      writeDetourStore({ place: { mode: "ang", id: null, ang: ang, y: 0, t: 0, ts: Date.now(),
+        fl: { item: ang, idx: line, src: "view" } }, glf: detourGlf });
+      pendingRestore = { mode: "ang", ang: ang, id: null, y: 0, t: 0,
+        fl: { item: ang, idx: line, src: "view" } };
+      loadAng(ang);
+    }
+    function renderGroups(groups, foldedChars){
+      resultsEl.innerHTML = "";
+      if(!groups.length){ setStatus("No match yet — try a few more words of the line."); return; }
+      var top = groups[0].best.score;
+      setStatus((foldedChars < 8 || top < 0.55) ? "Best guesses — a few more words would sharpen it:" : groups.length + (groups.length === 1 ? " match" : " matches"));
+      groups.forEach(function(g){
+        var p = panktis[g.best.id]; if(!p) return;
+        var b = document.createElement("button");
+        b.className = "search-hit";
+        var t = document.createElement("span"); t.className = "sh-text"; t.textContent = cleanText(p.t);
+        var m = document.createElement("span"); m.className = "sh-meta";
+        m.textContent = "ਅੰਗ " + paNum(p.a) + (g.angs.length > 1 ? " · also on " + (g.angs.length - 1) + " more" : "");
+        b.appendChild(t); b.appendChild(m);
+        b.addEventListener("click", function(){ openHit(p.a, p.l); });
+        resultsEl.appendChild(b);
+      });
+    }
+    var searching = false;
+    function runSearch(text){
+      text = (text || "").trim();
+      if(!text || searching) return;
+      ensureIndex().then(function(){
+        if(!matcher) return;
+        searching = true; setStatus("Searching…");
+        var heard = window.PanktiMatcher.foldHeard(text);
+        var candIds = [];
+        try{ candIds = matcher.candidates(heard); }catch(e){}
+        var files = {}, list = [];
+        candIds.forEach(function(id){ var sh = shardForId(id); if(sh && !files[sh.file]){ files[sh.file] = true; list.push(sh.file); } });
+        Promise.all(list.map(loadShard)).then(function(){
+          var raw = matcher.search(text, 30).filter(function(r){ return panktis[r.id]; });
+          renderGroups(groupResults(raw), heard.join("").length);
+        }).catch(function(){ setStatus("Search failed — check your connection and try again."); })
+        .then(function(){ searching = false; });
+      });
+    }
+
+    /* voice: finals only, never displayed — a final result just searches */
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recog = null, listening = false;
+    if(!SR){ micBtn.style.display = "none"; }
+    else {
+      recog = new SR();
+      recog.lang = "pa-IN"; recog.interimResults = false; recog.continuous = false; recog.maxAlternatives = 1;
+      recog.onresult = function(ev){
+        var finals = [];
+        for(var i = 0; i < ev.results.length; i++){ if(ev.results[i].isFinal) finals.push(ev.results[i][0].transcript.trim()); }
+        var text = finals.filter(Boolean).join(" ");
+        if(text) runSearch(text);
+      };
+      recog.onend = function(){ listening = false; micBtn.classList.remove("listening"); micBtn.setAttribute("aria-label", "Recite a pankti"); if(!searching && matcher) setStatus("Type a few words, or tap the mic and recite."); };
+      recog.onerror = function(ev){
+        listening = false; micBtn.classList.remove("listening");
+        setStatus({ "not-allowed": "Microphone permission was denied — allow the mic, or type the line.",
+                    "no-speech": "Nothing heard — tap the mic and recite again, a little closer.",
+                    "audio-capture": "No microphone found — type the line instead.",
+                    "network": "Voice needs a network connection — check it, or type the line." }[ev.error]
+                  || "Voice didn't work that time — tap to retry, or type the line.");
+      };
+      micBtn.addEventListener("click", function(){
+        if(listening){ try{ recog.stop(); }catch(e){} return; }
+        ensureIndex().then(function(){
+          try{ recog.start(); listening = true; micBtn.classList.add("listening"); micBtn.setAttribute("aria-label", "Listening — tap to stop"); setStatus("Listening… recite the line."); }
+          catch(e){}
+        });
+      });
+    }
+
+    var debounce = null;
+    input.addEventListener("input", function(){
+      clearTimeout(debounce);
+      var v = input.value;
+      if(v.trim().length < 3){ return; }
+      debounce = setTimeout(function(){ runSearch(v); }, 400);
+    });
+    input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); runSearch(input.value); } });
+
+    function openSearch(){
+      closeSheet(); closeAngPop(); closePaathPop(); islandHide();
+      sheetEl.classList.add("open"); scrim.classList.add("open");
+      showBars(); ensureIndex();
+      setTimeout(function(){ try{ input.focus({ preventScroll: true }); }catch(e){ try{ input.focus(); }catch(_){} } }, 380);
+    }
+    function closeSearch(){
+      sheetEl.classList.remove("open");
+      if(!sheet.classList.contains("open")) scrim.classList.remove("open");
+      if(listening && recog){ try{ recog.stop(); }catch(e){} }
+    }
+    $("searchBtn").addEventListener("click", openSearch);
+    $("qcSearch").addEventListener("click", openSearch);
+    $("searchClose").addEventListener("click", closeSearch);
+    scrim.addEventListener("click", closeSearch);
+    document.addEventListener("keydown", function(e){ if(e.key === "Escape" && sheetEl.classList.contains("open")) closeSearch(); });
+  })();
+
 })();
 </script>
 </body>
