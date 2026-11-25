@@ -346,6 +346,13 @@
     transition:opacity .25s,transform .3s cubic-bezier(.32,.72,.24,1);
   }
   .pv-toast.show{transform:translate(-50%,0);opacity:1}
+  /* transient messages (rename refusals, assign confirmations, sync
+     and navigation notes) get their own toast: they are sentences,
+     not labels — they wrap, they cap their width, and they render
+     above sheets and scrims so the feedback is never dimmed or
+     clipped. The preview pill above stays single-line and private
+     to the triple-tap preview, so the two never kill each other. */
+  .msg-toast{white-space:normal;max-width:min(92vw,480px);text-align:center;border-radius:18px;z-index:60;line-height:1.45}
   .float-pair{position:fixed;left:50%;transform:translateX(-50%);bottom:150px;z-index:45;display:flex;gap:8px;pointer-events:none}
   .recenter{
     transform:translateY(16px);opacity:0;pointer-events:none;
@@ -357,6 +364,11 @@
     white-space:nowrap;
   }
   .recenter.show{transform:none;opacity:1;pointer-events:auto}
+  /* a hidden cluster button leaves the layout entirely — an invisible
+     Recenter used to keep its ~130px of flex space, leaving the book
+     and bookmark icons floating apart with a dead gap (and a lone
+     off-centre icon in Bani mode, where the bookmark is display:none) */
+  .float-pair .recenter:not(.show){display:none}
   .recenter .pg-ico{color:var(--accent);flex:none;display:flex}
   .recenter.fp-ico{width:42px;height:42px;padding:0;justify-content:center;border-radius:50%;flex:none}
   .qc-font{font-family:"Noto Serif Gurmukhi",serif;font-size:15px;font-weight:600;color:var(--ink-soft)}
@@ -570,7 +582,18 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;
   }
   .now-playing small{display:block;font-family:-apple-system,sans-serif;font-size:10.5px;color:var(--muted);font-weight:500;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  @media (max-width:560px){ .now-playing{display:none} }
+  /* on phones the title yields (it is already in the top bar) but the
+     hint line stays: it is the only place the app teaches its core
+     gesture — double-tap a word to play from there. The control row is
+     too crowded to fit it beside the buttons, so on phones it takes
+     its own full-width line under them (main's bottom padding absorbs
+     the extra height) */
+  @media (max-width:560px){
+    .now-playing .np-title{display:none}
+    .ctrl-row{flex-wrap:wrap}
+    .now-playing{flex:1 0 100%;order:5;text-align:center;padding-top:2px}
+    .now-playing small{white-space:normal}
+  }
   .skip-btn{
     width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:50%;
   }
@@ -654,8 +677,9 @@
 </header>
 
 <button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
-<div class="float-pair" id="floatPair"><button class="recenter fp-ico" id="paathBtn" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button></div>
+<div class="float-pair" id="floatPair"><button class="recenter fp-ico" id="paathBtn" title="Sehaj Paaths — switch Paath, or go back to Default reading" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" title="Set a Sehaj Paath to this pankti" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button></div>
 <div class="pv-toast" id="pvToast" role="status">Normal speed preview · 1×</div>
+<div class="pv-toast msg-toast" id="msgToast" role="status"></div>
 <div class="quick" id="quickCtl">
   <button class="orb" id="qcPlay" aria-label="Pause"><svg id="qcPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="qcPauseIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
   <button class="qc-speed" id="qcSpeed" aria-label="Playback speed">1×</button>
@@ -865,7 +889,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><text x="12" y="16.5" text-anchor="middle" font-size="8.5" fill="currentColor" stroke="none" font-weight="700">5</text></svg>
       </button>
       <button class="skip-btn auto-btn active" id="autoScrollBtn" aria-label="Auto-scroll with audio" aria-pressed="true" title="Auto-scroll — follow the audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 10h13"/><path d="m8.5 15.5 3.5 3.5 3.5-3.5"/></svg></button>
-      <div class="now-playing" id="nowPlaying">ਜਪੁਜੀ ਸਾਹਿਬ<small>Double-tap a word to listen from there</small></div>
+      <div class="now-playing" id="nowPlaying"><span class="np-title">ਜਪੁਜੀ ਸਾਹਿਬ</span><small>Double-tap a word to listen from there</small></div>
     </div>
   </div>
 </div>
@@ -1097,6 +1121,7 @@
      reading actually starts: a hand scroll, a play, a new tap. */
   var focusMarkLi = -1;
   function markFocus(li){
+    clearTimeout(liteTimer); liteTimer = null;   /* a pending tap-wash fade must not strip the held mark */
     clearFocusMark();
     var el = contentEl.querySelector('.line[data-li="' + li + '"]');
     if(el){ el.classList.add("lite"); focusMarkLi = li; }
@@ -1353,7 +1378,13 @@
         (pv ? '<span class="paath-pv">' + esc(pv) + '</span>' : '') + '</span>';
       html += '</div>';
     };
-    if(!assign) row("free", "Default", "Just reading · not a Paath", null, !!detour);
+    if(!assign){
+      /* the Default row is a mode line, not a tracker — same plain
+         treatment as in the Library/switcher lists: no dot, no card */
+      html += '<div class="paath-row paath-free' + (detour ? " current" : "") + '" data-pop-row="free">';
+      html += '<span class="paath-text"><span class="paath-name">Default</span><span class="paath-sub">Just reading · not a Paath</span></span>';
+      html += '</div>';
+    }
     paathData.list.forEach(function(pt){
       row(pt.id, pt.name, paathPlaceLabel(pt.id), paathPreview(pt.id), !assign && !detour && paathData.current === pt.id);
     });
@@ -1376,7 +1407,7 @@
   }
   var toastTimer = null;
   function toastMsg(msg){
-    var t = $("pvToast"); if(!t) return;
+    var t = $("msgToast"); if(!t) return;
     t.textContent = msg; t.classList.add("show");
     if(toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2400);
@@ -1449,6 +1480,12 @@
   function placeRecenter(){
     var pl = document.querySelector(".player"), pair = $("floatPair");
     if(pl && pair) pair.style.bottom = (pl.offsetHeight + 10) + "px";
+    /* on desktop the Paath popup card anchors above the float pair:
+       derive its bottom offset from the same measured player height
+       (player + pair + gap) instead of a hard-coded 104px that let
+       the card overlap the pair it was opened from */
+    var pp = $("paathPop");
+    if(pp) pp.style.paddingBottom = (window.innerWidth >= 1024 && pl) ? (pl.offsetHeight + 62) + "px" : "";
   }
   /* Rotation (and any resize) is a non-event: the layout reflows, the
      anchor moves, line heights change — but the reading must not change.
@@ -1465,7 +1502,7 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function(){
       var wasPara = paraOn; computePara();
-      if(paraOn !== wasPara){ applyLayoutClass(); relayoutStream(); }   /* rotation / window resize crossed the size class — the other class's layout choice applies */
+      if(paraOn !== wasPara){ applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold)); }   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
       if(!audio.paused && autoScrollOn && !manualHold){
         var found = currentLineEl();
         if(found){
@@ -1486,6 +1523,19 @@
     if(Date.now() < resizeSettleUntil) return; /* no pager/island churn mid-rotation */
     if(sheet.classList.contains("open")) return;
     var pop = $("angPop"); if(pop && !pop.hidden) return;
+    /* the manual-hold release is checked FIRST, before the view-key
+       early returns: scrolling back to the audio's pankti usually
+       happens inside the same item, where the key never changes —
+       checked after those returns (as it once was), the release was
+       unreachable and the hold never let go on a same-item return */
+    if(manualHold){
+      zoneRefresh();
+      var wEl3 = currentWordEl(), wr3 = wordRect(wEl3);
+      if(wr3){ if(wr3.top >= zoneT && wr3.bottom <= zoneB) manualHold = false; }
+      else { var f2 = currentLineEl();
+        if(f2){ var r2 = f2.el.getBoundingClientRect(), a2 = Math.round(window.innerHeight * 0.35);
+          if(r2.bottom > a2 - 46 && r2.top < a2 + 46) manualHold = false; } }
+    }
     var key, label;
     if(state.mode === "ang"){
       var va = viewAngNow(); if(!va) return;
@@ -1504,14 +1554,6 @@
       label = bb.pa;
     } else return;
     updatePager();
-    if(manualHold){
-      zoneRefresh();
-      var wEl3 = currentWordEl(), wr3 = wordRect(wEl3);
-      if(wr3){ if(wr3.top >= zoneT && wr3.bottom <= zoneB) manualHold = false; }
-      else { var f2 = currentLineEl();
-        if(f2){ var r2 = f2.el.getBoundingClientRect(), a2 = Math.round(window.innerHeight * 0.35);
-          if(r2.bottom > a2 - 46 && r2.top < a2 + 46) manualHold = false; } }
-    }
     updateRecenter();
     /* the island is a browsing affordance: it appears for hand-driven
        scrolling, and once up it stays live until the changes stop —
@@ -1583,7 +1625,7 @@
   $("angInput").addEventListener("keydown", function(e){ if(e.key==="Enter") goAng(); });
   function goAng(){
     var v = parseInt($("angInput").value, 10);
-    if(!v || v < 1 || v > 1430){ $("angInput").focus(); $("angInput").select(); return; }
+    if(!v || v < 1 || v > 1430){ $("angInput").focus(); $("angInput").select(); toastMsg("Angs run " + paNum(1) + " – " + paNum(1430)); return; }
     closeSheet(); loadAng(v);
   }
 
@@ -1633,6 +1675,13 @@
      snapshot keeps whatever Ang state it already held instead */
   function snapshotCurrentPaath(){
     if(!paathData.current) return;
+    /* while free reading is live, the current Paath's state IS its ctx
+       snapshot — the live records belong to the free world, and the
+       place key still holds the Paath's pre-detour place. Snapshotting
+       now would rewrite the snapshot from that stale place and destroy
+       a place set by assign-to-Paath in the meantime. Callers snapshot
+       on the way OUT of the Paath world, before detour is set. */
+    if(detour) return;
     var lp = readPlace(), prev = readCtx(paathData.current) || {}, snap = {};
     snap.place = (lp && lp.mode === "bani") ? (prev.place || null) : lp;
     snap.glf = (glf && glf.mode === "bani") ? (prev.glf || null) : glf;
@@ -1654,7 +1703,10 @@
     var defMovedTo = null;
     if(defSnap && started(defSnap)){
       var p1 = paathById("p1");
-      if(p1 && !started(readCtx("p1"))){
+      if(p1 && !started(readCtx("p1")) && (!defName || p1.name === "Sehaj Paath ੧")){
+        /* fold into Paath ੧ only while it is truly untouched — a Paath
+           the reader renamed (even if never started) keeps its name;
+           with a defName to honour, the journey goes to a new tracker */
         writeCtx("p1", defSnap); if(defName) p1.name = defName; defMovedTo = "p1";
       } else {
         var n = paathData.list.length + 1, names = {};
@@ -1714,7 +1766,7 @@
     if(g.mode !== state.mode) return null;
     return previewText(lineTextAt(g.item, g.idx));
   }
-  var paathEditing = null;
+  var paathEditing = null, paathEditList = null;
   function buildPaathLists(){
     var notes = document.querySelectorAll("[data-paath-note]");
     var cur = paathData.current ? paathById(paathData.current) : null;
@@ -1723,15 +1775,17 @@
     for(var c=0;c<lists.length;c++){
       var html = "";
       var row = function(id, name){
-        var isCur = paathData.current === id;
+        /* in free reading the Default row above is the current one —
+           the underlying tracker is not (the popup guards the same way) */
+        var isCur = !detour && paathData.current === id;
         html += '<div class="paath-row' + (isCur ? " current" : "") + '" data-paath-row="' + (id || "") + '">';
         html += '<span class="paath-dot" aria-hidden="true"></span>';
         if(paathEditing !== null && paathEditing === id){
-          html += '<input class="paath-input" data-paath-input value="' + esc(name) + '" aria-label="Paath name" />';
+          html += '<input class="paath-input" data-paath-input maxlength="40" value="' + esc(name) + '" aria-label="Paath name" />';
           html += '<button class="paath-edit" data-paath-save aria-label="Save name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></button>';
         } else {
           var pv2 = paathPreview(id);
-          html += '<span class="paath-text"><span class="paath-name">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span>' + (pv2 ? '<span class="paath-pv">' + esc(pv2) + '</span>' : '') + '</span>';
+          html += '<span class="paath-text"><span class="paath-name" title="' + esc(name) + '">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span>' + (pv2 ? '<span class="paath-pv">' + esc(pv2) + '</span>' : '') + '</span>';
           html += '<button class="paath-edit" data-paath-edit aria-label="Rename ' + esc(name) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4.2 1.2L5 16Z"/></svg></button>';
         }
         html += '</div>';
@@ -1741,7 +1795,11 @@
       lists[c].innerHTML = html;
     }
     if(paathEditing){
-      var inp = document.querySelector("[data-paath-input]");
+      /* both lists render an input while editing — focus the one in
+         the surface the reader actually tapped, not the first in DOM
+         order (that opened the keyboard on the hidden sheet's field
+         when the edit began in the switcher, and vice versa) */
+      var inp = (paathEditList && paathEditList.querySelector("[data-paath-input]")) || document.querySelector("[data-paath-input]");
       if(inp){ inp.focus(); inp.select(); }
     }
   }
@@ -1761,8 +1819,20 @@
     closeSheet(); closeAngPop(); closePaathPop();
     if(id === paathData.current){
       /* already the current Paath — but if a detour is live, picking it
-         is the reader asking to go back: exit and restore its place */
-      if(detour){ exitDetour(); setMode("paath"); restoreFromPlace(readPlace()); updateRecenter(); }
+         is the reader asking to go back: install its snapshot (which an
+         assign-to-Paath may have just rewritten) as the live records,
+         exit free reading, and restore from the snapshot's place */
+      if(detour){
+        var csnap = readCtx(id);
+        if(csnap && csnap.place){
+          try{ localStorage.setItem(LAST_KEY, JSON.stringify(csnap.place)); }catch(e){}
+          if(csnap.glf){ glf = csnap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){} }
+          exitDetour(); setMode("paath"); restoreFromPlace(csnap.place); updateRecenter();
+        } else {
+          /* no snapshot: the Paath's live place IS the place key */
+          exitDetour(); setMode("paath"); restoreFromPlace(readPlace()); updateRecenter();
+        }
+      }
       return;
     }
     try{ savePlace(); }catch(e){}
@@ -1791,9 +1861,15 @@
     if(!inp) inp = document.querySelector("[data-paath-input]");
     if(inp){
       var v = inp.value.replace(/\s+/g, " ").trim();
-      if(v){
+      if(!v){ toastMsg("Name can\u2019t be empty"); }
+      else {
+        /* compare as the name will exist after the next load: the boot
+           rewrite turns "Sehaj Paath 2" into "Sehaj Paath ੨", and case
+           variants read as the same name — normalise before the
+           duplicate test or both slip through as look-alike Paaths */
+        var norm = function(s){ var mm = /^Sehaj Paath (\d+)$/i.exec(s); if(mm) s = "Sehaj Paath " + paNum(parseInt(mm[1], 10)); return s.toLowerCase(); };
         var dup = null;
-        paathData.list.forEach(function(x){ if(x.id !== paathEditing && x.name === v) dup = x; });
+        paathData.list.forEach(function(x){ if(x.id !== paathEditing && norm(x.name) === norm(v)) dup = x; });
         if(v.toLowerCase() === "default"){ toastMsg("\u201CDefault\u201D is the free-reading mode \u2014 a Paath can\u2019t take that name"); }
         else if(v.length > 40){ toastMsg("That name is too long"); }
         else if(dup){ toastMsg("Another Sehaj Paath already has that name"); }
@@ -1810,7 +1886,7 @@
       if(saveBtn){ commitPaathRename(saveBtn.closest("[data-paath-list]")); return; }
       var editBtn = e.target.closest("[data-paath-edit]");
       var rowEl = e.target.closest("[data-paath-row]");
-      if(editBtn && rowEl){ paathEditing = rowEl.getAttribute("data-paath-row"); buildPaathLists(); return; }
+      if(editBtn && rowEl){ paathEditing = rowEl.getAttribute("data-paath-row"); paathEditList = this; buildPaathLists(); return; }
       if(e.target.closest("[data-paath-input]")) return;
       if(e.target.closest("[data-paath-free]")){ enterFree(); return; }
       if(rowEl) switchPaath(rowEl.getAttribute("data-paath-row"));
@@ -1858,7 +1934,7 @@
   document.addEventListener("keydown", function(e){ if(e.key === "Escape"){ closeAngPop(); closePaathPop(); } });
   function goPopAng(){
     var v = parseInt($("popAngInput").value, 10);
-    if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); return; }
+    if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); toastMsg("Angs run " + paNum(1) + " – " + paNum(1430)); return; }
     closeAngPop(); loadAng(v);
   }
   $("popAngGo").addEventListener("click", goPopAng);
@@ -1872,7 +1948,7 @@
   });
 
   /* ---------- hide / show bars on scroll ---------- */
-  var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false, audioSwitchAt = 0, audioSwitching = false, lastGestureAt = 0;
+  var lastY = window.scrollY, manualScrollAt = 0, autoScrolling = false, audioSwitchAt = 0, audioSwitching = false, audioSwitchGen = 0, lastGestureAt = 0;
   var manualHold = false; /* the reader has taken the page by hand: auto-scroll stays off his back until he returns to the audio's pankti or taps recenter */
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
   var flashEl = null, flashTimer = null;
@@ -2058,9 +2134,9 @@
     /* end navigation */
     html += '<div class="end-nav">';
     if(state.mode === "ang"){
-      if(state.ang > 1) html += '<button id="prevAng">← Ang ' + (state.ang-1) + '</button>';
+      if(state.ang > 1) html += '<button id="prevAng">← Ang ' + paNum(state.ang-1) + '</button>';
       html += '<span class="spacer"></span>';
-      if(state.ang < 1430) html += '<button id="nextAng">Ang ' + (state.ang+1) + ' →</button>';
+      if(state.ang < 1430) html += '<button id="nextAng">Ang ' + paNum(state.ang+1) + ' →</button>';
     } else {
       var idx = BANIS.findIndex(function(b){ return b.id === state.id; });
       if(idx > 0) html += '<button id="prevBani">← ' + esc(BANIS[idx-1].en) + '</button>';
@@ -2079,7 +2155,7 @@
     if(na) na.addEventListener("click", function(){ loadAng(state.ang+1); });
 
     brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; resetView(); updatePager(); updateRecenter();
-    nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Double-tap a word to listen from there</small>";
+    nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(opts.titlePa) + "</span><small>Double-tap a word to listen from there</small>";
     markActiveBani();
     if(pendingRestore){
       var pr = pendingRestore; pendingRestore = null;
@@ -2190,7 +2266,10 @@
   }
   function fadeLite(){
     var a = contentEl.querySelector(".w.lite"); if(a) a.classList.remove("lite");
-    var b = contentEl.querySelector(".line.lite"); if(b) b.classList.remove("lite");
+    /* the held focus mark wears the same class but is NOT a tap wash:
+       it stays until reading actually starts — never fade it here */
+    var b = contentEl.querySelector(".line.lite");
+    if(b && Number(b.getAttribute("data-li")) !== focusMarkLi) b.classList.remove("lite");
     liteTimer = null;
   }
   function liteWord(el){
@@ -2204,22 +2283,27 @@
   function playFromLine(ln){
     var recL = state.flatLines[Number(ln.getAttribute("data-li"))];
     if(recL && typeof recL.start === "number"){
-      clearHighlight(); ln.classList.add("current");
+      clearHighlight();
       var la = state.lineAng[Number(ln.getAttribute("data-li"))];
       if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = recL.start; switchAudioToAng(la, false); }
       else if(state.mode === "bani" && la && la !== state.id){ pendingSeek = recL.start; switchAudioToBani(la, false); }
       else seekTo(recL.start);
+      /* paint AFTER the switch: the switch functions clear highlights,
+         so painting first erased the feedback on exactly the
+         cross-item taps */
+      ln.classList.add("current");
       playAudio(); showBars(); manualScrollAt = 0; manualHold = false; savePlace(); saveFocusLine(Number(ln.getAttribute("data-li")));
     }
   }
   function playFromWord(w){
     var rec = state.flatWords[Number(w.getAttribute("data-wi"))];
     if(rec && typeof rec.start === "number"){
-      clearHighlight(); w.classList.add("now");
+      clearHighlight();
       var wa = state.lineAng[rec.line];
       if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
       else if(state.mode === "bani" && wa && wa !== state.id){ pendingSeek = rec.start; switchAudioToBani(wa, false); }
       else seekTo(rec.start);
+      w.classList.add("now");   /* after the switch — see playFromLine */
       playAudio(); showBars(); manualScrollAt = 0; manualHold = false; savePlace(); saveFocusLine(rec.line);
     }
   }
@@ -2246,13 +2330,18 @@
         return;
       }
       if(pendingLineTap){ clearTimeout(pendingLineTap.timer); pendingLineTap = null; }
-      if(pendingTap && pendingTap.el === w){
+      /* the double-tap target is the LINE, not the exact word element
+         (the triple-tap rule above already counts this way): at big
+         fonts the page drifts between taps and the second tap lands
+         on a neighbouring word — that is still the reader's
+         double-tap, and it plays from the word actually tapped */
+      if(pendingTap && (pendingTap.el === w || pendingTap.line === w.closest(".line"))){
         clearTimeout(pendingTap.timer); pendingTap = null;
         playFromWord(w);
       } else {
         if(pendingTap){ clearTimeout(pendingTap.timer); liteWord(pendingTap.el); }
         var pw = w;
-        pendingTap = { el: pw, timer: setTimeout(function(){ liteWord(pw); pendingTap = null; }, 300) };
+        pendingTap = { el: pw, line: pw.closest(".line"), timer: setTimeout(function(){ liteWord(pw); pendingTap = null; }, 300) };
       }
       return;
     }
@@ -2332,8 +2421,18 @@
     if(!v2 || !v2.lines || v2.lines.length !== data.lines.length) return data;
     var merged = {}; for(var k in data) merged[k] = data[k];
     merged.lines = data.lines.map(function(l, i){
+      /* the overlay's premise is timings only — same words, retimed.
+         Validate per line: the V2 word sequence must match this
+         line's own word sequence exactly, or the line keeps its CTC
+         timings (a segmentation drift would otherwise mint ghost
+         words at the line's end and detach timings from tokens) */
+      var vl = v2.lines[i];
+      if(!vl || !vl.words || !l.words || vl.words.length !== l.words.length) return l;
+      for(var wi2 = 0; wi2 < vl.words.length; wi2++){
+        if(!vl.words[wi2] || vl.words[wi2].word !== l.words[wi2].word) return l;
+      }
       var nl = {}; for(var k2 in l) nl[k2] = l[k2];
-      nl.start = v2.lines[i].start; nl.end = v2.lines[i].end; nl.words = v2.lines[i].words;
+      nl.start = vl.start; nl.end = vl.end; nl.words = vl.words;
       return nl;
     });
     return merged;
@@ -2470,12 +2569,13 @@
   }
   function switchAudioToAng(ang, autoplay){
     audioSwitching = true; audioSwitchAt = Date.now();
-    setTimeout(function(){ audioSwitching = false; }, 5000);
+    var swGen = ++audioSwitchGen;
+    setTimeout(function(){ if(audioSwitchGen === swGen) audioSwitching = false; }, 5000);
     state.ang = ang;
     state.titlePa = "ਅੰਗ " + paNum(ang); state.titleEn = "Ang " + ang;
     state.duration = state.angDur[ang] || 0;
     brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"; resetView(); updatePager();
-    nowPlaying.innerHTML = esc(state.titlePa) + "<small>Double-tap a word to listen from there</small>";
+    nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(state.titlePa) + "</span><small>Double-tap a word to listen from there</small>";
     var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
     audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
     applySpeed();
@@ -2485,7 +2585,13 @@
   }
   function appendAng(ang, opts){
     opts = opts || {};
-    if(state.mode !== "ang" || state.appending || !ang || ang > 1430) return;
+    if(state.mode !== "ang" || !ang || ang > 1430) return;
+    /* a rollover that arrives while this Ang is already being appended
+       (the tail observer got there first) must not be dropped: the
+       in-flight append completes with play falsy and playback would
+       stop dead at the boundary. Record the intent; the in-flight
+       append honours it on completion. */
+    if(state.appending){ if(opts.play) state.appendPlay = { ang: ang, rollover: !!opts.rollover }; return; }
     if(state.streamAngs.indexOf(ang) >= 0){ if(opts.play){ switchAudioToAng(ang, true); if(opts.rollover) trackKick(); else scrollToAngStart(ang); } return; }
     state.appending = true;
     var token = state.loadToken;
@@ -2495,7 +2601,7 @@
     .then(function(json){
       if(token !== state.loadToken || state.mode !== "ang"){ state.appending = false; return null; }
       var data = json.angs && json.angs[String(ang)];
-      if(!data || !data.lines || !data.lines.length){ state.appending = false; if(opts.play) loadAng(ang, true); return null; }
+      if(!data || !data.lines || !data.lines.length){ state.appending = false; if(opts.play || (state.appendPlay && state.appendPlay.ang === ang)){ state.appendPlay = null; loadAng(ang, true); } return null; }
       return withV2(ang, data);
     })
     .then(function(data){
@@ -2509,9 +2615,11 @@
       if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
       state.streamAngs.push(ang);
       observeTail(); pruneStream();
-      if(opts.play){ switchAudioToAng(ang, true); if(opts.rollover) trackKick(); else scrollToAngStart(ang); }
+      var pendPlay = state.appendPlay && state.appendPlay.ang === ang ? state.appendPlay : null;
+      if(pendPlay) state.appendPlay = null;
+      if(opts.play || pendPlay){ switchAudioToAng(ang, true); if(opts.rollover || (pendPlay && pendPlay.rollover)) trackKick(); else scrollToAngStart(ang); }
     })
-    .catch(function(){ state.appending = false; if(opts.play) loadAng(ang, true); });
+    .catch(function(){ state.appending = false; if(opts.play || (state.appendPlay && state.appendPlay.ang === ang)){ state.appendPlay = null; loadAng(ang, true); } });
   }
   /* The stream runs both ways: landing on an Ang is a window into one
      continuous scroll — the previous Ang prepends above as the reader
@@ -2726,12 +2834,13 @@
   function switchAudioToBani(id, autoplay){
     var b = baniById(id); if(!b) return;
     audioSwitching = true; audioSwitchAt = Date.now();
-    setTimeout(function(){ audioSwitching = false; }, 5000);
+    var swGen = ++audioSwitchGen;
+    setTimeout(function(){ if(audioSwitchGen === swGen) audioSwitching = false; }, 5000);
     state.id = id;
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
     brandSub.textContent = "ਨਿਤਨੇਮ"; resetView(); updatePager();
-    nowPlaying.innerHTML = esc(b.pa) + "<small>Double-tap a word to listen from there</small>";
+    nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(b.pa) + "</span><small>Double-tap a word to listen from there</small>";
     audio.src = baniAudioUrl(b);
     applySpeed();
     audio.load(); resetProgress(); clearHighlight();
@@ -2740,7 +2849,8 @@
   }
   function appendBani(id, opts){
     opts = opts || {};
-    if(state.mode !== "bani" || state.appendingBani || !id) return;
+    if(state.mode !== "bani" || !id) return;
+    if(state.appendingBani){ if(opts.play) state.appendPlayBani = { id: id, rollover: !!opts.rollover }; return; }
     var b = baniById(id); if(!b) return;
     if(state.streamBanis.indexOf(id) >= 0){ if(opts.play){ switchAudioToBani(id, true); if(opts.rollover) trackKick(); else scrollToBaniStart(id); } return; }
     state.appendingBani = true;
@@ -2750,7 +2860,7 @@
       state.appendingBani = false;
       if(token !== state.loadToken || state.mode !== "bani") return;
       var groups = normalize(json);
-      if(!groups.length){ if(opts.play) loadBani(b, true); return; }
+      if(!groups.length){ if(opts.play || (state.appendPlayBani && state.appendPlayBani.id === id)){ state.appendPlayBani = null; loadBani(b, true); } return; }
       state.baniGroups[id] = groups; state.baniDur[id] = json.duration || 0;
       state.baniFirstLine[id] = state.flatLines.length;
       state.baniFirstWord[id] = state.flatWords.length;
@@ -2760,9 +2870,11 @@
       if(nav) nav.insertAdjacentHTML("beforebegin", html); else contentEl.insertAdjacentHTML("beforeend", html);
       state.streamBanis.push(id);
       observeBaniTail(); pruneBaniStream();
-      if(opts.play){ switchAudioToBani(id, true); if(opts.rollover) trackKick(); else scrollToBaniStart(id); }
+      var pendPlayB = state.appendPlayBani && state.appendPlayBani.id === id ? state.appendPlayBani : null;
+      if(pendPlayB) state.appendPlayBani = null;
+      if(opts.play || pendPlayB){ switchAudioToBani(id, true); if(opts.rollover || (pendPlayB && pendPlayB.rollover)) trackKick(); else scrollToBaniStart(id); }
     })
-    .catch(function(){ state.appendingBani = false; if(opts.play) loadBani(b, true); });
+    .catch(function(){ state.appendingBani = false; if(opts.play || (state.appendPlayBani && state.appendPlayBani.id === id)){ state.appendPlayBani = null; loadBani(b, true); } });
   }
   function prependBani(id){
     if(state.mode !== "bani" || state.appendingBani || state.prependingBani || !id) return;
@@ -2919,8 +3031,26 @@
   /* ---------- playback ---------- */
   function playAudio(){
     var p = audio.play();
-    if(p && p.catch) p.catch(function(){});
+    if(p && p.catch) p.catch(function(err){
+      /* a rejected play() that is NOT a user-gesture interruption
+         (AbortError from a pause racing the play) means the audio
+         really couldn't start — say so instead of sitting silent
+         under a Pause icon */
+      if(err && err.name === "NotSupportedError") audioLoadFailed();
+    });
   }
+  var audioErrAt = 0;
+  function audioLoadFailed(){
+    if(Date.now() - audioErrAt < 4000) return;   /* one note per failure burst */
+    audioErrAt = Date.now();
+    setPlayIcon(false);
+    toastMsg("Audio couldn't load — check your connection, then tap play");
+  }
+  audio.addEventListener("error", function(){
+    /* src-level failures (missing/unreachable MP3) surface here;
+       an empty src (nothing loaded yet) is not a failure */
+    if(audio.getAttribute("src")) audioLoadFailed();
+  });
   function pauseAudio(){ if(!audio.paused) audio.pause(); }
   function seekTo(t){
     if(!isFinite(t)) return;
@@ -2935,6 +3065,11 @@
   var seekFix = null;
   function armSeekFix(t){ seekFix = { target: t, at: performance.now(), tries: 0 }; }
   audio.addEventListener("seeked", function(){
+    /* a seek re-evaluates the tracker from scratch: the safety rule's
+       row key belongs to the pre-seek position — left in place, a row
+       that already fired its one glide could be re-entered by a seek
+       and never glide again, stranding the spoken row off-section */
+    trackRowKey = "";
     if(!seekFix) return;
     var elapsed = (performance.now() - seekFix.at) / 1000;
     var expected = audio.paused ? seekFix.target : seekFix.target + elapsed * (audio.playbackRate || 1);
@@ -3037,6 +3172,12 @@
     var dur = audio.duration || state.duration || 0;
     seekTo(dur * (Number(seekEl.value) / 100));
     state.seeking = false;
+  });
+  /* a drag released off the control (or a cancelled gesture) can end
+     without "change" ever firing — the seeking flag would wedge and
+     freeze the progress UI while the audio plays on */
+  ["pointerup", "pointercancel", "blur"].forEach(function(ev){
+    seekEl.addEventListener(ev, function(){ if(state.seeking && !seekEl.matches(":active")) state.seeking = false; });
   });
 
   audio.addEventListener("play", function(){ setPlayIcon(true); audioSwitching = false; scheduleAutoHide(); trackKick(); });
@@ -3180,7 +3321,24 @@
     document.body.classList.toggle("hdr-own", paraOn && paraHdrOwn);
     paintLayoutSegs();
   }
-  function relayoutStream(){
+  function relayoutStream(keepView){
+    /* keepView (resize-driven rebuilds while paused/browsing): the
+       pankti under the reader's eye is restored to the same screen
+       offset — rebuilding must not glide a browsing reader back to
+       the audio line for a purely cosmetic layout flip. The manual
+       Layout switch keeps the focus-line glide. */
+    var viewLi = -1, viewTop = 0;
+    if(keepView){
+      var flv = focusedLine();
+      if(flv && flv.item != null && typeof flv.idx === "number"){
+        var first = state.mode === "ang" ? state.angFirstLine[flv.item] : state.baniFirstLine[flv.item];
+        if(typeof first === "number"){
+          viewLi = first + flv.idx;
+          var el0 = contentEl.querySelector('.line[data-li="' + viewLi + '"]');
+          if(el0) viewTop = el0.getBoundingClientRect().top; else viewLi = -1;
+        }
+      }
+    }
     contentEl.querySelectorAll("section[data-ang]").forEach(function(sec){
       var ang = Number(sec.getAttribute("data-ang"));
       if(state.angLines[ang]) sec.innerHTML = buildLinesInnerAt(state.angLines[ang], ang);
@@ -3189,6 +3347,10 @@
       var id = sec.getAttribute("data-bani");
       if(state.baniGroups[id]) sec.innerHTML = buildBaniInnerAt(state.baniGroups[id], id);
     });
+    if(viewLi >= 0){
+      var elv = contentEl.querySelector('.line[data-li="' + viewLi + '"]');
+      if(elv){ autoScrolling = true; window.scrollTo(0, Math.max(0, elv.getBoundingClientRect().top + window.scrollY - viewTop)); setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60); updateRecenter(); return; }
+    }
     var f = effFocus(), el = f ? focusLineEl(f) : null;
     if(!el){ var cl = currentLineEl(); if(cl) el = cl.el; }
     if(el) glideToLine(el);
@@ -3286,7 +3448,11 @@
       var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
       var lineEl2 = contentEl.querySelector('.line[data-li="' + li + '"]');
       if(lineEl2 && curL <= lines[li].end + 0.45) lineEl2.classList.add("current");
-      state.curLine = li;
+      /* commit only when the line is actually in the DOM (or already
+         past): a pruned section's line has no element — committing
+         anyway made the early return above block the repaint when
+         the section rehydrated under the same spoken line */
+      if(lineEl2 || curL > lines[li].end + 0.45) state.curLine = li;
       return;
     }
     var words = state.flatWords;
@@ -3307,11 +3473,12 @@
     while(l <= r){ var mid = (l + r) >> 1; if(words[mid].start <= cur){ wi = mid; l = mid + 1; } else r = mid - 1; }
     if(wi === state.curWord) return;
     var prevW = contentEl.querySelector(".w.now"); if(prevW) prevW.classList.remove("now");
+    var wFound = false;
     if(wi >= lo && wi <= hi && cur <= words[wi].end + 0.45){
       var wEl = contentEl.querySelector('.w[data-wi="' + wi + '"]');
-      if(wEl) wEl.classList.add("now");
-    }
-    state.curWord = wi;
+      if(wEl){ wEl.classList.add("now"); wFound = true; }
+    } else wFound = true;   /* out of range or already past — nothing to paint later */
+    if(wFound) state.curWord = wi;   /* a pruned word stays uncommitted so rehydration repaints it */
   }
 
 
@@ -3387,7 +3554,14 @@
     if(zoneB < zoneT + 1.2 * lh) zoneB = zoneT + 1.2 * lh;
   }
   function zoneRefresh(){
-    var key = window.innerWidth + "x" + window.innerHeight + "|" + FS[fsIdx] + "|" + (paraOn ? "p" : "l");
+    /* the measured line height is part of the key: it changes when
+       the webfont lands (fallback metrics before fonts.ready) and
+       when the paragraph-header style flips — a key built only from
+       viewport + font size kept the stale band for the whole session */
+    var lhKey = 0;
+    var sample = contentEl.querySelector(".line:not(.mool):not(.hdr)") || contentEl.querySelector(".line");
+    if(sample) lhKey = Math.round(parseFloat(window.getComputedStyle(sample).lineHeight) || 0);
+    var key = window.innerWidth + "x" + window.innerHeight + "|" + FS[fsIdx] + "|" + (paraOn ? "p" : "l") + "|" + (paraHdrOwn ? "h1" : "h0") + "|" + lhKey;
     if(key !== zoneKey){ zoneKey = key; computeZone(); }
   }
   function wordElByIndex(wi){
@@ -3481,7 +3655,7 @@
          pankti changed mid-glide, retarget to the new pankti's top */
       if(wordMode && li !== trackLi && glideKind !== "sentence"){
         var mTop = lineFirstRowTop(found.el);
-        if(!(paraOn && trackWi > 0 && (function(){ var pe = wordElByIndex(trackWi - 1); var pr = wordRect(pe); return pr && Math.abs(pr.top - r.top) < 4; })()))
+        if(!(paraOn && trackWi > 0 && state.flatWords[trackWi - 1] && state.flatWords[trackWi - 1].line === li - 1 && (function(){ var pe = wordElByIndex(trackWi - 1); var pr = wordRect(pe); return pr && Math.abs(pr.top - r.top) < 4; })()))
           startGlide(window.scrollY + (mTop - zoneA), "sentence");
         trackLi = li;
       }
@@ -3511,8 +3685,15 @@
          cancelled for this pankti and only the safety rule may move. */
       var mixed = false;
       if(paraOn && trackWi > 0){
-        var pEl = wordElByIndex(trackWi - 1), pRect = wordRect(pEl);
-        if(pRect && Math.abs(pRect.top - r.top) < 4) mixed = true;
+        /* "previous word" must mean the last word of the immediately
+           preceding pankti — after a seek, the timestamp-previous word
+           can be a pankti far away whose row coincidentally aligns,
+           and cancelling G1 for that leaves this pankti half-out */
+        var prevRec = state.flatWords[trackWi - 1];
+        if(prevRec && prevRec.line === li - 1){
+          var pEl = wordElByIndex(trackWi - 1), pRect = wordRect(pEl);
+          if(pRect && Math.abs(pRect.top - r.top) < 4) mixed = true;
+        }
       }
       trackLi = li;
       if(!mixed){
@@ -3706,6 +3887,17 @@
           fl: { item: linkAng, idx: linkLine, src: "view" } }, glf: detourGlf });
         pendingRestore = { mode: "ang", ang: linkAng, id: null, y: 0, t: 0,
           fl: { item: linkAng, idx: linkLine, src: "view" } };
+      } else if(modeIsFree() || !readPlace()){
+        /* a plain Ang link lands in the world the reader lives in: in
+           Default free reading it must not write its place into the
+           Sehaj Paath world's records — resume the free slot so this
+           visit saves where free reading saves. A first-ever visit
+           (no mode key, no Paath place) is free reading too: fresh
+           installs start in Default. */
+        var lds = readDetourStore();
+        detour = { resumed: true };
+        detourGlf = lds && lds.glf ? lds.glf : null;
+        setMode("free");
       }
       loadAng(linkAng); return;
     }
@@ -3719,6 +3911,16 @@
       else if(saved.mode === "ang" && saved.ang >= 1 && saved.ang <= 1430){ pendingRestore = saved; loadAng(saved.ang); }
       else if(saved.mode === "bani" && saved.id){ var db0 = null; BANIS.forEach(function(x){ if(x.id === saved.id) db0 = x; }); if(db0){ pendingRestore = saved; loadBani(db0); } else loadBani(BANIS[0]); }
       else loadAng(1);
+      return;
+    }
+    if(modeIsFree()){
+      /* the remembered world is free reading but its slot holds no
+         usable place (pruned/corrupt) — still boot INTO free reading,
+         never fall through to the Paath place with the mode key
+         disagreeing underneath */
+      detour = { resumed: true };
+      detourGlf = dstore && dstore.glf ? dstore.glf : null;
+      loadAng(1);
       return;
     }
     var saved = readPlace();
@@ -3741,6 +3943,10 @@
       loadBani(BANIS[0]);
     }
   })();
+  /* the Paath lists were first built before this boot decided which
+     world the reader is in — rebuild them now so the DOM agrees with
+     the booted world even before any surface opens */
+  buildPaathLists();
 
   /* ---------- Google sign-in + cloud sync ----------
      Optional, and invisible when unused. localStorage stays the source
@@ -3757,7 +3963,20 @@
      and a live subscription applies newer cloud state as it arrives.
      The first device to sign in can no longer clobber a second device
      whose reading is more recent. Applying cloud state reloads once.
-     SDK blocked/offline -> local-only, exactly like the Tracker. */
+     SDK blocked/offline -> local-only, exactly like the Tracker.
+     Meta discipline: meta.keysJson is the last SYNCED fingerprint
+     (written only by a successful push, an apply, or an equal-keys
+     sign-in) — the poll never touches it, or every push would
+     early-return as already-synced. A failed push keeps the old
+     fingerprint, says so in the Account note, and retries with
+     backoff. Win/lose guards: a near-pristine device never overwrites
+     a rich cloud; inside a 10-minute stamp window the states' own
+     reading times (place/focus timestamps) break the tie; a push
+     whose last cloud read is stale re-reads first; a cloud copy that
+     loses its reader field is re-pushed from the live subscription;
+     an apply deletes local keys the winner does not have; sync meta
+     resets when the signed-in account changes, and every async sync
+     callback checks it still speaks for the current account. */
   (function(){
     /* apply-guard: if the previous page just wrote cloud state and
        reloaded, write it once more before anything trusts localStorage —
@@ -3800,17 +4019,33 @@
       return keys;
     }
     function placeTsOf(keys){
-      var ts = 0, pl = null, dt = null;
-      try{ pl = JSON.parse(keys["gurbani-reader:last-v1"] || "null"); }catch(e){}
-      try{ dt = JSON.parse(keys["gurbani-reader:detour-v1"] || "null"); }catch(e){}
-      if(pl && pl.ts) ts = Math.max(ts, pl.ts);
-      if(dt && dt.place && dt.place.ts) ts = Math.max(ts, dt.place.ts);
+      /* the newest READING time inside a state: the live place, the
+         free-reading place, the focus, and every Paath snapshot's
+         place/focus — settings and UI keys never move this clock,
+         which is what makes it a fair tiebreak between two devices */
+      var ts = 0;
+      var scan = function(o){ if(!o) return; if(o.ts) ts = Math.max(ts, o.ts); if(o.place) scan(o.place); if(o.glf) scan(o.glf); if(o.fl) scan(o.fl); };
+      Object.keys(keys).forEach(function(k){
+        if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:detour-v1" || k === "gurbani-reader:focus-v1" || k.indexOf("gurbani-reader:ctx-") === 0){
+          try{ scan(JSON.parse(keys[k] || "null")); }catch(e){}
+        }
+      });
       return ts;
+    }
+    /* a ctx entry counts only if it holds a real journey — an empty
+       stub ({place:null, glf:null}, written when a Bani entry snapshots
+       a never-started Paath) is not a snapshot */
+    function ctxCounts(keys){
+      for(var k in keys){
+        if(k.indexOf("gurbani-reader:ctx-") !== 0) continue;
+        try{ var s = JSON.parse(keys[k] || "null"); if(s && (s.place || s.glf)) return true; }catch(e){}
+      }
+      return false;
     }
     /* near-pristine: no Paath snapshots and no real reading progress —
        a fresh device in this state must never overwrite a rich cloud */
     function keysPristine(keys){
-      for(var k in keys){ if(k.indexOf("gurbani-reader:ctx-") === 0) return false; }
+      if(ctxCounts(keys)) return false;
       var pl = null, dt = null;
       try{ pl = JSON.parse(keys["gurbani-reader:last-v1"] || "null"); }catch(e){}
       try{ dt = JSON.parse(keys["gurbani-reader:detour-v1"] || "null"); }catch(e){}
@@ -3818,13 +4053,16 @@
       return fresh(pl) && fresh(dt && dt.place);
     }
     function keysRich(keys){
-      for(var k in keys){ if(k.indexOf("gurbani-reader:ctx-") === 0) return true; }
+      if(ctxCounts(keys)) return true;
       var pl = null, dt = null;
       try{ pl = JSON.parse(keys["gurbani-reader:last-v1"] || "null"); }catch(e){}
       try{ dt = JSON.parse(keys["gurbani-reader:detour-v1"] || "null"); }catch(e){}
       var deep = function(x){ return !!x && ((x.ang || 0) > 1 || (x.t || 0) >= 30); };
       return deep(pl) || deep(dt && dt.place);
     }
+    /* pure decision helpers, exposed for the test harness (the live
+       sync paths need a real account and cannot run in a sandbox) */
+    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich };
     function setNote(s){ if(note) note.textContent = s; }
     function paint(){
       if(user){ btn.textContent = "Sign out"; setNote("Signed in as " + (user.email || "") + " — place, Paaths & settings sync to your account."); }
@@ -3852,20 +4090,39 @@
       }
       doPush();
     }
-    function doPush(){
+    var pushRetries = 0, retryTimer = null;
+    function doPush(force){
       if(!user || applying) return;
       var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
-      if(keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
+      if(!force && keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
       /* the blob's stamp is the last CHANGE's time, not the push time —
          devices compare change against change */
       var at = Math.max(m.localAt || 0, m.savedAt || 0);
       if(keysJson !== m.keysJson && (m.localAt || 0) <= (m.savedAt || 0)) at = Date.now();
       var stamped = JSON.stringify({ keys: keys, savedAt: at });
-      try{ localStorage.setItem(META, JSON.stringify({ savedAt: at, keysJson: keysJson, localAt: m.localAt || 0 })); }catch(e){}
-      lastSent = stamped;
-      db.collection("progress").doc(user.uid).set({ readerJson: stamped, readerAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
-        .then(function(){ if(user) setNote("Synced ✓ — signed in as " + (user.email || "")); })
-        .catch(function(){ lastSent = null; if(user) setNote("Couldn't sync — your reading is safe on this device and will retry."); });
+      var uid = user.uid;
+      db.collection("progress").doc(uid).set({ readerJson: stamped, readerAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+        .then(function(){
+          /* the synced fingerprint is written ONLY once the cloud has
+             the state — writing it optimistically (as before) made a
+             single failed push mark unsynced reading as synced, and
+             no later saveNow ever retried it */
+          lastSent = stamped; pushRetries = 0;
+          try{ var mm = meta(); mm.savedAt = at; mm.keysJson = keysJson; localStorage.setItem(META, JSON.stringify(mm)); }catch(e){}
+          if(user) setNote("Synced ✓ — signed in as " + (user.email || ""));
+        })
+        .catch(function(){
+          lastSent = null;
+          if(user) setNote("Couldn't sync — your reading is safe on this device and will retry.");
+          /* bounded retry with backoff: a failed push is retried, not
+             forgotten (an offline train ride no longer loses the
+             session's sync when the tab closes) */
+          if(user && pushRetries < 3){
+            pushRetries++;
+            clearTimeout(retryTimer);
+            retryTimer = setTimeout(function(){ saveNow(); }, 4000 * pushRetries);
+          }
+        });
     }
     /* the poll runs signed in or not: its first job is stamping this
        device's last local change (localAt) so a later sign-in can tell
@@ -3876,7 +4133,12 @@
       if(j === lastSeenJson) return;
       lastSeenJson = j;
       if(!applying){
-        var m = meta(); m.localAt = Date.now(); m.keysJson = j;
+        /* stamp ONLY the change time. META.keysJson is the last SYNCED
+           fingerprint — saveNow/doPush skip a push whose keys match it.
+           Writing the just-changed keys here (as a previous build did)
+           made every later push early-return as "already synced", so
+           the cloud silently stopped receiving pushes altogether. */
+        var m = meta(); m.localAt = Date.now();
         try{ localStorage.setItem(META, JSON.stringify(m)); }catch(e){}
       }
       if(!user || applying || !syncReady) return;
@@ -3886,29 +4148,85 @@
     btn.addEventListener("click", function(){
       if(user){ auth.signOut(); return; }
       var prov = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(prov).catch(function(){ auth.signInWithRedirect(prov); });
+      auth.signInWithPopup(prov).catch(function(){
+        setNote("Sign-in didn't complete — trying another way…");
+        auth.signInWithRedirect(prov).catch(function(){ setNote("Sign-in didn't complete — tap to try again. Everything still saves on this device."); });
+      });
     });
     function applyCloud(cloudKeys, cloudAt, raw){
       applying = true;
+      var guardKeys = {};
+      Object.keys(cloudKeys).forEach(function(k){ guardKeys[k] = cloudKeys[k]; });
       try{
-        Object.keys(cloudKeys).forEach(function(k){ if(cloudKeys[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, cloudKeys[k]); });
-        localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: cloudAt }));
+        /* wholesale means wholesale: a local key the winning cloud
+           state does not have (an orphaned ctx-*, a stale detour)
+           must not survive the apply — it would be re-collected on
+           the next push and resurrect state the winner never had.
+           Deletions ride in the apply-guard too, so the reload-window
+           replay performs them as well. */
+        var before = collectKeys();
+        Object.keys(before).forEach(function(k){ if(!(k in cloudKeys)) guardKeys[k] = null; });
+        Object.keys(guardKeys).forEach(function(k){ if(guardKeys[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, guardKeys[k]); });
+        var gm2 = meta();
+        localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: cloudAt, lastUid: gm2.lastUid || (user ? user.uid : null) }));
       }catch(e){}
       lastSent = raw;
-      try{ sessionStorage.setItem("gurbani-reader:apply-guard", JSON.stringify({ uid: user ? user.uid : null, blob: raw })); }catch(e){}
+      var guardBlob = raw;
+      try{ var gp = JSON.parse(raw); gp.keys = guardKeys; guardBlob = JSON.stringify(gp); }catch(e){}
+      try{ sessionStorage.setItem("gurbani-reader:apply-guard", JSON.stringify({ uid: user ? user.uid : null, blob: guardBlob })); }catch(e){}
       setNote("Found your synced reading — refreshing…");
       setTimeout(function(){ location.reload(); }, 700);
     }
     auth.onAuthStateChanged(function(u){
       user = u;
       syncReady = false;
-      if(u){ var mu = meta(); if(mu.lastUid !== u.uid){ mu.lastUid = u.uid; try{ localStorage.setItem(META, JSON.stringify(mu)); }catch(e){} } }
+      if(u){
+        var mu = meta();
+        if(mu.lastUid !== u.uid){
+          /* a different account starts with a clean slate: the previous
+             account's stamps say nothing about this account's cloud,
+             and judging this cloud by them could suppress its apply
+             and push this device's state into the wrong doc's place */
+          mu.lastUid = u.uid; mu.savedAt = 0; mu.localAt = 0; mu.keysJson = null;
+          try{ localStorage.setItem(META, JSON.stringify(mu)); }catch(e){}
+        }
+      }
       if(unsub){ unsub(); unsub = null; }
       if(!u){ paint(); lastSent = null; return; }
       paint();
       setNote("Signed in — syncing…");
+      var myUid = u.uid;
       var ref = db.collection("progress").doc(u.uid);
+      /* live pull is set up on its own, not inside the initial get():
+         a failed first read must not cost the whole session its
+         subscription. It also repairs a cloud copy that lost its
+         reader field mid-session, and applies newer reading with the
+         same win rules as sign-in. */
+      var subscribe = function(){
+        if(unsub) return;
+        unsub = ref.onSnapshot(function(snap2){
+          lastPullAt = Date.now();
+          if(!user || user.uid !== myUid || applying) return;
+          var c2 = snap2.exists ? (snap2.data().readerJson || null) : null;
+          if(!c2){
+            /* the cloud copy lost its reader field (deleted doc/field)
+               — re-push this device's state instead of showing
+               "Synced ✓" over a cloud that no longer exists */
+            if(lastSent && Object.keys(collectKeys()).length) doPush(true);
+            return;
+          }
+          if(c2 === lastSent) return;
+          var cj2 = null; try{ cj2 = JSON.parse(c2); }catch(e){}
+          if(!cj2 || !cj2.keys) return;
+          var m2 = meta(), localNow = collectKeys();
+          if(JSON.stringify(cj2.keys) === JSON.stringify(localNow)) return;
+          var wins = (cj2.savedAt || 0) > (m2.savedAt || 0) && (cj2.savedAt || 0) > (m2.localAt || 0);
+          if(!wins && Math.abs((cj2.savedAt || 0) - (m2.localAt || 0)) < 600000 && placeTsOf(cj2.keys) > placeTsOf(localNow)) wins = true;
+          if(wins) applyCloud(cj2.keys, cj2.savedAt, c2);
+        }, function(){ if(user) setNote("Couldn't sync — your reading is safe on this device and will retry."); });
+      };
       ref.get().then(function(snap){
+        if(!user || user.uid !== myUid) return;
         var cloud = snap.exists ? (snap.data().readerJson || null) : null;
         var cloudAt = 0, cloudKeys = null;
         if(cloud){ try{ var cj = JSON.parse(cloud); cloudAt = cj.savedAt || 0; cloudKeys = cj.keys || null; }catch(e){} }
@@ -3930,25 +4248,21 @@
           applyCloud(cloudKeys, cloudAt, cloud);
         } else {
           if(cloudKeys && JSON.stringify(cloudKeys) === JSON.stringify(collectKeys())){
-            try{ localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: m.localAt || 0 })); }catch(e){}
+            try{ localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: m.localAt || 0, lastUid: myUid })); }catch(e){}
             lastSent = cloud;
             setNote("Synced ✓ — signed in as " + (u.email || ""));
           } else saveNow();
         }
-        /* live pull: when another device pushes newer reading, it
-           arrives here and applies the same way — no re-sign-in needed */
-        unsub = ref.onSnapshot(function(snap2){
-          lastPullAt = Date.now();
-          if(!user || applying) return;
-          var c2 = snap2.exists ? (snap2.data().readerJson || null) : null;
-          if(!c2 || c2 === lastSent) return;
-          var cj2 = null; try{ cj2 = JSON.parse(c2); }catch(e){}
-          if(!cj2 || !cj2.keys) return;
-          var m2 = meta();
-          if((cj2.savedAt || 0) > (m2.savedAt || 0) && (cj2.savedAt || 0) > (m2.localAt || 0) && JSON.stringify(cj2.keys) !== JSON.stringify(collectKeys()))
-            applyCloud(cj2.keys, cj2.savedAt, c2);
-        }, function(){ if(user) setNote("Couldn't sync — your reading is safe on this device and will retry."); });
-      }).catch(function(){ syncReady = true; saveNow(); });
+        subscribe();
+      }).catch(function(){
+        if(!user || user.uid !== myUid) return;
+        /* a failed first read says so — and live pull still starts,
+           so the session is not silently deaf to the other device */
+        syncReady = true;
+        setNote("Couldn't reach sync — your reading is safe on this device and will retry.");
+        subscribe();
+        saveNow();
+      });
     });
   })();
 
@@ -3992,10 +4306,11 @@
     pvState = { from: rec.start, end: last.end, dur: Math.max(0.2, last.end - rec.start), rate: pvRate, timer: null, armed: false };
     /* start exactly like a double-tap on the word (same switch, seek
        and focus behaviour) — minus calling the bars up */
-    clearHighlight(); wordEl.classList.add("now");
+    clearHighlight();
     if(state.mode === "ang" && item && item !== state.ang){ pendingSeek = rec.start; switchAudioToAng(item, false); }
     else if(state.mode === "bani" && item && item !== state.id){ pendingSeek = rec.start; switchAudioToBani(item, false); }
     else { seekTo(rec.start); pvArm(); }
+    wordEl.classList.add("now");   /* after the switch — see playFromLine */
     playAudio();
     try{ audio.playbackRate = pvRate; }catch(e){}
     manualScrollAt = 0; manualHold = false; savePlace(); saveFocusLine(rec.line);
@@ -4009,7 +4324,7 @@
   audio.addEventListener("play", function(){ if(pvState){ try{ audio.playbackRate = pvState.rate; }catch(e){} pvArm(); } });
   audio.addEventListener("loadedmetadata", function(){ if(pvState){ try{ audio.playbackRate = pvState.rate; }catch(e){} } });
   audio.addEventListener("timeupdate", function(){ if(pvState && audio.currentTime >= pvState.end) pvFinish(); });
-  audio.addEventListener("pause", function(){ if(pvState) pvFinish(); });
+  audio.addEventListener("pause", function(){ if(pvState && !audioSwitching) pvFinish(); });   /* a cross-item preview's own switch emits pause — that is not the reader pausing */
   audio.addEventListener("ended", function(){ if(pvState) pvFinish(); });
   audio.addEventListener("seeking", function(){
     if(pvState && (audio.currentTime < pvState.from - 0.6 || audio.currentTime > pvState.end + 0.05)) pvFinish();

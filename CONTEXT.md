@@ -134,7 +134,14 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   only preloads the next track.
 - Rollover at track end is seamless: the next item's audio is already
   loaded; the switch must not flash the bars, restart the scroll, or lose
-  any setting (see the speed lesson below).
+  any setting (see the speed lesson below). If the next item is still
+  being appended when the track ends, the rollover's play intent is
+  recorded and the in-flight append honours it on completion — the
+  boundary never stalls in silence.
+- A failed audio load is never silent: an `error` on the audio element
+  (or a `NotSupportedError` play rejection) resets the play icon and
+  shows a toast ("Audio couldn't load — check your connection, then
+  tap play").
 - **Speed-hold lesson (hard-won):** browsers reset `audio.playbackRate`
   to 1 when a new track loads. Setting the rate from the UI control
   *before* `load()` is not enough — on an automatic Ang change the new
@@ -186,6 +193,13 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
       sync. In paragraph layout, if the new pankti's entry row is
       shared with the previous pankti, G1 is cancelled for that
       pankti (a shared row cannot be isolated) and only G2 may move.
+      "Previous" means the last word of the immediately preceding
+      pankti — after a seek, a distant word whose row coincidentally
+      aligns does not cancel G1. A seek also resets G2's row key, so
+      a re-entered row can glide again. The section's cache key
+      includes the measured line height itself, so a webfont landing
+      (or a paragraph-header style flip) re-derives the section
+      instead of keeping fallback-font geometry all session.
     - **G2, the safety glide.** Within a pankti, only when the spoken
       word's own row has actually reached the section's bottom edge
       does the page move — the minimum shift that makes that row the
@@ -230,6 +244,10 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   from the new orientation's dimensions at the same moment (its cache
   keys on width as well as height, font and layout), so a landscape
   section and a portrait section are each sized for their own screen.
+  A resize that flips the layout class rebuilds the stream in place:
+  a paused or browsing reader keeps the pankti under his eye at the
+  same screen offset — only a playing, following reader is
+  re-anchored to the spoken line.
   Fullscreen is the browser's to keep and is never touched. (The pre-fix behaviour — the tracker easing across the whole
   distance at full speed after every rotation — read as a fast,
   wrong-feeling scroll.)
@@ -298,6 +316,12 @@ the line at the 35% anchor, is the one saved, not a stale spoken line).
 1. A `?ang=N` deep link wins for that landing only, and is stripped from
    the URL immediately (otherwise every refresh re-applies the link —
    this caused a real bug: saved 165, link 295, refresh bounced forever).
+   A plain Ang link (no `line`) lands in the world the reader lives in:
+   in Default free reading the visit saves to the free slot, never into
+   the Sehaj Paath world's records. If the remembered world is free
+   reading but its slot holds no usable place, the app still boots into
+   free reading (at Ang 1) — never into the Paath place with the mode
+   key disagreeing underneath.
 2. If `fl.src === "view"`, reopen **that item** and restore the whole
    **screen**: land at the saved pixel scroll position, so the pankti
    under the reader's eye returns to the exact spot it left (the
@@ -428,7 +452,12 @@ the landing marks it.
   never a selection and never a seek.
 - **Double tap (within ~300ms, same word/line) = play from there:**
   full highlight, audio seeks (switching item if the tap was in another
-  streamed Ang/Bani), playback starts.
+  streamed Ang/Bani), playback starts. The double-tap target is the
+  **line**, not the exact word element (the triple-tap preview counts
+  the same way): at big fonts the page drifts between taps and the
+  second tap lands on a neighbouring word — it still plays, from the
+  word actually tapped. The highlight is painted after any item switch
+  the tap triggers, so cross-item taps keep their feedback too.
 Single taps must never jump the audio — too sensitive on a phone.
 
 **Catch-up flash.** A one-time line highlight when auto-scroll *arrives*
@@ -557,6 +586,12 @@ Ang-only verb: in Bani mode the bookmark button is hidden, and the
 assign function itself refuses a Bani record — a Paath snapshot is
 only ever written from Ang state (snapshot writers substitute the
 snapshot's previous Ang state when the live record is a Bani's).
+While free reading is live, a Paath's snapshot IS its state: nothing
+re-snapshots it from the live records (they belong to the free
+world), so an assigned place survives the reader switching to
+another Paath first. Picking the current Paath from free reading
+installs its snapshot as the live records and resumes from it (with
+no snapshot, the live place key is already its place).
 
 **Appearance — Day / Auto / Night.** Controlled only by the top-bar
 button beside Full screen, which cycles Day →
@@ -595,7 +630,9 @@ one) and addable without limit via "+ New Sehaj Paath". There is no
 at `ctx-default`, display name in `defName`) — a one-time migration
 folds its journey into Sehaj Paath ੧ (or a new tracker if ੧ already has
 one), drops `defName`, and scrubs any Bani place/focus out of every
-snapshot. Each journey is a complete snapshot world —
+snapshot. The fold never renames a Paath: a renamed ੧ keeps its name
+whether or not it has started (with a stored `defName` to honour and
+a renamed ੧, the journey goes to a new tracker carrying that name). Each journey is a complete snapshot world —
 its own saved place + its own global focus (`ctx-<id>`): switching
 stashes the live records under the old context, installs the target's,
 and lands through the ordinary restore machinery, so "continue" opens
@@ -606,8 +643,19 @@ for the current one), "Not started" otherwise (a snapshot whose
 place is a Bani's renders "Not started" too — a Paath label only ever
 names an Ang). Every journey row carries a pencil to rename it inline;
 renames are validated — "Default" (the mode's name), a duplicate of
-another Paath's name, and names over 40 characters are refused with a
-toast. Under the sub-label, each row previews its focus
+another Paath's name, an empty name, and names over 40 characters are
+refused with a toast. Duplicates are judged on the name as it will
+exist after the next load (Latin-digit "Sehaj Paath 1" normalises to
+"Sehaj Paath ੧") and case-insensitively. The rename input is focused
+in the surface where the pencil was tapped (both lists render one).
+In the lists exactly one row is ever marked current: in free reading
+that is the Default row, not the underlying tracker (the popup marks
+its tracker rows the same way, and its Default row is the same plain
+mode line — no dot, no card). Transient messages (refusals,
+confirmations, notes) appear in their own toast that wraps, caps its
+width, and renders above sheets and scrims; the triple-tap preview
+keeps its own single-line pill, and the two never dismiss each
+other. Under the sub-label, each row previews its focus
 pankti — the line's first few Gurmukhi words plus " …", the dandi
 (॥) kept wherever it falls — stored on
 the focus record itself, so snapshots carry it (rows whose line text
@@ -700,6 +748,27 @@ applied. A failed push or pull says so in the Account note
 retry.") instead of failing silently. Signed out, SDK blocked, or
 offline: local-only, exactly as before — sign-in is invisible
 unless wanted.
+
+Sync meta discipline: `sync-v1.keysJson` is the last **synced**
+fingerprint — written only by a successful push, an apply, or an
+equal-keys sign-in. The poll never writes it: it stamps `localAt`
+only. (Writing the just-changed keys there makes every push
+early-return as "already synced" and the cloud silently stops
+receiving pushes.) A failed push therefore keeps the old
+fingerprint, is retried with bounded backoff, and is never
+forgotten. The live subscription is created independently of the
+initial read (a failed first `get()` still subscribes, and says
+so), applies the same win rules as sign-in (including the
+reading-time tiebreak), and re-pushes this device's state if the
+cloud doc loses its `readerJson` field mid-session. An apply is
+wholesale in both directions: local keys the winning cloud state
+does not have are deleted (and the deletions ride in the
+apply-guard). The meta resets its stamps when the signed-in
+account changes, and every async sync callback verifies it still
+speaks for the current account before applying anything. For the
+pristine/rich guards, a Paath snapshot counts only when it holds a
+real journey — an empty `{place: null, glf: null}` stub is not a
+snapshot.
 
 ## 10. Design language
 
