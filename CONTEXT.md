@@ -287,8 +287,7 @@ this derivation.
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
 | `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world |
 | `gurbani-reader:mode-v1` | Which world the reader left in: `free` (Default reading) or `paath` |
-| `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint + `localAt`, this device's last local change |
-| `gurbani-reader:apply-guard` (sessionStorage) | One-shot: the cloud blob just applied, re-written once after the apply reload |
+| `gurbani-reader:sync-v1` | Cloud-sync meta (never itself synced): this device's writer id (`cid`), the last account seen, and per-record baselines — each synced record's last pushed / last applied canonical form + last seen server stamp |
 
 Font sizes: `[20, 22, 24, 26, 29, 32, 36, 40, 44, 48]px`, default
 index 2 (24px). New sizes are only ever **appended** — a saved index
@@ -715,71 +714,70 @@ hidden stays hidden, bars shown stays shown, fullscreen persists.
 Account block: "Sign in with Google", or the signed-in email + Sign
 out. It uses the same Firebase project as the Nitnem Tracker
 (`nitnem-tracker`, compat SDK vendored under `firebasejs/10.12.5/`)
-and mirrors the Tracker's pattern: every `gurbani-reader:*` key
-(place, focus, settings, Paaths + snapshots — the sync meta itself
-excluded) is serialised into the `readerJson` field of the user's
-own doc in the Tracker's `progress` collection (merge write; the
-two apps never touch each other's fields, so the rules that let
-the Tracker sync let this sync). **Newer READING wins wholesale** —
-the stamp that decides is each device's last local *change*, not its
-last sync: the 2.5s poll runs signed out too and stamps `localAt` in
-the sync meta whenever the collected keys change (first poll only
-sets a baseline, so boot writes don't count), and a push carries its
-change's stamp. On sign-in the cloud applies only when it postdates
-this device's `localAt`; otherwise this device pushes. After sign-in
-a live `onSnapshot` subscription applies newer cloud state as it
-arrives (own writes recognised and ignored), so an already-signed-in
-device follows the other device's reading without re-signing-in.
-Applying cloud state reloads once, with a one-shot sessionStorage
-guard re-writing the applied keys after the reload (the dying page's
-own place saves can otherwise clobber the synced place in the reload
-window). No push happens before the sign-in's initial cloud check
-settles, and pushes fire only when the key set actually changed
-(debounced, plus on pagehide) — an idle signed-in tab never
-overwrites another device. Three more guards keep newer-wins
-honest: a **near-pristine device** (no Paath snapshots, no real
-reading progress) never overwrites a **rich cloud** at sign-in,
-whatever the stamps say; inside a 10-minute stamp window the
-states' own reading times (`place.ts`) break the tie, which absorbs
-cross-device clock skew; and a push whose last cloud read is over a
-minute old re-reads first and applies a newer cloud instead of
-overwriting it. The apply-guard is bound to the account that wrote
-it — a guard from another account's session is discarded, never
-applied. A failed push or pull says so in the Account note
-instead of failing silently — and the note carries the Firebase
-error's short code ("Couldn't sync (permission-denied) — your
-reading is safe on this device and will retry."), with the full
-error in the console under `[reader-sync]`, so a screenshot of the
-Account section names the cause. A dead listener frees its slot
-and re-subscribes once shortly instead of staying deaf all
-session. Sign-in follows Firebase's platform guidance: touch
-devices use `signInWithRedirect` first (popups are unreliable in
-mobile browsers), desktop keeps popup-first with a redirect
-fallback, and a redirect result's error is surfaced in the note
-rather than vanishing. Signed out, SDK blocked, or offline:
-local-only, exactly as before — sign-in is invisible unless
-wanted.
+and the user's own doc in its `progress` collection (merge writes
+only; the two apps never touch each other's fields).
 
-Sync meta discipline: `sync-v1.keysJson` is the last **synced**
-fingerprint — written only by a successful push, an apply, or an
-equal-keys sign-in. The poll never writes it: it stamps `localAt`
-only. (Writing the just-changed keys there makes every push
-early-return as "already synced" and the cloud silently stops
-receiving pushes.) A failed push therefore keeps the old
-fingerprint, is retried with bounded backoff, and is never
-forgotten. The live subscription is created independently of the
-initial read (a failed first `get()` still subscribes, and says
-so), applies the same win rules as sign-in (including the
-reading-time tiebreak), and re-pushes this device's state if the
-cloud doc loses its `readerJson` field mid-session. An apply is
-wholesale in both directions: local keys the winning cloud state
-does not have are deleted (and the deletions ride in the
-apply-guard). The meta resets its stamps when the signed-in
-account changes, and every async sync callback verifies it still
-speaks for the current account before applying anything. For the
-pristine/rich guards, a Paath snapshot counts only when it holds a
-real journey — an empty `{place: null, glf: null}` stub is not a
-snapshot.
+Sync is **per record**, never a whole-state blob. What is shared is
+durable progress: `rec_paaths` (the Sehaj Paath list — ids and names
+only; which Paath is current is this device's own business and is
+not synced), `rec_settings` (font size, speed, follow-along mode,
+appearance, advanced mode, auto-scroll, paragraph headers), and one
+`rec_ctx_<id>` per Sehaj Paath (its Ang-only snapshot). What is
+**never** shared is presence: free (Default) reading's place and
+focus (`detour-v1`), the world this device is in (`mode-v1`), the
+live records (`last-v1`, `focus-v1`), and the per-size-class layout
+keys. Free reading is per-device, full stop. The current Paath's
+shared record is *derived* from the live records while this device
+is in the Paath world (Ang-scrubbed, exactly like a switch-time
+snapshot); in free reading the record is the parked snapshot,
+unchanged — free reading can never dirty a Paath record.
+
+Each record carries its own server timestamp (`<field>_at`, a
+Firestore `serverTimestamp` — the **only** ordering clock; client
+clocks never decide a win) and its writer's device id (`<field>_by`
+— a device never applies its own writes). A record's identity is
+canonical (volatile `ts`/`y`/`t` in place records and `ts` in focus
+records stripped), and per-record baselines (last pushed / last
+applied canonical form + last seen server stamp) persist in
+`sync-v1`, so decisions survive reloads. Changed records batch into
+one merge write; the 2.5s poll only *triggers* pushes of records
+whose canonical form actually changed — it stamps nothing, so boot
+and restore writes can never mint a "new state". That discipline is
+what makes the old refresh loop impossible by construction: there
+is no client stamp to advance, no fingerprint for a boot write to
+falsify, and no reload in the apply path at all.
+
+Applying a record is **in place**: it never reloads the page, never
+closes an open sheet or popup, and never moves the reader. A Paath
+record updates that Paath's stored resume point; if it is this
+device's current Paath and playback is paused, the live records
+move underneath the reader (the view does not — the Kindle rule);
+while playback is running, only the stored point updates and this
+session's own next save supersedes. A list record that drops a
+Paath removes its local snapshot and repairs `current` if needed;
+a Paath record for an id the list does not name is held, inert,
+until a list names it. Settings records re-apply the settings
+underneath whatever is on screen.
+
+Sign-in merges **per record** — it never erases local data and
+never reloads. With no baseline for a record, bootstrap decides:
+Paath records by their content's own reading time, the list by
+customised-beats-default (a renamed list beats a default-named
+one), settings from the cloud. After bootstrap, only server order
+speaks. Snapshots with pending local writes or cache origin are
+ignored (they are echoes, not remote commits). A failed push or
+pull says so in the Account note **with the Firebase error's short
+code** ("Couldn't sync (permission-denied) — your reading is safe
+on this device and will retry."), the full error in the console
+under `[reader-sync]`, and a failed push retries with bounded
+backoff. A dead listener frees its slot and re-subscribes once
+shortly. Sign-in follows Firebase's platform guidance: touch
+devices use `signInWithRedirect` first, desktop popup-first with a
+redirect fallback, and a redirect result's error is surfaced in
+the note. Signed out, SDK blocked, or offline: local-only, exactly
+as before. The legacy whole-state `readerJson` field is no longer
+written or read; old builds keep their frozen copy and never touch
+the record fields.
 
 ## 10. Design language
 
