@@ -4028,7 +4028,7 @@
     var btn = $("syncBtn"), note = $("syncNote");
     if(!btn) return;
     if(!window.firebase){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
-    var CFG = { apiKey: "<redacted>", authDomain: "nitnem-tracker.firebaseapp.com", projectId: "nitnem-tracker", storageBucket: "nitnem-tracker.firebasestorage.app", messagingSenderId: "712584913445", appId: "1:712584913445:web:a7f0fd0d2082fc6e7755cc" };
+    var CFG = { apiKey: "AIzaSyADH6-AzMWjDLPzoxu7WZy1-vvYNsHXtxk", authDomain: "nitnem-tracker.firebaseapp.com", projectId: "nitnem-tracker", storageBucket: "nitnem-tracker.firebasestorage.app", messagingSenderId: "712584913445", appId: "1:712584913445:web:a7f0fd0d2082fc6e7755cc" };
     var auth, db;
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
     catch(e){ try{ console.error("[reader-sync] init:", e); }catch(_){} if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
