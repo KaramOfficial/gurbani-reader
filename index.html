@@ -525,6 +525,32 @@
   body.print .section{text-align:left}
   body.print .line.hdr{font-weight:700;color:var(--accent-strong)}
   body.print .line.mool{display:block;text-align:center}
+  /* book mode — a two-page spread (landscape desktop/tablet only): whole
+     Angs in print flow, one Ang per page, pages TURN (no scrolling); the
+     book sets its own type size from the page box, the reader zooms */
+  .book-view{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column}
+  .book-view[hidden]{display:none}
+  .book-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)}
+  .book-title{font-weight:700;font-size:16px}
+  .book-range{color:var(--muted);font-size:14px}
+  .book-zoomval{min-width:52px;text-align:center;color:var(--muted);font-size:14px}
+  .book-stage{position:relative;flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:18px 64px}
+  .book-spread{display:flex;align-items:stretch;width:100%;max-width:1280px;height:100%;transform-origin:center center}
+  .book-page{background:var(--surface);border:1px solid var(--border);flex:1;min-width:0;padding:34px 38px 26px;display:flex;flex-direction:column;box-shadow:0 12px 34px rgba(0,0,0,.16)}
+  #bookPageL{border-radius:10px 3px 3px 10px;border-right:none}
+  #bookPageR{border-radius:3px 10px 10px 3px;border-left:none}
+  .book-spine{flex:0 0 26px;background:linear-gradient(90deg, rgba(0,0,0,.15), rgba(0,0,0,.03) 45%, rgba(0,0,0,.03) 55%, rgba(0,0,0,.15))}
+  .book-text{flex:1;overflow:hidden;font-family:"Noto Serif Gurmukhi","Noto Sans Gurmukhi",serif;font-weight:500;color:var(--ink);line-height:1.95;text-align:left}
+  .book-text .line{display:inline;font-size:inherit;line-height:inherit;padding:0 1px;border-radius:6px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .book-text .line + .line{margin-top:0}
+  .book-text .line.mool{display:block;text-align:center;font-size:1.12em;margin:.3em 0 .7em}
+  .book-text .line.hdr{font-weight:700;color:var(--accent-strong)}
+  .book-pagenum{text-align:center;color:var(--muted);font-size:13.5px;padding-top:10px;font-family:"Noto Serif Gurmukhi",serif}
+  .book-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;opacity:.9;z-index:2}
+  .book-nav.prev{left:10px}
+  .book-nav.next{right:10px}
+  .book-nav:disabled{opacity:.3;cursor:default}
+  .book-nav svg{width:22px;height:22px}
   body.para.hdr-own .line.hdr{display:block;text-align:center;margin:16px 0 6px;font-weight:600;color:var(--ink)}
   .w{cursor:pointer;border-radius:6px;padding:1px 0;transition:background .18s,color .18s;-webkit-tap-highlight-color:transparent}
   .w.large-pause{color:#A0728E}
@@ -711,6 +737,28 @@
 <button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
 <div class="float-pair" id="floatPair"><button class="recenter fp-ico" id="paathBtn" title="Sehaj Paaths — switch Paath, or go back to Default reading" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" title="Set a Sehaj Paath to this pankti" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button></div>
 <div class="pv-toast" id="pvToast" role="status">Normal speed preview · 1×</div>
+<div class="book-view" id="bookView" hidden>
+  <div class="book-bar">
+    <span class="book-title">Book</span>
+    <span class="book-range" id="bookRange"></span>
+    <span class="menu-spacer"></span>
+    <button class="fbtn" id="bookZoomOut" aria-label="Zoom out">&minus;</button>
+    <span class="book-zoomval" id="bookZoomVal">100%</span>
+    <button class="fbtn" id="bookZoomIn" aria-label="Zoom in">+</button>
+    <button class="fbtn" id="bookClose" aria-label="Close book mode">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </div>
+  <div class="book-stage" id="bookStage">
+    <div class="book-spread" id="bookSpread">
+      <div class="book-page" id="bookPageL"><div class="book-text"></div><div class="book-pagenum"></div></div>
+      <div class="book-spine"></div>
+      <div class="book-page" id="bookPageR"><div class="book-text"></div><div class="book-pagenum"></div></div>
+    </div>
+    <button class="book-nav prev" id="bookPrev" aria-label="Previous pages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
+    <button class="book-nav next" id="bookNext" aria-label="Next pages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
+  </div>
+</div>
 <div class="pv-toast msg-toast" id="msgToast" role="status"></div>
 <div class="quick" id="quickCtl">
   <button class="orb" id="qcPlay" aria-label="Pause"><svg id="qcPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="qcPauseIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
@@ -750,6 +798,14 @@
         <button data-layout="para">Paragraphs</button>
         <button data-layout="print">Print</button>
       </div>
+    </div>
+    <div class="menu-row" id="bookRow" style="display:none">
+      <div>
+        <span class="menu-label">Book mode</span>
+        <p class="menu-note">Two pages, like a book. Landscape only.</p>
+      </div>
+      <span class="menu-spacer"></span>
+      <button class="fbtn" id="bookOpenBtn">Open</button>
     </div>
     <div class="menu-row" id="paraHdrRow">
       <div>
@@ -1678,7 +1734,7 @@
       btns[i].classList.toggle("active", state.mode==="bani" && btns[i].getAttribute("data-bani")===state.id);
     }
   }
-  function openSheet(){ islandHide(); buildPaathLists(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
+  function openSheet(){ islandHide(); buildPaathLists(); paintBookRow(); showMenuPanel("main"); sheet.classList.add("open"); scrim.classList.add("open"); $("libraryBtn").setAttribute("aria-expanded","true"); showBars(); }
   function showMenuPanel(which){
     var st = $("sheetTitle"); if(st) st.textContent = which === "library" ? "Library" : "Menu";
     var main = $("menuMain"), lib = $("menuLibrary");
@@ -4591,6 +4647,130 @@
   audio.addEventListener("seeking", function(){
     if(pvState && (audio.currentTime < pvState.from - 0.6 || audio.currentTime > pvState.end + 0.05)) pvFinish();
   });
+  /* ---------- Book mode ----------
+     A two-page spread of whole Angs in print flow, for landscape
+     desktops/tablets (Reader V2's GGS idea, rebuilt for V1). Pages
+     TURN — nothing scrolls. The book sets its own type size from the
+     page box and each Ang's length (the Text size setting does not
+     apply here); the reader zooms the view instead. Playback pauses
+     on entry and the stream underneath is never touched; leaving
+     returns the reader to the spread's left Ang in the stream. */
+  var bookViewEl = $("bookView"), bookLeft = 1, bookZoom = 1, bookCache = {}, bookIsOpen = false, bookFitTimer = null;
+  function bookEligible(){ return window.innerWidth >= 1024 && window.innerWidth > window.innerHeight; }
+  function paintBookRow(){ var r = $("bookRow"); if(r) r.style.display = (bookEligible() && state.mode === "ang") ? "" : "none"; }
+  function bookFetchLines(ang){
+    if(bookCache[ang]) return bookCache[ang];
+    var c = chunkFor(ang);
+    bookCache[ang] = fetch(BASE + "/chunks/chunk-" + c[0] + "-" + c[1] + ".json")
+      .then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function(json){ var d = json.angs && json.angs[String(ang)]; return (d && d.lines) || []; })
+      .catch(function(){ return []; });
+    return bookCache[ang];
+  }
+  function bookJoinParts(parts){
+    var out = "";
+    parts.forEach(function(part, i){
+      if(i === 0){ out = part; return; }
+      var txt = part.replace(/<[^>]*>/g, "");
+      out += (/^[\s॥।੦-੯]+$/.test(txt) ? "\u00A0" : " ") + part;
+    });
+    return out;
+  }
+  function bookPageHtml(lines){
+    var deco = paraDeco(lines), html = "";
+    lines.forEach(function(line, lidx){
+      var parts = [];
+      (line.text || "").split(/\s+/).filter(Boolean).forEach(function(tok){
+        var lc = tok.charAt(tok.length - 1), pc = "", disp = esc(tok);
+        if(lc === ";" || lc === "," || lc === "."){ pc = lc === ";" ? " large-pause" : (lc === "," ? " medium-pause" : " small-pause"); disp = esc(tok.slice(0, -1)); }
+        parts.push('<span class="w' + pc + '">' + disp + '</span>');
+      });
+      html += '<p class="line' + (isMoolLine(line) ? ' mool' : '') + (deco.hdr[lidx] ? ' hdr' : '') + '">' + bookJoinParts(parts) + '</p> ';
+    });
+    return html;
+  }
+  function fitBookText(){
+    if(!bookIsOpen) return;
+    var texts = bookViewEl.querySelectorAll(".book-text");
+    var pageH = texts[0] ? texts[0].clientHeight : 0;
+    if(!pageH) return;
+    var size = Math.max(11, Math.min(21, pageH * 0.027));
+    function over(){ var o = false; texts.forEach(function(t){ if(t.scrollHeight > t.clientHeight + 1) o = true; }); return o; }
+    function under(){ var u = true; texts.forEach(function(t){ if(t.scrollHeight > t.clientHeight * 0.86) u = false; }); return u; }
+    for(var iter = 0; iter < 16; iter++){
+      texts.forEach(function(t){ t.style.fontSize = size + "px"; });
+      if(over()){ size *= 0.93; continue; }
+      if(under() && size < 21){ size *= 1.05; continue; }
+      break;
+    }
+    if(over()){ size *= 0.93; texts.forEach(function(t){ t.style.fontSize = size + "px"; }); }
+  }
+  function showSpread(left){
+    bookLeft = Math.max(1, Math.min(1429, left % 2 === 0 ? left - 1 : left));
+    var L = bookLeft, R = bookLeft + 1;
+    $("bookRange").textContent = "\u0A05\u0A70\u0A17 " + paNum(L) + " \u2013 " + paNum(R);
+    $("bookPrev").disabled = L <= 1;
+    $("bookNext").disabled = R >= 1430;
+    Promise.all([bookFetchLines(L), bookFetchLines(R)]).then(function(res){
+      if(!bookIsOpen || bookLeft !== L) return;
+      var pl = $("bookPageL"), pr = $("bookPageR");
+      pl.querySelector(".book-text").innerHTML = bookPageHtml(res[0]);
+      pr.querySelector(".book-text").innerHTML = bookPageHtml(res[1]);
+      pl.querySelector(".book-pagenum").textContent = "\u0A05\u0A70\u0A17 " + paNum(L);
+      pr.querySelector(".book-pagenum").textContent = "\u0A05\u0A70\u0A17 " + paNum(R);
+      requestAnimationFrame(fitBookText);
+    });
+  }
+  function applyBookZoom(){ $("bookSpread").style.transform = "scale(" + bookZoom + ")"; $("bookZoomVal").textContent = Math.round(bookZoom * 100) + "%"; }
+  function setBookZoom(z){ bookZoom = Math.max(0.5, Math.min(2, Math.round(z * 20) / 20)); applyBookZoom(); }
+  function openBook(){
+    if(!bookEligible() || state.mode !== "ang") return;
+    closeSheet();
+    var ss = $("searchSheet"); if(ss) ss.classList.remove("open");
+    bookIsOpen = true;
+    bookViewEl.hidden = false;
+    document.body.style.overflow = "hidden";
+    if(!audio.paused) audio.pause();
+    bookZoom = 1; applyBookZoom();
+    var a = viewAngNow() || state.ang || 1;
+    showSpread(a);
+  }
+  function closeBook(){
+    if(!bookIsOpen) return;
+    bookIsOpen = false;
+    bookViewEl.hidden = true;
+    document.body.style.overflow = "";
+    if(state.mode === "ang" && bookLeft !== state.ang) loadAng(bookLeft);
+  }
+  if($("bookOpenBtn")) $("bookOpenBtn").addEventListener("click", openBook);
+  if($("bookClose")) $("bookClose").addEventListener("click", closeBook);
+  if($("bookPrev")) $("bookPrev").addEventListener("click", function(){ showSpread(bookLeft - 2); });
+  if($("bookNext")) $("bookNext").addEventListener("click", function(){ showSpread(bookLeft + 2); });
+  if($("bookZoomIn")) $("bookZoomIn").addEventListener("click", function(){ setBookZoom(bookZoom + 0.25); });
+  if($("bookZoomOut")) $("bookZoomOut").addEventListener("click", function(){ setBookZoom(bookZoom - 0.25); });
+  document.addEventListener("keydown", function(e){
+    if(!bookIsOpen) return;
+    if(e.key === "Escape") closeBook();
+    else if(e.key === "ArrowRight") showSpread(bookLeft + 2);
+    else if(e.key === "ArrowLeft") showSpread(bookLeft - 2);
+  });
+  var bookTouchX = null;
+  if($("bookStage")){
+    $("bookStage").addEventListener("touchstart", function(e){ bookTouchX = e.changedTouches[0].clientX; }, { passive: true });
+    $("bookStage").addEventListener("touchend", function(e){
+      if(bookTouchX == null) return;
+      var dx = e.changedTouches[0].clientX - bookTouchX; bookTouchX = null;
+      if(dx < -60) showSpread(bookLeft + 2); else if(dx > 60) showSpread(bookLeft - 2);
+    }, { passive: true });
+    $("bookStage").addEventListener("wheel", function(e){ if(e.ctrlKey){ e.preventDefault(); setBookZoom(bookZoom + (e.deltaY < 0 ? 0.1 : -0.1)); } }, { passive: false });
+  }
+  window.addEventListener("resize", function(){
+    paintBookRow();
+    if(!bookIsOpen) return;
+    if(!bookEligible()){ closeBook(); return; }
+    clearTimeout(bookFitTimer); bookFitTimer = setTimeout(fitBookText, 180);
+  });
+
   /* ---------- Pankti Search popup ----------
      One search for the whole SGGS, living in the Reader: type a line in
      English or Gurmukhi (fuzzy — the Pankti Search matcher, vendored as

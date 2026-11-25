@@ -715,6 +715,20 @@ block so the seek bar gets the width (~288px vs ~170px) — total chrome
 44px minimum touch targets. Rotating changes nothing else: bars
 hidden stays hidden, bars shown stays shown, fullscreen persists.
 
+**Book mode.** Menu → Display carries a Book row, shown only where a
+book fits: landscape and ≥1024px wide (desktops and tablets; never on
+portrait or phone). It opens a two-page spread over the reader — the
+left page is the current Ang rounded down to odd, the right page the
+next Ang — each page a whole Ang in Print flow, with the Ang number
+centred at the foot. Pages TURN (‹ › buttons, arrow keys, swipe);
+nothing scrolls and the page never clips: the book sets its own type
+size per spread, fitted to the page box and the fuller page's length,
+so the Text size setting does not apply in the book — the reader
+zooms the spread instead (± buttons, Ctrl+wheel, 50–200%). Playback
+pauses on entry; the stream underneath is untouched; closing returns
+the stream to the spread's left Ang. Rotating out of landscape (or
+below the size floor) closes the book.
+
 **Pankti Search (in-Reader popup).** A search button sits in the top
 bar (beside Appearance) and in the floating quick cluster. It opens a
 sheet (the Menu sheet's shape and motion) holding one search field, a
