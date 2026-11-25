@@ -1013,7 +1013,13 @@
     if(!detour) return glf;
     return detourGlf || null;
   }
+  /* while a remote sync apply is landing, place/focus saves stand
+     down: the landing must not re-write the very records it just
+     installed (their canonical form is unchanged either way — this
+     keeps the stored records byte-faithful to the winning state) */
+  var syncMute = { on: false };
   function savePlace(force){
+    if(syncMute.on) return;
     /* transient layouts lie: during a load (state already names the new
        item, the screen still shows the old one) or a prepend compensation,
        the anchor line under the crosshair belongs to the previous item —
@@ -1081,6 +1087,7 @@
     return null;
   }
   function writeFocus(item, idx, start, tsec){
+    if(syncMute.on) return;
     if(item == null || typeof idx !== "number") return;
     var pv = previewText(lineTextAt(item, idx));
     if(!pv && glf && glf.item === item && glf.idx === idx) pv = glf.pv || null;
@@ -3963,79 +3970,108 @@
 
   /* ---------- Google sign-in + cloud sync ----------
      Optional, and invisible when unused. localStorage stays the source
-     of truth on this device; signing in mirrors every gurbani-reader:*
-     key (place, focus, settings, Sehaj Paaths + their snapshots) into
-     the reader's own field (readerJson) of the user's doc in the same
-     Firebase project/collection the Nitnem Tracker uses, so the rules
-     that already let the Tracker sync let this sync too, and neither
-     app touches the other's field. Newer READING wins wholesale: every
-     device stamps its last local change (meta.localAt, bumped by the
-     poll below whenever the collected keys change, signed in or not),
-     and a push carries that change's stamp — so a device applies the
-     cloud only when the cloud state postdates its own last change,
-     and a live subscription applies newer cloud state as it arrives.
-     The first device to sign in can no longer clobber a second device
-     whose reading is more recent. Applying cloud state reloads once.
-     SDK blocked/offline -> local-only, exactly like the Tracker.
-     Meta discipline: meta.keysJson is the last SYNCED fingerprint
-     (written only by a successful push, an apply, or an equal-keys
-     sign-in) — the poll never touches it, or every push would
-     early-return as already-synced. A failed push keeps the old
-     fingerprint, says so in the Account note, and retries with
-     backoff. Win/lose guards: a near-pristine device never overwrites
-     a rich cloud; inside a 10-minute stamp window the states' own
-     reading times (place/focus timestamps) break the tie; a push
-     whose last cloud read is stale re-reads first; a cloud copy that
-     loses its reader field is re-pushed from the live subscription;
-     an apply deletes local keys the winner does not have; sync meta
-     resets when the signed-in account changes, and every async sync
-     callback checks it still speaks for the current account. */
+     of truth on this device. Sync uses the same Firebase project as
+     the Nitnem Tracker (nitnem-tracker) and the user's own doc in its
+     progress collection — merge writes only; the two apps never touch
+     each other's fields.
+
+     Design (owner's model, validated by two Gemini-style juries
+     against the world-standard patterns — Chrome Sync's per-item
+     merge, Kindle's furthest-page, Google Docs' presence-vs-content
+     split — 2026-11-25; full use-case matrix in the session notes):
+
+     WHAT IS SHARED is durable progress, as PER-RECORD units, never a
+     whole-state blob:
+       * rec_paaths — the Sehaj Paath list ({id, name} only; which
+         Paath is "current" is this device's own business and is not
+         synced);
+       * rec_settings — the shared reading settings (font size, speed,
+         follow-along, appearance, advanced, auto-scroll, paragraph
+         headers). Layout stays per-device per size class, as before;
+       * rec_ctx_<id> — one record per Sehaj Paath: its snapshot
+         {place, glf}, Ang state only. The CURRENT Paath's record is
+         derived from the live records while this device is in the
+         Paath world; in free reading it is the parked snapshot,
+         unchanged — reading free can never dirty a Paath record.
+     WHAT IS NEVER SHARED is session/presence state: free (Default)
+     reading's place and focus (detour-v1), the world this device is
+     in (mode-v1), and the live records themselves (last-v1,
+     focus-v1). Free reading is per-device, full stop — two devices
+     can never mess with each other's free reading.
+
+     Each record in the doc carries its own server timestamp
+     (<field>_at, a serverTimestamp — the ONLY ordering clock; client
+     clocks never decide a win) and its writer's device id
+     (<field>_by — a device never applies its own writes). Dirty
+     records batch into ONE merge write. A record's identity is
+     CANONICAL (volatile ts/y/t in place records and ts in focus
+     records stripped), and per-record baselines (last pushed / last
+     applied canonical form + last seen server stamp) persist in the
+     sync meta, so decisions survive reloads and live nowhere only in
+     memory. Applying a record is IN PLACE and can never reload the
+     page, close a surface, or move the reader: a Paath record updates
+     that Paath's stored resume point (and, if it is this device's
+     current Paath, the live records underneath) — the view and
+     playback are never yanked (Kindle rule); the reader's own next
+     save carries a newer reading time and legitimately supersedes.
+
+     Sign-in merges PER RECORD — it never erases local data and never
+     reloads. With no baseline for a record, bootstrap decides:
+     Paath records by their content's own reading time, the list by
+     customised-beats-default, settings from the cloud. The live path
+     uses none of those heuristics — server order only.
+     Offline / signed out / SDK blocked: local-only, exactly as
+     before. A failed push or pull names its Firebase error code in
+     the Account note (full error in the console under [reader-sync])
+     instead of failing silently. */
   (function(){
-    /* apply-guard: if the previous page just wrote cloud state and
-       reloaded, write it once more before anything trusts localStorage —
-       the dying page's own place saves can land after the apply's writes
-       in the reload window and silently clobber the synced place. */
-    try{
-      var guard = sessionStorage.getItem("gurbani-reader:apply-guard");
-      if(guard){
-        sessionStorage.removeItem("gurbani-reader:apply-guard");
-        var gobj = JSON.parse(guard) || {};
-        var gblob = gobj.blob || guard;   /* older guards stored the blob itself */
-        var guid = gobj.blob ? gobj.uid : null;
-        var gm = {}; try{ gm = JSON.parse(localStorage.getItem("gurbani-reader:sync-v1") || "null") || {}; }catch(e){}
-        /* a guard written under a different account is never applied */
-        if(!guid || !gm.lastUid || guid === gm.lastUid){
-          var gk = (JSON.parse(gblob) || {}).keys || {};
-          Object.keys(gk).forEach(function(k){ if(gk[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, gk[k]); });
-          if(guid && gm.lastUid !== guid){ gm.lastUid = guid; try{ localStorage.setItem("gurbani-reader:sync-v1", JSON.stringify(gm)); }catch(e){} }
-        }
-      }
-    }catch(e){}
     var btn = $("syncBtn"), note = $("syncNote");
     if(!btn) return;
     if(!window.firebase){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
-    var CFG = { apiKey: "AIzaSyADH6-AzMWjDLPzoxu7WZy1-vvYNsHXtxk", authDomain: "nitnem-tracker.firebaseapp.com", projectId: "nitnem-tracker", storageBucket: "nitnem-tracker.firebasestorage.app", messagingSenderId: "712584913445", appId: "1:712584913445:web:a7f0fd0d2082fc6e7755cc" };
+    var CFG = { apiKey: "<redacted>", authDomain: "nitnem-tracker.firebaseapp.com", projectId: "nitnem-tracker", storageBucket: "nitnem-tracker.firebasestorage.app", messagingSenderId: "712584913445", appId: "1:712584913445:web:a7f0fd0d2082fc6e7755cc" };
     var auth, db;
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
     catch(e){ try{ console.error("[reader-sync] init:", e); }catch(_){} if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
     var META = "gurbani-reader:sync-v1";
-    var user = null, lastSent = null, applying = false, timer = null, syncReady = false, unsub = null, lastSeenJson = null, lastPullAt = 0;
+    var user = null, applying = false, syncReady = false, unsub = null, pushRetries = 0, retryTimer = null, muteTimer = null;
+    var heldCtx = {};   /* ctx records whose Paath the list has not named yet on this device */
     function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
-    function collectKeys(){
-      var keys = {};
-      try{
-        for(var i=0;i<localStorage.length;i++){
-          var k = localStorage.key(i);
-          if(k && k.indexOf("gurbani-reader:") === 0 && k !== META && k !== LAYOUT_WIDE_KEY && k !== LAYOUT_NARROW_KEY) keys[k] = localStorage.getItem(k);   /* layout is per-device, per size class — never synced */
+    function setMeta(patch){ try{ var m = meta(); for(var k in patch) m[k] = patch[k]; localStorage.setItem(META, JSON.stringify(m)); }catch(e){} }
+    /* this device's writer id: random, generated once, persisted in
+       the (never synced) meta, kept across sign-outs and accounts —
+       it names the device, not the user */
+    var CID = meta().cid || null;
+    if(!CID){ CID = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); setMeta({ cid: CID }); }
+    function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+    function lsSet(k, v){ try{ if(v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
+    /* canonical identity of a key set: parsed values with the
+       volatile fields stripped — ts/y/t in place records, ts in
+       focus records. A boot/restore re-save moves only those fields,
+       so it can never mint a "new" state. */
+    function canonKeys(keys){
+      var out = {};
+      Object.keys(keys).sort().forEach(function(k){
+        var v = keys[k];
+        if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:focus-v1" || k === "gurbani-reader:detour-v1" || k.indexOf("gurbani-reader:ctx-") === 0){
+          try{
+            var o = JSON.parse(v || "null");
+            if(o && typeof o === "object"){
+              var stripP = function(p){ if(p && typeof p === "object"){ delete p.ts; delete p.y; delete p.t; } };
+              var stripF = function(f){ if(f && typeof f === "object"){ delete f.ts; } };
+              if(k === "gurbani-reader:last-v1") stripP(o);
+              else if(k === "gurbani-reader:focus-v1") stripF(o);
+              else { stripP(o.place); stripF(o.glf); }
+              v = o;
+            }
+          }catch(e){}
         }
-      }catch(e){}
-      return keys;
+        out[k] = v;
+      });
+      return JSON.stringify(out);
     }
     function placeTsOf(keys){
-      /* the newest READING time inside a state: the live place, the
-         free-reading place, the focus, and every Paath snapshot's
-         place/focus — settings and UI keys never move this clock,
-         which is what makes it a fair tiebreak between two devices */
+      /* the newest READING time inside a state — used ONLY by the
+         sign-in bootstrap for Paath records, never by the live path */
       var ts = 0;
       var scan = function(o){ if(!o) return; if(o.ts) ts = Math.max(ts, o.ts); if(o.place) scan(o.place); if(o.glf) scan(o.glf); if(o.fl) scan(o.fl); };
       Object.keys(keys).forEach(function(k){
@@ -4045,9 +4081,6 @@
       });
       return ts;
     }
-    /* a ctx entry counts only if it holds a real journey — an empty
-       stub ({place:null, glf:null}, written when a Bani entry snapshots
-       a never-started Paath) is not a snapshot */
     function ctxCounts(keys){
       for(var k in keys){
         if(k.indexOf("gurbani-reader:ctx-") !== 0) continue;
@@ -4055,8 +4088,6 @@
       }
       return false;
     }
-    /* near-pristine: no Paath snapshots and no real reading progress —
-       a fresh device in this state must never overwrite a rich cloud */
     function keysPristine(keys){
       if(ctxCounts(keys)) return false;
       var pl = null, dt = null;
@@ -4073,9 +4104,9 @@
       var deep = function(x){ return !!x && ((x.ang || 0) > 1 || (x.t || 0) >= 30); };
       return deep(pl) || deep(dt && dt.place);
     }
-    /* pure decision helpers, exposed for the test harness (the live
-       sync paths need a real account and cannot run in a sandbox) */
-    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich };
+    /* decision helpers, exposed for the test harness (the live sync
+       paths need a real account and cannot run in a sandbox) */
+    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich, canonKeys: canonKeys };
     function setNote(s){ if(note) note.textContent = s; }
     /* bug zero was silence: every sync failure used to swallow its
        error, so a screenshot could never say WHY sync failed. Now
@@ -4093,87 +4124,248 @@
       if(user){ btn.textContent = "Sign out"; setNote("Signed in as " + (user.email || "") + " — place, Paaths & settings sync to your account."); }
       else { btn.textContent = "Sign in with Google"; setNote("Optional — sync your place, Sehaj Paaths & settings across devices."); }
     }
-    function saveNow(){
-      if(!user || applying || !syncReady) return;
-      var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
-      if(keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
-      /* stale-push guard: if the cloud has not been re-read in a while,
-         look before pushing — a newer cloud state applies instead of
-         being silently overwritten */
-      if(lastPullAt && Date.now() - lastPullAt > 60000){
-        lastPullAt = Date.now();
-        db.collection("progress").doc(user.uid).get().then(function(snap){
-          var c = snap.exists ? (snap.data().readerJson || null) : null, cj = null;
-          if(c){ try{ cj = JSON.parse(c); }catch(e){} }
-          var m2 = meta();
-          if(cj && cj.keys && (cj.savedAt || 0) > (m2.savedAt || 0) && (cj.savedAt || 0) > (m2.localAt || 0) && JSON.stringify(cj.keys) !== JSON.stringify(collectKeys())){
-            applyCloud(cj.keys, cj.savedAt, c); return;
-          }
-          doPush();
-        }).catch(function(e){ syncErr("reread", e); doPush(); });
-        return;
+    function syncedNote(){ if(user) setNote("Synced ✓ — signed in as " + (user.email || "")); }
+
+    /* ---------- records: identity, local value, doc fields ---------- */
+    var SETTINGS_KEYS = ["gurbani-reader:fontsize-v1", "gurbani-reader:speed-v1", "gurbani-reader:hlmode-v1", "gurbani-reader:appearance-v1", "gurbani-reader:advanced-v1", "gurbani-reader:autoscroll-v1", "gurbani-reader:parahead-v1"];
+    function fieldOf(recId){ return recId === "paaths" ? "rec_paaths" : recId === "settings" ? "rec_settings" : "rec_ctx_" + recId.slice(4); }
+    function recIdOfField(f){ return f === "rec_paaths" ? "paaths" : f === "rec_settings" ? "settings" : "ctx:" + f.slice(8); }
+    function deriveCtx(id){
+      /* the current Paath's shared record, derived from the live
+         records exactly as a switch-time snapshot is (Ang state only:
+         a Bani place/focus never enters it — the snapshot's previous
+         Ang state stands instead). In free reading the derivation is
+         never used: the record is the parked snapshot, unchanged. */
+      if(id === paathData.current && !detour){
+        var lp = readPlace(), prev = readCtx(id) || {};
+        return { place: (lp && lp.mode === "bani") ? (prev.place || null) : lp,
+                 glf: (glf && glf.mode === "bani") ? (prev.glf || null) : glf };
       }
-      doPush();
+      return readCtx(id);
     }
-    var pushRetries = 0, retryTimer = null;
-    function doPush(force){
+    function localRecord(recId){
+      if(recId === "paaths") return { list: paathData.list.map(function(p){ return { id: p.id, name: p.name }; }) };
+      if(recId === "settings"){
+        var o = {}, any = false;
+        SETTINGS_KEYS.forEach(function(k){ var v = lsGet(k); if(v !== null){ o[k] = v; any = true; } });
+        return any ? o : null;
+      }
+      if(recId.indexOf("ctx:") === 0) return deriveCtx(recId.slice(4));
+      return null;
+    }
+    function recIdsLocal(){
+      var ids = ["paaths", "settings"];
+      paathData.list.forEach(function(p){ ids.push("ctx:" + p.id); });
+      return ids;
+    }
+    function canonOf(recId, data){
+      if(data == null) return null;
+      if(recId === "paaths") return JSON.stringify({ list: data.list });
+      if(recId === "settings"){ var o = {}; Object.keys(data).sort().forEach(function(k){ o[k] = data[k]; }); return JSON.stringify(o); }
+      var wrap = {}; wrap["gurbani-reader:ctx-z"] = JSON.stringify(data); return canonKeys(wrap);
+    }
+    function recMeta(recId){ var m = meta(); return (m.recs || {})[recId] || {}; }
+    function setRecMeta(recId, patch){
+      var m = meta(); if(!m.recs) m.recs = {};
+      var r = m.recs[recId] || {}; for(var k in patch) r[k] = patch[k]; m.recs[recId] = r;
+      try{ localStorage.setItem(META, JSON.stringify(m)); }catch(e){}
+    }
+    function ctxReadingTs(data){
+      if(!data) return 0;
+      var wrap = {}; wrap["gurbani-reader:ctx-z"] = JSON.stringify(data); return placeTsOf(wrap);
+    }
+    function listCustomised(list){
+      if(!list) return false;
+      if(list.length !== 4) return true;
+      for(var i=0;i<list.length;i++){ if(!/^Sehaj Paath [੧-੯]+$/.test(list[i].name)) return true; }
+      return false;
+    }
+
+    /* ---------- push: only substantively changed records write ---------- */
+    function dirtyRecords(){
+      var out = [];
+      recIdsLocal().forEach(function(recId){
+        var data = localRecord(recId);
+        if(data === null) return;
+        if(recId.indexOf("ctx:") === 0 && !data.place && !data.glf) return;   /* a never-started Paath is the absence of a record */
+        var c = canonOf(recId, data), rm = recMeta(recId);
+        if(c !== rm.s && c !== rm.a) out.push({ recId: recId, data: data, canon: c });
+      });
+      return out;
+    }
+    function maybePush(){
+      if(!user || !syncReady || applying) return;
+      var dirty = dirtyRecords();
+      if(dirty.length) doPush(dirty);
+    }
+    function doPush(dirty){
       if(!user || applying) return;
-      var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
-      if(!force && keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
-      /* the blob's stamp is the last CHANGE's time, not the push time —
-         devices compare change against change */
-      var at = Math.max(m.localAt || 0, m.savedAt || 0);
-      if(keysJson !== m.keysJson && (m.localAt || 0) <= (m.savedAt || 0)) at = Date.now();
-      var stamped = JSON.stringify({ keys: keys, savedAt: at });
-      var uid = user.uid;
-      db.collection("progress").doc(uid).set({ readerJson: stamped, readerAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+      var upd = {}, uid = user.uid;
+      dirty.forEach(function(d){
+        var f = fieldOf(d.recId);
+        upd[f] = JSON.stringify(d.data);
+        upd[f + "_at"] = firebase.firestore.FieldValue.serverTimestamp();
+        upd[f + "_by"] = CID;
+      });
+      db.collection("progress").doc(uid).set(upd, { merge: true })
         .then(function(){
-          /* the synced fingerprint is written ONLY once the cloud has
-             the state — writing it optimistically (as before) made a
-             single failed push mark unsynced reading as synced, and
-             no later saveNow ever retried it */
-          lastSent = stamped; pushRetries = 0;
-          try{ var mm = meta(); mm.savedAt = at; mm.keysJson = keysJson; localStorage.setItem(META, JSON.stringify(mm)); }catch(e){}
-          if(user) setNote("Synced ✓ — signed in as " + (user.email || ""));
+          pushRetries = 0;
+          dirty.forEach(function(d){ setRecMeta(d.recId, { s: d.canon }); });
+          syncedNote();
         })
         .catch(function(e){
-          lastSent = null;
           if(user) failNote("push", e);
-          /* bounded retry with backoff: a failed push is retried, not
-             forgotten (an offline train ride no longer loses the
-             session's sync when the tab closes) */
+          /* bounded retry with backoff: a failed push is retried, not forgotten */
           if(user && pushRetries < 3){
             pushRetries++;
             clearTimeout(retryTimer);
-            retryTimer = setTimeout(function(){ saveNow(); }, 4000 * pushRetries);
+            retryTimer = setTimeout(maybePush, 4000 * pushRetries);
           }
         });
     }
-    /* the poll runs signed in or not: its first job is stamping this
-       device's last local change (localAt) so a later sign-in can tell
-       whose reading is actually newer; its second is scheduling pushes */
-    setInterval(function(){
-      var j = JSON.stringify(collectKeys());
-      if(lastSeenJson === null){ lastSeenJson = j; return; }
-      if(j === lastSeenJson) return;
-      lastSeenJson = j;
-      if(!applying){
-        /* stamp ONLY the change time. META.keysJson is the last SYNCED
-           fingerprint — saveNow/doPush skip a push whose keys match it.
-           Writing the just-changed keys here (as a previous build did)
-           made every later push early-return as "already synced", so
-           the cloud silently stopped receiving pushes altogether. */
-        var m = meta(); m.localAt = Date.now();
-        try{ localStorage.setItem(META, JSON.stringify(m)); }catch(e){}
+    /* the poll is only a push trigger: it stamps nothing, so boot
+       writes and restore re-saves can never dirty a record */
+    setInterval(function(){ maybePush(); }, 2500);
+    window.addEventListener("pagehide", function(){ maybePush(); });
+
+    /* ---------- apply: per record, in place, never a reload ---------- */
+    function rehydrateSettings(){
+      try{ var fsv = parseInt(lsGet("gurbani-reader:fontsize-v1"), 10); if(fsv >= 0 && fsv < FS.length && fsv !== fsIdx){ fsIdx = fsv; applyFs(); } }catch(e){}
+      try{ var sv = lsGet("gurbani-reader:speed-v1"); if(sv && $("speed")){ $("speed").value = sv; var nr = Number(sv) || 1; if(nr !== speedRate){ speedRate = nr; applySpeed(); } } }catch(e){}
+      try{ var hm = lsGet("gurbani-reader:hlmode-v1"); if((hm === "sentence" || hm === "word" || hm === "off") && hm !== hlMode){ hlMode = hm; paintHlSeg(); } }catch(e){}
+      try{ var ap = lsGet("gurbani-reader:appearance-v1"); if((ap === "day" || ap === "night" || ap === "auto") && ap !== appearance){ appearance = ap; applyAppearance(); paintAppSeg(); paintAppBtn(); } }catch(e){}
+      try{ var av = lsGet("gurbani-reader:advanced-v1") === "1"; if(av !== advancedMode) setAdvanced(av); }catch(e){}
+      try{ var asv = lsGet("gurbani-reader:autoscroll-v1"); if(asv !== null){ var aon = asv === "1"; if(aon !== autoScrollOn){ autoScrollOn = aon; var ab = $("autoScrollBtn"); if(ab){ ab.classList.toggle("active", aon); ab.setAttribute("aria-pressed", aon ? "true" : "false"); } } } }catch(e){}
+    }
+    function applyCtxRecord(id, data){
+      if(!data) return;
+      var local = deriveCtx(id);
+      if(!data.place && !data.glf && local && (local.place || local.glf)) return;   /* a "not started" record never erases a started journey */
+      writeCtx(id, data);
+      var playing = false;
+      try{ playing = !!(audio && !audio.paused && !audio.ended); }catch(e){}
+      if(id === paathData.current && !detour && !playing){
+        /* current Paath, paused: the stored resume point and the live
+           records move underneath the reader; the VIEW does not
+           (Kindle rule). While playback is running the live records
+           are this session's own — a remote record updates only the
+           stored resume point, and this session's next save (newer
+           reading time) legitimately supersedes it. */
+        if(data.place) lsSet(LAST_KEY, JSON.stringify(data.place)); else lsSet(LAST_KEY, null);
+        if(data.glf){ glf = data.glf; lsSet(FOCUS_KEY, JSON.stringify(data.glf)); }
+        else { glf = null; lsSet(FOCUS_KEY, null); }
       }
-      if(!user || applying || !syncReady) return;
-      clearTimeout(timer); timer = setTimeout(saveNow, 1200);
-    }, 2500);
-    window.addEventListener("pagehide", saveNow);
+    }
+    function applyListRecord(data){
+      if(!data || !Array.isArray(data.list)) return;
+      var newIds = {};
+      data.list.forEach(function(p){ newIds[p.id] = 1; });
+      paathData.list.forEach(function(p){ if(!newIds[p.id]) lsSet(ctxKey(p.id), null); });
+      paathData.list = data.list.map(function(p){ return { id: p.id, name: p.name }; });
+      if(paathData.current && !newIds[paathData.current]) paathData.current = paathData.list.length ? paathData.list[0].id : null;
+      savePaathData();
+      /* ctx records that arrived before the list named their Paath land now */
+      Object.keys(heldCtx).forEach(function(recId){
+        var id = recId.slice(4);
+        if(newIds[id]){
+          var h = heldCtx[recId]; delete heldCtx[recId];
+          applyCtxRecord(id, h.data);
+          setRecMeta(recId, { s: canonOf(recId, h.data), a: canonOf(recId, h.data), at: h.at });
+        }
+      });
+    }
+    function applyRecord(recId, data, at){
+      applying = true;
+      syncMute.on = true;
+      if(recId === "paaths") applyListRecord(data);
+      else if(recId === "settings"){ SETTINGS_KEYS.forEach(function(k){ if(k in data) lsSet(k, data[k]); }); rehydrateSettings(); }
+      else if(recId.indexOf("ctx:") === 0) applyCtxRecord(recId.slice(4), data);
+      setRecMeta(recId, { s: canonOf(recId, data), a: canonOf(recId, data), at: (at != null ? at : recMeta(recId).at) });
+      buildPaathLists();
+      try{ window.__applyCount = (window.__applyCount || 0) + 1; }catch(e){}
+      syncedNote();
+      /* saves stay muted while the apply settles; even a save that
+         slips through changes only volatile fields, whose canonical
+         form equals the applied hash — it cannot re-push */
+      clearTimeout(muteTimer);
+      muteTimer = setTimeout(function(){ syncMute.on = false; applying = false; }, 1200);
+    }
+
+    function atOf(v){
+      if(v == null) return null;
+      if(typeof v === "number") return v;
+      if(typeof v.toMillis === "function"){ try{ return v.toMillis(); }catch(e){ return null; } }
+      return null;
+    }
+    /* one decision per record sighting (sign-in read or live
+       snapshot): the server stamp orders, the writer id silences
+       echoes, the canonical hash decides sameness */
+    function handleRecord(recId, raw, at, by, fromGet){
+      var rm = recMeta(recId);
+      var data = null; try{ data = JSON.parse(raw || "null"); }catch(e){}
+      if(data === null) return;
+      var ch = canonOf(recId, data);
+      if(by && by === CID){
+        /* own write echoing back: advance the baselines, never apply */
+        setRecMeta(recId, { s: ch, at: (at != null ? at : rm.at) });
+        return;
+      }
+      if(!fromGet){
+        if(at == null) return;   /* unresolved server stamp — the resolved delivery follows */
+        if(rm.at != null && at < rm.at) return;
+        if(rm.at != null && at === rm.at && ch === rm.a) return;
+      }
+      if(ch === canonOf(recId, localRecord(recId))){
+        /* same substantive record, whatever its volatile fields say */
+        setRecMeta(recId, { s: ch, a: ch, at: (at != null ? at : rm.at) });
+        return;
+      }
+      if(recId.indexOf("ctx:") === 0 && !paathById(recId.slice(4))){
+        /* a Paath record whose Paath this device's list does not name
+           yet: hold it — the list record lands it when it arrives */
+        heldCtx[recId] = { data: data, at: at };
+        return;
+      }
+      if(fromGet && rm.s == null && rm.a == null && rm.at == null){
+        /* bootstrap (first contact for this record): the only place
+           heuristics run */
+        if(recId === "settings"){ applyRecord(recId, data, at); return; }
+        if(recId === "paaths"){
+          var local = localRecord("paaths");
+          if(listCustomised(local && local.list) && !listCustomised(data.list)) return;   /* local list wins; the push carries it */
+          applyRecord(recId, data, at); return;
+        }
+        if(ctxReadingTs(data) >= ctxReadingTs(localRecord(recId))){ applyRecord(recId, data, at); return; }
+        return;   /* local record is newer reading: the push carries it */
+      }
+      if(fromGet && at != null && rm.at != null && at < rm.at) return;
+      applyRecord(recId, data, at);
+    }
+    function handleDoc(data, fromGet){
+      if(!data){
+        /* the doc itself is gone: forget synced fingerprints so the
+           records re-push */
+        var recs = meta().recs || {};
+        Object.keys(recs).forEach(function(recId){ if(recs[recId].s != null) setRecMeta(recId, { s: null }); });
+        maybePush();
+        return;
+      }
+      var seen = {};
+      Object.keys(data).forEach(function(f){
+        if(f.indexOf("rec_") !== 0 || /_(at|by)$/.test(f)) return;
+        var recId = recIdOfField(f);
+        seen[recId] = 1;
+        handleRecord(recId, data[f], atOf(data[f + "_at"]), data[f + "_by"] || null, fromGet);
+      });
+      /* a record field that vanished from the doc re-pushes */
+      var recs2 = meta().recs || {};
+      Object.keys(recs2).forEach(function(recId){ if(!seen[recId] && recs2[recId].s != null) setRecMeta(recId, { s: null }); });
+      maybePush();
+    }
+
     /* Firebase's own guidance: popups are unreliable in mobile
        browsers — touch devices go redirect-first, desktop keeps
-       popup-first with a redirect fallback. (Sign-in was never the
-       failing half here; this is robustness, not the sync fix.) */
+       popup-first with a redirect fallback. */
     var isTouch = false;
     try{ isTouch = (window.matchMedia && matchMedia("(pointer: coarse)").matches) || /Android|iPhone|iPad/i.test(navigator.userAgent || ""); }catch(e){}
     btn.addEventListener("click", function(){
@@ -4201,76 +4393,36 @@
         setNote("Sign-in didn't complete (" + syncErr("redirect-result", e) + ") — tap to try again. Everything still saves on this device.");
       });
     }
-    function applyCloud(cloudKeys, cloudAt, raw){
-      applying = true;
-      var guardKeys = {};
-      Object.keys(cloudKeys).forEach(function(k){ guardKeys[k] = cloudKeys[k]; });
-      try{
-        /* wholesale means wholesale: a local key the winning cloud
-           state does not have (an orphaned ctx-*, a stale detour)
-           must not survive the apply — it would be re-collected on
-           the next push and resurrect state the winner never had.
-           Deletions ride in the apply-guard too, so the reload-window
-           replay performs them as well. */
-        var before = collectKeys();
-        Object.keys(before).forEach(function(k){ if(!(k in cloudKeys)) guardKeys[k] = null; });
-        Object.keys(guardKeys).forEach(function(k){ if(guardKeys[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, guardKeys[k]); });
-        var gm2 = meta();
-        localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: cloudAt, lastUid: gm2.lastUid || (user ? user.uid : null) }));
-      }catch(e){}
-      lastSent = raw;
-      var guardBlob = raw;
-      try{ var gp = JSON.parse(raw); gp.keys = guardKeys; guardBlob = JSON.stringify(gp); }catch(e){}
-      try{ sessionStorage.setItem("gurbani-reader:apply-guard", JSON.stringify({ uid: user ? user.uid : null, blob: guardBlob })); }catch(e){}
-      setNote("Found your synced reading — refreshing…");
-      setTimeout(function(){ location.reload(); }, 700);
-    }
     auth.onAuthStateChanged(function(u){
       user = u;
       syncReady = false;
       if(u){
         var mu = meta();
         if(mu.lastUid !== u.uid){
-          /* a different account starts with a clean slate: the previous
-             account's stamps say nothing about this account's cloud,
-             and judging this cloud by them could suppress its apply
-             and push this device's state into the wrong doc's place */
-          mu.lastUid = u.uid; mu.savedAt = 0; mu.localAt = 0; mu.keysJson = null;
-          try{ localStorage.setItem(META, JSON.stringify(mu)); }catch(e){}
+          /* a different account starts with clean record baselines:
+             the previous account's say nothing about this doc. The
+             writer id stays — it names this device, not the user.
+             Local data itself is never touched by a sign-in. */
+          setMeta({ lastUid: u.uid, recs: {} });
         }
       }
       if(unsub){ unsub(); unsub = null; }
-      if(!u){ paint(); lastSent = null; return; }
+      clearTimeout(retryTimer);
+      if(!u){ paint(); return; }
       paint();
       setNote("Signed in — syncing…");
       var myUid = u.uid;
       var ref = db.collection("progress").doc(u.uid);
       /* live pull is set up on its own, not inside the initial get():
          a failed first read must not cost the whole session its
-         subscription. It also repairs a cloud copy that lost its
-         reader field mid-session, and applies newer reading with the
-         same win rules as sign-in. */
+         subscription */
       var subscribe = function(){
         if(unsub) return;
         unsub = ref.onSnapshot(function(snap2){
-          lastPullAt = Date.now();
-          if(!user || user.uid !== myUid || applying) return;
-          var c2 = snap2.exists ? (snap2.data().readerJson || null) : null;
-          if(!c2){
-            /* the cloud copy lost its reader field (deleted doc/field)
-               — re-push this device's state instead of showing
-               "Synced ✓" over a cloud that no longer exists */
-            if(lastSent && Object.keys(collectKeys()).length) doPush(true);
-            return;
-          }
-          if(c2 === lastSent) return;
-          var cj2 = null; try{ cj2 = JSON.parse(c2); }catch(e){}
-          if(!cj2 || !cj2.keys) return;
-          var m2 = meta(), localNow = collectKeys();
-          if(JSON.stringify(cj2.keys) === JSON.stringify(localNow)) return;
-          var wins = (cj2.savedAt || 0) > (m2.savedAt || 0) && (cj2.savedAt || 0) > (m2.localAt || 0);
-          if(!wins && Math.abs((cj2.savedAt || 0) - (m2.localAt || 0)) < 600000 && placeTsOf(cj2.keys) > placeTsOf(localNow)) wins = true;
-          if(wins) applyCloud(cj2.keys, cj2.savedAt, c2);
+          if(!user || user.uid !== myUid) return;
+          var md = snap2.metadata || {};
+          if(md.hasPendingWrites || md.fromCache) return;   /* local echoes and cache reads are not remote commits */
+          handleDoc(snap2.exists ? snap2.data() : null, false);
         }, function(e){
           /* a dead listener used to stay "subscribed" forever (unsub
              non-null), so the session never retried it. Name the
@@ -4282,32 +4434,18 @@
       };
       ref.get().then(function(snap){
         if(!user || user.uid !== myUid) return;
-        var cloud = snap.exists ? (snap.data().readerJson || null) : null;
-        var cloudAt = 0, cloudKeys = null;
-        if(cloud){ try{ var cj = JSON.parse(cloud); cloudAt = cj.savedAt || 0; cloudKeys = cj.keys || null; }catch(e){} }
-        var m = meta();
-        syncReady = true;
-        lastPullAt = Date.now();
-        var localKeys = collectKeys(), keysDiffer = !!cloudKeys && JSON.stringify(cloudKeys) !== JSON.stringify(localKeys);
-        /* whose reading wins: the cloud postdates this device's last
-           change — OR this device is near-pristine and the cloud is
-           rich (a fresh device never overwrites a seasoned library) —
-           OR the stamps sit inside the clock-skew window and the
-           cloud's own reading time is the later one */
-        var cloudWins = !!cloudKeys && keysDiffer && (
-          cloudAt > (m.localAt || 0) ||
-          (keysPristine(localKeys) && keysRich(cloudKeys)) ||
-          (Math.abs(cloudAt - (m.localAt || 0)) < 600000 && placeTsOf(cloudKeys) > placeTsOf(localKeys))
-        );
-        if(cloudWins){
-          applyCloud(cloudKeys, cloudAt, cloud);
-        } else {
-          if(cloudKeys && JSON.stringify(cloudKeys) === JSON.stringify(collectKeys())){
-            try{ localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: m.localAt || 0, lastUid: myUid })); }catch(e){}
-            lastSent = cloud;
-            setNote("Synced ✓ — signed in as " + (u.email || ""));
-          } else saveNow();
+        var md = snap.metadata || {};
+        if(md.fromCache){
+          /* a cache-only first read decides nothing; the live
+             subscription delivers the server's word */
+          syncReady = true;
+          subscribe();
+          return;
         }
+        if(snap.exists) handleDoc(snap.data(), true);
+        syncReady = true;
+        maybePush();
+        if(user && !applying) syncedNote();
         subscribe();
       }).catch(function(e){
         if(!user || user.uid !== myUid) return;
@@ -4316,7 +4454,7 @@
         syncReady = true;
         setNote("Couldn't reach sync (" + syncErr("get", e) + ") — your reading is safe on this device and will retry.");
         subscribe();
-        saveNow();
+        maybePush();
       });
     });
   })();
