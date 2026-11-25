@@ -4473,22 +4473,33 @@
         if(raw == null) return;
         var at = atOf(d[f + "_at"]);
         if(at == null) return;
-        if(d[f + "_by"] === CID){ markSeen(recId, at); markSent(recId, raw); return; }
+        var prevSeen = seenMap()[recId] || 0;
+        if(d[f + "_by"] === CID){
+          /* own write, adopted — but a late older echo must never
+             regress the stamp or the sent baseline */
+          if(at > prevSeen) markSeen(recId, at);
+          if(at >= prevSeen) markSent(recId, raw);
+          return;
+        }
         var data = null;
         try{ data = JSON.parse(raw); }catch(e){ return; }
         if(!data) return;
         var first = seenMap()[recId] == null;
-        if(!first && at <= (seenMap()[recId] || 0)) return;
+        if(!first && at <= prevSeen) return;
         if(recId.indexOf("ctx:") === 0){
           var local = localRecord(recId);
           if(local && (local.place || local.glf) && ctxTs(local) > ctxTs(data)){
-            markSeen(recId, at); forgetSent(recId); schedulePush(); return;
+            /* local reading is newer: republish it. The cloud stamp is
+               deliberately NOT marked seen — if this device's push
+               never lands, the cloud record must stay eligible for
+               re-evaluation instead of being blacklisted. */
+            forgetSent(recId); schedulePush(); return;
           }
           var known = {}; paathData.list.forEach(function(p){ known[p.id] = 1; });
-          if(!known[recId.slice(4)]){ markSeen(recId, at); return; }   /* a Paath this device's list does not carry */
+          if(!known[recId.slice(4)]) return;   /* a Paath this device's list does not carry — left unseen so a later list that names it evaluates it fresh */
         }
         if(first && recId === "paaths" && listCustomised(localRecord("paaths")) && !listCustomised(data)){
-          markSeen(recId, at); forgetSent(recId); schedulePush(); return;
+          forgetSent(recId); schedulePush(); return;
         }
         applyRecord(recId, data, at);
       });
