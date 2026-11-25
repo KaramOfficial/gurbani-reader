@@ -263,13 +263,13 @@ this derivation.
 | `gurbani-reader:hlmode-v1` | Follow-along mode: off / sentence / word |
 | `gurbani-reader:autoscroll-v1` | Auto-scroll on/off |
 | `gurbani-reader:nitnem-open` | Nitnem section expanded in switcher/Library |
-| `gurbani-reader:paaths-v1` | Sehaj Paath trackers: the list, the current one, the Default's custom name |
-| `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` (`ctx-default` for the Default) |
+| `gurbani-reader:paaths-v1` | Sehaj Paath trackers: the list + the current one's id (always a real tracker — there is no "Default" Paath) |
+| `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` — Ang state only, never a Bani's |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
 | `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world |
 | `gurbani-reader:mode-v1` | Which world the reader left in: `free` (Default reading) or `paath` |
-| `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint |
+| `gurbani-reader:sync-v1` | Cloud-sync meta (not itself synced): last synced state's stamp + key fingerprint + `localAt`, this device's last local change |
 | `gurbani-reader:apply-guard` (sessionStorage) | One-shot: the cloud blob just applied, re-written once after the apply reload |
 
 Font sizes: `[20, 22, 24, 26, 29, 32, 36, 40, 44, 48]px`, default
@@ -514,7 +514,10 @@ detour-v1 slot, same shapes as the real ones), so neither world
 ever disturbs the other, and `mode-v1` remembers which world the
 reader left in; at boot that world resumes (an existing install
 with no mode key boots into its Paath world, unchanged). Default
-reading is entered three ways: a **fresh install** starts there; a
+reading is entered four ways: a **fresh install** starts there;
+**opening any Bani** enters it (a Bani is Nitnem, never Sehaj Paath —
+the outgoing Paath is snapshotted, Ang state only, and the Bani reads
+and resumes in the free world); a
 **Pankti Voice Search deep link** (?ang=N&line=L — the search index
 and the Reader's chunks enumerate an Ang's lines identically,
 verified line-for-line) lands there on that exact pankti as the
@@ -533,17 +536,24 @@ a **book icon** (left) and a **bookmark icon** (right). The book
 opens the **Paath popup**: a "Default — just reading · not a
 Paath" row (marked current in Default reading; choosing it leaves
 the Paath world via a snapshot of the outgoing Paath, the
-switchPaath trick in reverse) followed by every Sehaj Paath (the
-Default Paath included) with its place label and focus preview;
-choosing one switches to it. Default-the-mode appears ONLY in this
-popup — never in the Library/switcher Paath lists. The bookmark
-opens the same popup in **assign mode**: choosing a Paath makes
+switchPaath trick in reverse) followed by every Sehaj Paath with
+its place label and focus preview; choosing one switches to it.
+The same Default-mode row also heads the Library/switcher Paath
+lists — a plain mode line (no tracker dot, no pencil, separated by
+a hairline), navigation only: nothing can be saved to Default. The
+bookmark opens the same popup in **assign mode** (real Paaths only
+— no Default row; the header keeps the current-context line and
+adds the instruction under it): choosing a Paath makes
 the pankti the reader is on (the focus if there is one, else the
 pankti at the anchor — captured when the popup opens, since the
 popup covers the anchor) that Paath's resume point, by rewriting
 its snapshot (or the live place/focus when it is the current
 Paath); the reader never moves, and a toast confirms. This is the
-manual counterpart to a Paath's automatic tracking.
+manual counterpart to a Paath's automatic tracking. Assign is an
+Ang-only verb: in Bani mode the bookmark button is hidden, and the
+assign function itself refuses a Bani record — a Paath snapshot is
+only ever written from Ang state (snapshot writers substitute the
+snapshot's previous Ang state when the live record is a Bani's).
 
 **Appearance — Day / Auto / Night.** Controlled only by the top-bar
 button beside Full screen, which cycles Day →
@@ -573,20 +583,30 @@ Granth Sahib Ji — days to years — and a reader may keep several going
 at once. Below the Nitnem expandable (in BOTH the Library and the
 switcher popup, same pattern, shared persisted expand state) sits a
 ਸਹਜ ਪਾਠ expandable whose header note names the current context
-("Current · …"). Rows: the **Default** state (the untracked reading —
-the app's original behaviour) plus one row per journey, seeded with
-four ("Sehaj Paath ੧–੪", Gurmukhi numerals) and addable without limit
-via "+ New Sehaj Paath". Each journey is a complete snapshot world —
+("Current · …", or the Default-mode line in free reading). Rows: a
+**Default** mode line first (just reading — not a journey, no pencil,
+never counted among the Paaths), then one row per journey, seeded with
+four ("Sehaj Paath ੧–੪", Gurmukhi numerals; the first is the current
+one) and addable without limit via "+ New Sehaj Paath". There is no
+"Default" tracker: older builds kept a nameless one (id null, snapshot
+at `ctx-default`, display name in `defName`) — a one-time migration
+folds its journey into Sehaj Paath ੧ (or a new tracker if ੧ already has
+one), drops `defName`, and scrubs any Bani place/focus out of every
+snapshot. Each journey is a complete snapshot world —
 its own saved place + its own global focus (`ctx-<id>`): switching
 stashes the live records under the old context, installs the target's,
 and lands through the ordinary restore machinery, so "continue" opens
 the journey's Ang on its pankti, marked, audio parked. A journey with
 no snapshot starts at ਅੰਗ ੧. Row sub-labels say the action: "Resume at
 ਅੰਗ ੧੬੫ · 12% complete" for a journey in progress ("ਅੰਗ … · % complete"
-for the current one), "Not started" otherwise; the Default row shows
-just its Ang. Every row — Default included — carries a pencil to
-rename it inline. Under the sub-label, each row previews its focus
-pankti — the line's first few Gurmukhi words plus " …" — stored on
+for the current one), "Not started" otherwise (a snapshot whose
+place is a Bani's renders "Not started" too — a Paath label only ever
+names an Ang). Every journey row carries a pencil to rename it inline;
+renames are validated — "Default" (the mode's name), a duplicate of
+another Paath's name, and names over 40 characters are refused with a
+toast. Under the sub-label, each row previews its focus
+pankti — the line's first few Gurmukhi words plus " …", the dandi
+(॥) kept wherever it falls — stored on
 the focus record itself, so snapshots carry it (rows whose line text
 isn't loaded derive it when the item is in memory, else no preview).
 Rename reads the input in the surface actually used: the list exists
@@ -612,15 +632,22 @@ kept OUT of sync, and re-applies on rotation/resize class flips; switching
 rebuilds mounted sections and re-anchors to the focus pankti. Header style
 is `parahead-v1` (synced normally). Spec: ~/workspace/reader-design/paragraph-mode-spec.md.
 
-**Large screens (≥761px, Cook jury Nov 24).** ONE measure — 700px — for the
-reading column, top bar, pager, player card and sheet content (they were
-700/760/680 stacked, which read as a phone layout centred by accident).
-First run on a ≥1280px screen with no saved font size starts one step up
-(26px); a saved choice always wins. At ≥1024px the Menu sheet is a centred
-700px panel (side hairlines, top-drop kept) instead of a full-width curtain,
-and the quick cluster anchors to the reading column
-(`right: calc(50% - 412px)` — column edge + 16px gap) instead of the
-viewport edge. Phone CSS untouched.
+**Large screens — designed per size, not the phone layout scaled.**
+One measure for the reading column, top bar, pager and player card:
+700px at ≥761px, **800px at ≥1024px, 840px at ≥1600px** (at desktop font
+sizes 700px starves the line; full width would fatigue it — the margins
+stay calm and empty by intent). First run on a ≥1280px screen with no
+saved font size starts one step up (26px); a saved choice always wins.
+The Menu follows the same per-size intent: a full-width top sheet on
+phone, a **centred 700px panel at 761–1023px**, and at **≥1024px a
+compact 400px panel in the top-right corner** (top 64px, right 20px,
+max-height calc(100dvh − 84px), internal scroll, fade/slide in) — the
+Library and settings live inside it unchanged. The quick cluster anchors
+to the reading column's right edge (`right: calc(50% - 462px)` at the
+800px measure, −482px at 840px). The Paath popup at ≥1024px anchors
+above the floating pair at the column's right edge (360px wide) instead
+of centring; the Ang switcher card widens to 560px; toasts sit
+bottom-right, clear of the centred player. Phone CSS untouched.
 
 **Landscape phones.** In landscape (short height), the chrome merges
 to one row each: the top bar drops the wordmark to the ੴ mark alone so
@@ -640,17 +667,25 @@ and mirrors the Tracker's pattern: every `gurbani-reader:*` key
 excluded) is serialised into the `readerJson` field of the user's
 own doc in the Tracker's `progress` collection (merge write; the
 two apps never touch each other's fields, so the rules that let
-the Tracker sync let this sync). Newer state wins wholesale by
-client stamp; applying cloud state reloads once, with a one-shot
-sessionStorage guard re-writing the applied keys after the reload
-(the dying page's own place saves can otherwise clobber the synced
-place in the reload window). No push happens before the sign-in's
-initial cloud check settles, and pushes fire only when the key set
-actually changed (2.5s poll, debounced, plus on pagehide) — an idle
-signed-in tab never overwrites another device. Last-writer-wins is
-the known limit, same as the Tracker. Signed out, SDK blocked, or
-offline: local-only, exactly as before — sign-in is invisible
-unless wanted.
+the Tracker sync let this sync). **Newer READING wins wholesale** —
+the stamp that decides is each device's last local *change*, not its
+last sync: the 2.5s poll runs signed out too and stamps `localAt` in
+the sync meta whenever the collected keys change (first poll only
+sets a baseline, so boot writes don't count), and a push carries its
+change's stamp. On sign-in the cloud applies only when it postdates
+this device's `localAt`; otherwise this device pushes. After sign-in
+a live `onSnapshot` subscription applies newer cloud state as it
+arrives (own writes recognised and ignored), so an already-signed-in
+device follows the other device's reading without re-signing-in.
+Applying cloud state reloads once, with a one-shot sessionStorage
+guard re-writing the applied keys after the reload (the dying page's
+own place saves can otherwise clobber the synced place in the reload
+window). No push happens before the sign-in's initial cloud check
+settles, and pushes fire only when the key set actually changed
+(debounced, plus on pagehide) — an idle signed-in tab never
+overwrites another device. Cross-device clock skew is the known
+limit. Signed out, SDK blocked, or offline: local-only, exactly as
+before — sign-in is invisible unless wanted.
 
 ## 10. Design language
 
