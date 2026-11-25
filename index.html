@@ -517,6 +517,14 @@
   .pbrk{display:none}
   body.para .pbrk{display:block;height:.85em}
   body.para .line.hdr{font-weight:700;color:var(--accent-strong)}
+  /* print mode — the whole Ang as one continuous page (readgurbani.com
+     print view): panktis flow inline line after line with NO paragraph
+     breaks at all; only the Mool Mantar keeps its own centred line */
+  body.print .line{display:inline;padding:0 1px;text-align:left;border-radius:6px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  body.print .line + .line{margin-top:0}
+  body.print .section{text-align:left}
+  body.print .line.hdr{font-weight:700;color:var(--accent-strong)}
+  body.print .line.mool{display:block;text-align:center}
   body.para.hdr-own .line.hdr{display:block;text-align:center;margin:16px 0 6px;font-weight:600;color:var(--ink)}
   .w{cursor:pointer;border-radius:6px;padding:1px 0;transition:background .18s,color .18s;-webkit-tap-highlight-color:transparent}
   .w.large-pause{color:#A0728E}
@@ -740,6 +748,7 @@
       <div class="seg" id="layoutSeg" role="group" aria-label="Layout">
         <button data-layout="lines">Lines</button>
         <button data-layout="para">Paragraphs</button>
+        <button data-layout="print">Print</button>
       </div>
     </div>
     <div class="menu-row" id="paraHdrRow">
@@ -1562,8 +1571,8 @@
     resizeSettleUntil = Date.now() + 400;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function(){
-      var wasPara = paraOn; computePara();
-      if(paraOn !== wasPara){ applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold)); }   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
+      var wasPara = paraOn + "/" + printOn; computePara();
+      if((paraOn + "/" + printOn) !== wasPara){ applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold)); }   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
       if(!audio.paused && autoScrollOn && !manualHold){
         var found = currentLineEl();
         if(found){
@@ -2529,14 +2538,15 @@
   }
   /* ---------- paragraph (print-flow) layout ---------- */
   var LAYOUT_WIDE_KEY = "gurbani-reader:layout-wide-v1", LAYOUT_NARROW_KEY = "gurbani-reader:layout-narrow-v1";
-  var paraOn = false, paraHdrOwn = false;
+  var paraOn = false, printOn = false, paraHdrOwn = false;
   try{ paraHdrOwn = localStorage.getItem("gurbani-reader:parahead-v1") === "own"; }catch(e){}
   function sizeClassWide(){ return window.innerWidth >= 761 && window.innerHeight >= 500; }
   function layoutKey(){ return sizeClassWide() ? LAYOUT_WIDE_KEY : LAYOUT_NARROW_KEY; }
   function computePara(){
     var c = null;
     try{ c = localStorage.getItem(layoutKey()); }catch(e){}
-    paraOn = c ? (c === "para") : sizeClassWide();   /* default: Paragraphs on wide screens, Lines on narrow — switchable in Menu > Display */
+    printOn = (c === "print");
+    paraOn = c ? (c === "para") : sizeClassWide();   /* default: Paragraphs on wide screens, Lines on narrow — switchable in Menu > Display; "print" is the third stored choice */
   }
   function isHeaderLine(tx){
     if(!tx) return false;
@@ -2563,7 +2573,7 @@
     });
     return { hdr: hdr, brk: brk };
   }
-  function paraSuffix(deco, i){ return paraOn ? (deco.brk[i] ? '<span class="pbrk"></span>' : ' ') : ''; }
+  function paraSuffix(deco, i){ if(printOn) return ' '; return paraOn ? (deco.brk[i] ? '<span class="pbrk"></span>' : ' ') : ''; }
   /* print never strands a danda: in paragraph flow a punctuation-only
      part (॥, ॥N॥, a verse number) joins the part before it with a
      non-breaking space, so word + danda + number wrap as one unit */
@@ -3383,7 +3393,7 @@
   /* ---------- layout wiring (Lines / Paragraphs + header style) ---------- */
   function paintLayoutSegs(){
     var ls = $("layoutSeg");
-    if(ls) ls.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-layout") === "para") === paraOn); });
+    if(ls) ls.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-layout") === (printOn ? "print" : paraOn ? "para" : "lines")); });
     var hs = $("paraHdrSeg");
     if(hs) hs.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", (b.getAttribute("data-phdr") === "own") === paraHdrOwn); });
     var row = $("paraHdrRow");
@@ -3392,6 +3402,7 @@
   function applyLayoutClass(){
     computePara();
     document.body.classList.toggle("para", paraOn);
+    document.body.classList.toggle("print", printOn);
     document.body.classList.toggle("hdr-own", paraOn && paraHdrOwn);
     paintLayoutSegs();
   }
@@ -3432,9 +3443,9 @@
   }
   function setLayout(mode){
     try{ localStorage.setItem(layoutKey(), mode); }catch(e){}
-    var was = paraOn;
+    var was = paraOn + "/" + printOn;
     applyLayoutClass();
-    if(paraOn !== was) relayoutStream();
+    if((paraOn + "/" + printOn) !== was) relayoutStream();
   }
   function setParaHdr(own){
     paraHdrOwn = own;

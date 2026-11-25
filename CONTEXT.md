@@ -677,7 +677,12 @@ never across a section/Ang. Word + ॥ + verse number are one unbreakable
 unit (`joinParts` glues punctuation-only parts with NBSP in para mode).
 Auto-scroll and Recenter work exactly as in lines mode — the focus
 section (§6) measures its line height from the wrapped rows. Menu → Display: **Layout**
-(Lines/Paragraphs) + **Paragraph headers** (Inline/Own line). Layout is
+(Lines/Paragraphs/Print) + **Paragraph headers** (Inline/Own line; the row
+shows only in Paragraphs). **Print** is the third layout: the whole Ang as
+one continuous page, readgurbani.com print-view style — panktis flow inline
+line after line with NO paragraph breaks anywhere (headers flow inline
+too); only the Mool Mantar keeps its own centred line, as in every layout.
+Layout is
 stored PER SIZE CLASS (`layout-wide-v1` / `layout-narrow-v1`; wide =
 ≥761px wide and ≥500px tall), defaults Paragraphs-wide / Lines-narrow, is
 kept OUT of sync, and re-applies on rotation/resize class flips; switching
