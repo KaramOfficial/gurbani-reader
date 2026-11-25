@@ -4157,27 +4157,27 @@
      (<field>_at, a serverTimestamp — the ONLY ordering clock; client
      clocks never decide a win) and its writer's device id
      (<field>_by — a device never applies its own writes). Dirty
-     records batch into ONE merge write. A record's identity is
-     CANONICAL (volatile ts/y/t in place records and ts in focus
-     records stripped), and per-record baselines (last pushed / last
-     applied canonical form + last seen server stamp) persist in the
-     sync meta, so decisions survive reloads and live nowhere only in
-     memory. Applying a record is IN PLACE and can never reload the
-     page, close a surface, or move the reader: a Paath record updates
-     that Paath's stored resume point (and, if it is this device's
-     current Paath, the live records underneath) — the view and
-     playback are never yanked (Kindle rule); the reader's own next
-     save carries a newer reading time and legitimately supersedes.
-
-     Sign-in merges PER RECORD — it never erases local data and never
-     reloads. With no baseline for a record, bootstrap decides:
-     Paath records by their content's own reading time, the list by
-     customised-beats-default, settings from the cloud. The live path
-     uses none of those heuristics — server order only.
+     records batch into ONE merge write. The protocol is the boring,
+     standard Firestore one: ONE snapshot listener (its first
+     delivery is the sign-in merge — there is no separate pull), a
+     push on every save, and per record the server stamp decides —
+     with ONE content rule for Paath records: a record is applied
+     only when its reading time (the reading stamp inside the place/
+     focus content) is at least the local record's, so an older
+     reading never overwrites a newer one and the newer side is
+     republished instead. The list gets the same protection at first
+     contact only (a customised list is never replaced by a factory
+     default). Applying a record is IN PLACE and can never reload
+     the page, close a surface, or move the reader: a Paath record
+     updates that Paath's stored resume point (and, if it is this
+     device's current Paath and playback is paused, the live records
+     underneath) — the view and playback are never yanked (Kindle
+     rule); the reader's own next save carries a newer reading time
+     and legitimately supersedes.
      Offline / signed out / SDK blocked: local-only, exactly as
-     before. A failed push or pull names its Firebase error code in
-     the Account note (full error in the console under [reader-sync])
-     instead of failing silently. */
+     before. A failed push or listen names its Firebase error code
+     in the Account note (full error in the console under
+     [reader-sync]) instead of failing silently. */
   (function(){
     var btn = $("syncBtn"), note = $("syncNote");
     if(!btn) return;
@@ -4187,8 +4187,7 @@
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
     catch(e){ try{ console.error("[reader-sync] init:", e); }catch(_){} if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
     var META = "gurbani-reader:sync-v1";
-    var user = null, applying = false, syncReady = false, unsub = null, pushRetries = 0, retryTimer = null, muteTimer = null;
-    var heldCtx = {};   /* ctx records whose Paath the list has not named yet on this device */
+    var user = null, applying = false, unsub = null, pushRetries = 0, retryTimer = null;
     function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
     function setMeta(patch){ try{ var m = meta(); for(var k in patch) m[k] = patch[k]; localStorage.setItem(META, JSON.stringify(m)); }catch(e){} }
     /* this device's writer id: random, generated once, persisted in
@@ -4284,119 +4283,118 @@
     var SETTINGS_KEYS = ["gurbani-reader:fontsize-v1", "gurbani-reader:speed-v1", "gurbani-reader:hlmode-v1", "gurbani-reader:appearance-v1", "gurbani-reader:advanced-v1", "gurbani-reader:autoscroll-v1", "gurbani-reader:parahead-v1"];
     function fieldOf(recId){ return recId === "paaths" ? "rec_paaths" : recId === "settings" ? "rec_settings" : "rec_ctx_" + recId.slice(4); }
     function recIdOfField(f){ return f === "rec_paaths" ? "paaths" : f === "rec_settings" ? "settings" : "ctx:" + f.slice(8); }
+
+    /* ---------- records: what this device would send ----------
+       A Paath record is that Paath's stored resume point (place) and
+       focus line (glf). The free/Default reading place is NEVER part
+       of a record — it stays per-device by design. The list record is
+       the shared list only: which Paath THIS device is reading is a
+       per-device fact and is not synced. */
     function deriveCtx(id){
-      /* the current Paath's shared record, derived from the live
-         records exactly as a switch-time snapshot is (Ang state only:
-         a Bani place/focus never enters it — the snapshot's previous
-         Ang state stands instead). In free reading the derivation is
-         never used: the record is the parked snapshot, unchanged. */
       if(id === paathData.current && !detour){
-        var lp = readPlace(), prev = readCtx(id) || {};
-        return { place: (lp && lp.mode === "bani") ? (prev.place || null) : lp,
-                 glf: (glf && glf.mode === "bani") ? (prev.glf || null) : glf };
+        var place = null, g = null;
+        try{ place = readPlace(); }catch(e){}
+        try{ g = glf; }catch(e){}
+        if(g && g.mode === "bani"){ var prev = readCtx(id); g = prev ? prev.glf : null; }
+        return { place: place, glf: g };
       }
-      return readCtx(id);
+      return readCtx(id) || { place: null, glf: null };
     }
     function localRecord(recId){
       if(recId === "paaths") return { list: paathData.list.map(function(p){ return { id: p.id, name: p.name }; }) };
-      if(recId === "settings"){
-        var o = {}, any = false;
-        SETTINGS_KEYS.forEach(function(k){ var v = lsGet(k); if(v !== null){ o[k] = v; any = true; } });
-        return any ? o : null;
-      }
-      if(recId.indexOf("ctx:") === 0) return deriveCtx(recId.slice(4));
-      return null;
+      if(recId === "settings"){ var o = {}; SETTINGS_KEYS.forEach(function(k){ var v = lsGet(k); if(v !== null) o[k] = v; }); return o; }
+      return deriveCtx(recId.slice(4));
     }
     function recIdsLocal(){
       var ids = ["paaths", "settings"];
       paathData.list.forEach(function(p){ ids.push("ctx:" + p.id); });
       return ids;
     }
-    function canonOf(recId, data){
-      if(data == null) return null;
-      if(recId === "paaths") return JSON.stringify({ list: data.list });
-      if(recId === "settings"){ var o = {}; Object.keys(data).sort().forEach(function(k){ o[k] = data[k]; }); return JSON.stringify(o); }
-      var wrap = {}; wrap["gurbani-reader:ctx-z"] = JSON.stringify(data); return canonKeys(wrap);
-    }
-    function recMeta(recId){ var m = meta(); return (m.recs || {})[recId] || {}; }
-    function setRecMeta(recId, patch){
-      var m = meta(); if(!m.recs) m.recs = {};
-      var r = m.recs[recId] || {}; for(var k in patch) r[k] = patch[k]; m.recs[recId] = r;
-      try{ localStorage.setItem(META, JSON.stringify(m)); }catch(e){}
-    }
-    function ctxReadingTs(data){
+
+    /* ---------- sync state ----------
+       Per record this device remembers only two things, both in the
+       sync meta: sent[recId] — the exact JSON last handed to (or
+       applied from) Firestore, a cheap guard so an unchanged record
+       is never rewritten; seen[recId] — the newest server stamp
+       applied for the record. No hashes, no baselines, no heuristics
+       beyond one content rule for Paath records (below). */
+    function sentMap(){ return meta().sent || {}; }
+    function seenMap(){ return meta().seen || {}; }
+    function markSent(recId, json){ var s = sentMap(); s[recId] = json; setMeta({ sent: s }); }
+    function forgetSent(recId){ var s = sentMap(); delete s[recId]; setMeta({ sent: s }); }
+    function markSeen(recId, at){ var s = seenMap(); s[recId] = at; setMeta({ seen: s }); }
+    /* when the user actually read in a Paath record: the newest
+       reading stamp inside its content */
+    function ctxTs(data){
       if(!data) return 0;
-      var wrap = {}; wrap["gurbani-reader:ctx-z"] = JSON.stringify(data); return placeTsOf(wrap);
+      var t = 0;
+      if(data.place && data.place.ts) t = Math.max(t, data.place.ts);
+      if(data.glf && data.glf.ts) t = Math.max(t, data.glf.ts);
+      return t;
     }
-    function listCustomised(list){
-      if(!list) return false;
-      if(list.length !== 4) return true;
-      for(var i=0;i<list.length;i++){ if(!/^Sehaj Paath [੧-੯]+$/.test(list[i].name)) return true; }
+    function listCustomised(data){
+      if(!data || !Array.isArray(data.list)) return false;
+      var def = ["Sehaj Paath ੧", "Sehaj Paath ੨", "Sehaj Paath ੩", "Sehaj Paath ੪"];
+      if(data.list.length !== def.length) return true;
+      for(var i = 0; i < def.length; i++){ if(!data.list[i] || data.list[i].name !== def[i]) return true; }
       return false;
     }
 
-    /* ---------- push: only substantively changed records write ---------- */
-    function dirtyRecords(){
-      var out = [];
+    /* ---------- push: on save, immediately; Firestore queues and
+       retries the write itself. A short debounce coalesces a burst of
+       saves into one merge write; a slow reconcile interval plus
+       visibility/focus/pagehide flushes catch everything else. The
+       sent-guard makes every one of these a no-op when nothing
+       changed. ---------- */
+    var pushTimer = null;
+    function schedulePush(){ if(pushTimer) return; pushTimer = setTimeout(function(){ pushTimer = null; pushNow(); }, 250); }
+    function retryPush(){ if(retryTimer) return; retryTimer = setTimeout(function(){ retryTimer = null; pushNow(); }, 20000); }
+    function pushNow(){
+      if(!user || !db || applying) return;
+      var upd = {}, sentJson = {};
       recIdsLocal().forEach(function(recId){
-        var data = localRecord(recId);
-        if(data === null) return;
-        if(recId.indexOf("ctx:") === 0 && !data.place && !data.glf) return;   /* a never-started Paath is the absence of a record */
-        var c = canonOf(recId, data), rm = recMeta(recId);
-        if(c !== rm.s && c !== rm.a) out.push({ recId: recId, data: data, canon: c });
-      });
-      return out;
-    }
-    function maybePush(){
-      if(!user || !syncReady || applying) return;
-      var dirty = dirtyRecords();
-      if(dirty.length) doPush(dirty);
-    }
-    function doPush(dirty){
-      if(!user || applying) return;
-      var upd = {}, uid = user.uid;
-      dirty.forEach(function(d){
-        var f = fieldOf(d.recId);
-        upd[f] = JSON.stringify(d.data);
+        var data = localRecord(recId); if(!data) return;
+        if(recId.indexOf("ctx:") === 0 && !data.place && !data.glf) return;
+        var json = JSON.stringify(data);
+        if(sentMap()[recId] === json) return;
+        var f = fieldOf(recId);
+        upd[f] = json;
         upd[f + "_at"] = firebase.firestore.FieldValue.serverTimestamp();
         upd[f + "_by"] = CID;
+        sentJson[recId] = json;
       });
-      db.collection("progress").doc(uid).set(upd, { merge: true })
-        .then(function(){
-          pushRetries = 0;
-          dirty.forEach(function(d){ setRecMeta(d.recId, { s: d.canon }); });
-          syncedNote();
-          maybePush();   /* drain: anything saved during the flight goes now, not at the next tick */
-        })
-        .catch(function(e){
-          if(user) failNote("push", e);
-          /* bounded retry with backoff: a failed push is retried, not forgotten */
-          if(user && pushRetries < 3){
-            pushRetries++;
-            clearTimeout(retryTimer);
-            retryTimer = setTimeout(maybePush, 4000 * pushRetries);
-          }
-        });
+      /* Paaths deleted from the list lose their cloud record too */
+      var cur = {}; paathData.list.forEach(function(p){ cur[p.id] = 1; });
+      (meta().knownCtx || []).forEach(function(id){
+        if(cur[id]) return;
+        var f = "rec_ctx_" + id;
+        upd[f] = firebase.firestore.FieldValue.delete();
+        upd[f + "_at"] = firebase.firestore.FieldValue.delete();
+        upd[f + "_by"] = firebase.firestore.FieldValue.delete();
+      });
+      if(!Object.keys(upd).length) return;
+      db.collection("progress").doc(user.uid).set(upd, { merge: true }).then(function(){
+        Object.keys(sentJson).forEach(function(recId){ markSent(recId, sentJson[recId]); });
+        setMeta({ knownCtx: paathData.list.map(function(p){ return p.id; }) });
+        pushRetries = 0;
+        syncedNote();
+        schedulePush();   /* anything saved mid-flight goes next round */
+      }).catch(function(e){ failNote("push", e); retryPush(); });
     }
-    /* the poll is only a push trigger: it stamps nothing, so boot
-       writes and restore re-saves can never dirty a record */
-    setInterval(function(){ maybePush(); }, 2500);
-    window.addEventListener("pagehide", function(){ maybePush(); });
-    /* saves announce themselves: push within a breath of the save,
-       coalescing bursts (scroll settles fire several) into one write */
-    var dirtyQueued = false;
-    document.addEventListener("reader-dirty", function(){
-      if(dirtyQueued) return; dirtyQueued = true;
-      setTimeout(function(){ dirtyQueued = false; maybePush(); }, 300);
-    });
-    /* a hidden tab's timers and sockets stall: on return, flush
-       whatever is still dirty and re-check the doc's word */
-    document.addEventListener("visibilitychange", function(){ if(!document.hidden) maybePush(); });
-    window.addEventListener("focus", function(){ maybePush(); });
+    document.addEventListener("reader-dirty", schedulePush);
+    document.addEventListener("visibilitychange", function(){ if(!document.hidden) pushNow(); });
+    window.addEventListener("focus", pushNow);
+    window.addEventListener("pagehide", pushNow);
+    setInterval(pushNow, 2500);
 
-    /* ---------- apply: per record, in place, never a reload ---------- */
+    /* ---------- apply: the snapshot listener is the only reader.
+       Applying is IN PLACE and can never reload the page, close a
+       surface, or move the reader: a Paath record updates that
+       Paath's stored resume point (and, if it is this device's
+       current Paath and playback is paused, the live records
+       underneath) — the view is never yanked (Kindle rule). ------- */
     function rehydrateSettings(){
-      try{ var fsv = parseInt(lsGet("gurbani-reader:fontsize-v1"), 10); if(fsv >= 0 && fsv < FS.length && fsv !== fsIdx){ fsIdx = fsv; applyFs(); } }catch(e){}
+      try{ var fv = lsGet("gurbani-reader:fontsize-v1"); if(fv && FONT_STEPS.indexOf(fv) >= 0 && fv !== fontStep){ fontStep = fv; document.documentElement.style.setProperty("--reader-font", fontStep); paintFontLabel(); } }catch(e){}
       try{ var sv = lsGet("gurbani-reader:speed-v1"); if(sv && $("speed")){ $("speed").value = sv; var nr = Number(sv) || 1; if(nr !== speedRate){ speedRate = nr; applySpeed(); } } }catch(e){}
       try{ var hm = lsGet("gurbani-reader:hlmode-v1"); if((hm === "sentence" || hm === "word" || hm === "off") && hm !== hlMode){ hlMode = hm; paintHlSeg(); } }catch(e){}
       try{ var ap = lsGet("gurbani-reader:appearance-v1"); if((ap === "day" || ap === "night" || ap === "auto") && ap !== appearance){ appearance = ap; applyAppearance(); paintAppSeg(); paintAppBtn(); } }catch(e){}
@@ -4411,12 +4409,6 @@
       var playing = false;
       try{ playing = !!(audio && !audio.paused && !audio.ended); }catch(e){}
       if(id === paathData.current && !detour && !playing){
-        /* current Paath, paused: the stored resume point and the live
-           records move underneath the reader; the VIEW does not
-           (Kindle rule). While playback is running the live records
-           are this session's own — a remote record updates only the
-           stored resume point, and this session's next save (newer
-           reading time) legitimately supersedes it. */
         if(data.place) lsSet(LAST_KEY, JSON.stringify(data.place)); else lsSet(LAST_KEY, null);
         if(data.glf){ glf = data.glf; lsSet(FOCUS_KEY, JSON.stringify(data.glf)); }
         else { glf = null; lsSet(FOCUS_KEY, null); }
@@ -4430,198 +4422,104 @@
       paathData.list = data.list.map(function(p){ return { id: p.id, name: p.name }; });
       if(paathData.current && !newIds[paathData.current]) paathData.current = paathData.list.length ? paathData.list[0].id : null;
       savePaathData();
-      /* ctx records that arrived before the list named their Paath land now */
-      Object.keys(heldCtx).forEach(function(recId){
-        var id = recId.slice(4);
-        if(newIds[id]){
-          var h = heldCtx[recId]; delete heldCtx[recId];
-          applyCtxRecord(id, h.data);
-          setRecMeta(recId, { s: canonOf(recId, h.data), a: canonOf(recId, h.data), at: h.at });
-        }
-      });
     }
     function applyRecord(recId, data, at){
       applying = true;
-      syncMute.on = true;
       if(recId === "paaths") applyListRecord(data);
       else if(recId === "settings"){ SETTINGS_KEYS.forEach(function(k){ if(k in data) lsSet(k, data[k]); }); rehydrateSettings(); }
       else if(recId.indexOf("ctx:") === 0) applyCtxRecord(recId.slice(4), data);
-      setRecMeta(recId, { s: canonOf(recId, data), a: canonOf(recId, data), at: (at != null ? at : recMeta(recId).at) });
+      markSeen(recId, at);
+      markSent(recId, JSON.stringify(data));
       buildPaathLists();
       try{ window.__applyCount = (window.__applyCount || 0) + 1; }catch(e){}
       syncedNote();
-      /* saves stay muted while the apply settles; even a save that
-         slips through changes only volatile fields, whose canonical
-         form equals the applied hash — it cannot re-push */
-      clearTimeout(muteTimer);
-      muteTimer = setTimeout(function(){ syncMute.on = false; applying = false; }, 1200);
+      applying = false;
     }
-
     function atOf(v){
       if(v == null) return null;
       if(typeof v === "number") return v;
       if(typeof v.toMillis === "function"){ try{ return v.toMillis(); }catch(e){ return null; } }
+      if(typeof v.seconds === "number") return v.seconds * 1000 + Math.floor((v.nanoseconds || 0) / 1e6);
       return null;
     }
-    /* one decision per record sighting (sign-in read or live
-       snapshot): the server stamp orders, the writer id silences
-       echoes, the canonical hash decides sameness */
-    function handleRecord(recId, raw, at, by, fromGet){
-      var rm = recMeta(recId);
-      var data = null; try{ data = JSON.parse(raw || "null"); }catch(e){}
-      if(data === null) return;
-      var ch = canonOf(recId, data);
-      if(by && by === CID){
-        /* own write echoing back: advance the baselines, never apply */
-        setRecMeta(recId, { s: ch, at: (at != null ? at : rm.at) });
-        return;
-      }
-      if(!fromGet){
-        if(at == null) return;   /* unresolved server stamp — the resolved delivery follows */
-        if(rm.at != null && at < rm.at) return;
-        if(rm.at != null && at === rm.at && ch === rm.a) return;
-      }
-      if(ch === canonOf(recId, localRecord(recId))){
-        /* same substantive record, whatever its volatile fields say */
-        setRecMeta(recId, { s: ch, a: ch, at: (at != null ? at : rm.at) });
-        return;
-      }
-      if(recId.indexOf("ctx:") === 0 && !paathById(recId.slice(4))){
-        /* a Paath record whose Paath this device's list does not name
-           yet: hold it — the list record lands it when it arrives */
-        heldCtx[recId] = { data: data, at: at };
-        return;
-      }
-      if(fromGet && rm.s == null && rm.a == null && rm.at == null){
-        /* bootstrap (first contact for this record): the only place
-           heuristics run */
-        if(recId === "settings"){ applyRecord(recId, data, at); return; }
-        if(recId === "paaths"){
-          var local = localRecord("paaths");
-          if(listCustomised(local && local.list) && !listCustomised(data.list)) return;   /* local list wins; the push carries it */
-          applyRecord(recId, data, at); return;
-        }
-        if(ctxReadingTs(data) >= ctxReadingTs(localRecord(recId))){ applyRecord(recId, data, at); return; }
-        return;   /* local record is newer reading: the push carries it */
-      }
-      if(fromGet && at != null && rm.at != null && at < rm.at) return;
-      applyRecord(recId, data, at);
-    }
-    function handleDoc(data, fromGet){
-      if(!data){
-        /* the doc itself is gone: forget synced fingerprints so the
-           records re-push */
-        var recs = meta().recs || {};
-        Object.keys(recs).forEach(function(recId){ if(recs[recId].s != null) setRecMeta(recId, { s: null }); });
-        maybePush();
-        return;
-      }
-      var seen = {};
-      Object.keys(data).forEach(function(f){
-        if(f.indexOf("rec_") !== 0 || /_(at|by)$/.test(f)) return;
-        var recId = recIdOfField(f);
-        seen[recId] = 1;
-        handleRecord(recId, data[f], atOf(data[f + "_at"]), data[f + "_by"] || null, fromGet);
+
+    /* ---------- the merge: one snapshot handler for everything.
+       Own writes (writer id = this device) are adopted, never
+       applied. For every other record the server stamp decides —
+       with ONE content rule for Paath records: a record is applied
+       only when its reading time is at least the local record's;
+       an older-reading record never overwrites a newer local
+       reading, the local one is (re)published instead. The list is
+       protected the same way at first contact only: a customised
+       local list is never replaced by a factory-default cloud list.
+       ---------------------------------------------------------- */
+    function handleDoc(doc){
+      if(!doc || !doc.exists){ schedulePush(); return; }   /* new account: publish what this device has */
+      var d = doc.data() || {};
+      recIdsLocal().forEach(function(recId){
+        if(d[fieldOf(recId)] == null && seenMap()[recId] != null) forgetSent(recId);
       });
-      /* a record field that vanished from the doc re-pushes */
-      var recs2 = meta().recs || {};
-      Object.keys(recs2).forEach(function(recId){ if(!seen[recId] && recs2[recId].s != null) setRecMeta(recId, { s: null }); });
-      maybePush();
+      var ids = ["paaths", "settings"];
+      Object.keys(d).forEach(function(f){
+        if(f.indexOf("rec_ctx_") !== 0) return;
+        var base = f.replace(/_(at|by)$/, "");
+        if(base !== f) return;
+        var recId = recIdOfField(base);
+        if(ids.indexOf(recId) < 0) ids.push(recId);
+      });
+      ids.forEach(function(recId){
+        var f = fieldOf(recId);
+        var raw = d[f];
+        if(raw == null) return;
+        var at = atOf(d[f + "_at"]);
+        if(at == null) return;
+        if(d[f + "_by"] === CID){ markSeen(recId, at); markSent(recId, raw); return; }
+        var data = null;
+        try{ data = JSON.parse(raw); }catch(e){ return; }
+        if(!data) return;
+        var first = seenMap()[recId] == null;
+        if(!first && at <= (seenMap()[recId] || 0)) return;
+        if(recId.indexOf("ctx:") === 0){
+          var local = localRecord(recId);
+          if(local && (local.place || local.glf) && ctxTs(local) > ctxTs(data)){
+            markSeen(recId, at); forgetSent(recId); schedulePush(); return;
+          }
+          var known = {}; paathData.list.forEach(function(p){ known[p.id] = 1; });
+          if(!known[recId.slice(4)]){ markSeen(recId, at); return; }   /* a Paath this device's list does not carry */
+        }
+        if(first && recId === "paaths" && listCustomised(localRecord("paaths")) && !listCustomised(data)){
+          markSeen(recId, at); forgetSent(recId); schedulePush(); return;
+        }
+        applyRecord(recId, data, at);
+      });
+      schedulePush();
     }
 
-    /* Firebase's own guidance: popups are unreliable in mobile
-       browsers — touch devices go redirect-first, desktop keeps
-       popup-first with a redirect fallback. */
-    var isTouch = false;
-    try{ isTouch = (window.matchMedia && matchMedia("(pointer: coarse)").matches) || /Android|iPhone|iPad/i.test(navigator.userAgent || ""); }catch(e){}
+    /* ---------- sign-in ---------- */
     btn.addEventListener("click", function(){
-      if(user){ var so = auth.signOut(); if(so && so.catch) so.catch(function(e){ syncErr("signout", e); }); return; }
-      var prov = new firebase.auth.GoogleAuthProvider();
-      var viaRedirect = function(e1){
-        syncErr("popup", e1);
-        setNote("Sign-in didn't complete — trying another way…");
-        auth.signInWithRedirect(prov).catch(function(e2){ setNote("Sign-in didn't complete (" + syncErr("redirect-signin", e2) + ") — tap to try again. Everything still saves on this device."); });
-      };
-      if(isTouch){
-        auth.signInWithRedirect(prov).catch(function(e1){
-          syncErr("redirect-signin", e1);
-          setNote("Sign-in didn't complete — trying another way…");
-          auth.signInWithPopup(prov).catch(function(e2){ setNote("Sign-in didn't complete (" + syncErr("popup", e2) + ") — tap to try again. Everything still saves on this device."); });
-        });
-      } else {
-        auth.signInWithPopup(prov).catch(viaRedirect);
-      }
+      if(user){ auth.signOut(); return; }
+      var provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      auth.signInWithPopup(provider).catch(function(e){
+        if(e && (e.code === "auth/popup-blocked" || e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) auth.signInWithRedirect(provider).catch(function(e2){ failNote("sign-in", e2); });
+        else failNote("sign-in", e);
+      });
     });
-    /* a redirect sign-in lands back here: surface its result's error
-       instead of letting it vanish (the popup flow never uses this) */
-    if(auth.getRedirectResult){
-      auth.getRedirectResult().catch(function(e){
-        setNote("Sign-in didn't complete (" + syncErr("redirect-result", e) + ") — tap to try again. Everything still saves on this device.");
-      });
-    }
+    if(auth.getRedirectResult) auth.getRedirectResult().catch(function(e){ if(e) failNote("sign-in", e); });
+
+    /* one listener from sign-in on: its first delivery IS the
+       bootstrap (Firestore always opens with a full snapshot of the
+       document), and every later write from any device arrives the
+       same way. No polling, no separate pull. */
     auth.onAuthStateChanged(function(u){
-      user = u;
-      syncReady = false;
-      if(u){
-        var mu = meta();
-        if(mu.lastUid !== u.uid){
-          /* a different account starts with clean record baselines:
-             the previous account's say nothing about this doc. The
-             writer id stays — it names this device, not the user.
-             Local data itself is never touched by a sign-in. */
-          setMeta({ lastUid: u.uid, recs: {} });
-        }
-      }
-      if(unsub){ unsub(); unsub = null; }
-      clearTimeout(retryTimer);
-      if(!u){ paint(); return; }
+      user = u || null;
+      if(user && meta().uid !== user.uid) setMeta({ uid: user.uid, sent: {}, seen: {}, knownCtx: [] });
       paint();
-      setNote("Signed in — syncing…");
-      var myUid = u.uid;
-      var ref = db.collection("progress").doc(u.uid);
-      /* live pull is set up on its own, not inside the initial get():
-         a failed first read must not cost the whole session its
-         subscription */
-      var subscribe = function(){
-        if(unsub) return;
-        unsub = ref.onSnapshot(function(snap2){
-          if(!user || user.uid !== myUid) return;
-          var md = snap2.metadata || {};
-          if(md.hasPendingWrites || md.fromCache) return;   /* local echoes and cache reads are not remote commits */
-          handleDoc(snap2.exists ? snap2.data() : null, false);
-        }, function(e){
-          /* a dead listener used to stay "subscribed" forever (unsub
-             non-null), so the session never retried it. Name the
-             error, free the slot, and re-subscribe once shortly. */
-          unsub = null;
-          if(user) failNote("listen", e);
-          setTimeout(function(){ if(user && user.uid === myUid) subscribe(); }, 15000);
-        });
-      };
-      ref.get().then(function(snap){
-        if(!user || user.uid !== myUid) return;
-        var md = snap.metadata || {};
-        if(md.fromCache){
-          /* a cache-only first read decides nothing; the live
-             subscription delivers the server's word */
-          syncReady = true;
-          subscribe();
-          return;
-        }
-        if(snap.exists) handleDoc(snap.data(), true);
-        syncReady = true;
-        maybePush();
-        if(user && !applying) syncedNote();
-        subscribe();
-      }).catch(function(e){
-        if(!user || user.uid !== myUid) return;
-        /* a failed first read says so — and live pull still starts,
-           so the session is not silently deaf to the other device */
-        syncReady = true;
-        setNote("Couldn't reach sync (" + syncErr("get", e) + ") — your reading is safe on this device and will retry.");
-        subscribe();
-        maybePush();
-      });
+      if(unsub){ try{ unsub(); }catch(e){} unsub = null; }
+      if(!user) return;
+      setNote("Syncing…");
+      unsub = db.collection("progress").doc(user.uid).onSnapshot(handleDoc, function(e){ failNote("listen", e); });
+      schedulePush();
     });
   })();
 

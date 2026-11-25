@@ -287,7 +287,7 @@ this derivation.
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
 | `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world |
 | `gurbani-reader:mode-v1` | Which world the reader left in: `free` (Default reading) or `paath` |
-| `gurbani-reader:sync-v1` | Cloud-sync meta (never itself synced): this device's writer id (`cid`), the last account seen, and per-record baselines — each synced record's last pushed / last applied canonical form + last seen server stamp |
+| `gurbani-reader:sync-v1` | Cloud-sync meta (never itself synced): this device's writer id (`cid`), the account the sync state belongs to (`uid`), and per record only the exact JSON last sent or applied (`sent`) + the newest server stamp applied (`seen`) |
 
 Font sizes: `[20, 22, 24, 26, 29, 32, 36, 40, 44, 48]px`, default
 index 2 (24px). New sizes are only ever **appended** — a saved index
@@ -786,65 +786,70 @@ snapshot); in free reading the record is the parked snapshot,
 unchanged — free reading can never dirty a Paath record.
 
 Each record carries its own server timestamp (`<field>_at`, a
-Firestore `serverTimestamp` — the **only** ordering clock; client
-clocks never decide a win) and its writer's device id (`<field>_by`
-— a device never applies its own writes). A record's identity is
-canonical (volatile `ts`/`y`/`t` in place records and `ts` in focus
-records stripped), and per-record baselines (last pushed / last
-applied canonical form + last seen server stamp) persist in
-`sync-v1`, so decisions survive reloads. Changed records batch into
-one merge write. Pushes fire **on the save itself**: place, focus and
-Paath-list saves announce a `reader-dirty` event, and the sync layer
-pushes within ~300 ms (bursts coalesced); a completed push drains —
-anything saved during its flight pushes immediately after — and
-returning to the tab (visible / focus) flushes whatever is still
-dirty. The 2.5 s poll remains only as a backstop trigger; it stamps
-nothing, so boot
-and restore writes can never mint a "new state". That discipline is
-what makes the old refresh loop impossible by construction: there
-is no client stamp to advance, no fingerprint for a boot write to
-falsify, and no reload in the apply path at all.
+Firestore `serverTimestamp`) and its writer's device id
+(`<field>_by` — a device never applies its own writes; it adopts
+the stamp and moves on).
 
-Applying a record is **in place**: it never reloads the page, never
-closes an open sheet or popup, and never moves the reader. A Paath
-record updates that Paath's stored resume point; if it is this
-device's current Paath and playback is paused, the live records
-move underneath the reader (the view does not — the Kindle rule);
-while playback is running, only the stored point updates and this
-session's own next save supersedes. A list record that drops a
-Paath removes its local snapshot and repairs `current` if needed;
-a Paath record for an id the list does not name is held, inert,
-until a list names it. Settings records re-apply the settings
-underneath whatever is on screen.
+The protocol is the standard Firestore shape, deliberately boring
+(the first per-record build carried a custom canonical-hash /
+baseline merge engine; it failed in the field in ways that were
+hard to observe, and was replaced wholesale on 2026-11-25 — do not
+reintroduce it). **One snapshot listener**, attached at sign-in,
+is the only reader: its first delivery IS the sign-in merge (there
+is no separate pull and no read polling), and every later remote
+write arrives the same way. **Pushes fire on the save itself**:
+place, focus and Paath-list saves announce a `reader-dirty` event
+and the sync layer pushes within ~300 ms (bursts coalesced into
+one merge write); a 2.5 s reconcile interval plus visible / focus /
+pagehide flushes catch anything else, and every push path is
+guarded by a per-record "last sent" string, so an unchanged record
+is never rewritten and a quiet app writes nothing. Per record the
+device remembers only two things in `sync-v1`: the exact JSON last
+sent or applied, and the newest server stamp applied. That state
+is scoped to the account — a different uid signing in resets it
+(the device id persists). A record that vanishes from the document
+is republished by the reconcile. Removing a Paath from the list
+deletes its `rec_ctx_*` fields in the same merge write.
 
-Sign-in merges **per record** — it never erases local data and
-never reloads. With no baseline for a record, bootstrap decides:
-Paath records by their content's own reading time — a position's
-`ts` is when that position was SET, never when it was re-saved:
-opening the app, landing, resizing or settling re-saves a place
-without minting a new reading time (same rule for the focus
-record), so a stale line on a freshly opened device can never
-out-rank a genuinely newer reading from another device. The
-Library's Paath label/preview read the live records only while
+Ordering is the server stamp's — with **one content rule for Paath
+records**: a record is applied only when its reading time is at
+least the local record's. A position's `ts` is when that position
+was SET, never when it was re-saved: opening the app, landing,
+resizing or settling re-saves a place without minting a new
+reading time (same rule for the focus record), so a stale line on
+a freshly opened device can never out-rank a genuinely newer
+reading from another device; when the local reading is the newer
+one, the incoming record is adopted-not-applied and the local
+record is republished instead. The list gets the same protection
+at first contact only (a customised local list is never replaced
+by a factory-default cloud list); settings take the cloud's word.
+The Library's Paath label/preview read the live records only while
 actually in that Paath; in free reading they read the synced
 snapshot. While audio plays, the focus is saved continuously
-(throttled), and a real pause saves place as well as focus. The list by
-customised-beats-default (a renamed list beats a default-named
-one), settings from the cloud. After bootstrap, only server order
-speaks. Snapshots with pending local writes or cache origin are
-ignored (they are echoes, not remote commits). A failed push or
-pull says so in the Account note **with the Firebase error's short
-code** ("Couldn't sync (permission-denied) — your reading is safe
-on this device and will retry."), the full error in the console
-under `[reader-sync]`, and a failed push retries with bounded
-backoff. A dead listener frees its slot and re-subscribes once
-shortly. Sign-in follows Firebase's platform guidance: touch
-devices use `signInWithRedirect` first, desktop popup-first with a
-redirect fallback, and a redirect result's error is surfaced in
-the note. Signed out, SDK blocked, or offline: local-only, exactly
-as before. The legacy whole-state `readerJson` field is no longer
-written or read; old builds keep their frozen copy and never touch
-the record fields.
+(throttled), and a real pause saves place as well as focus.
+
+Applying a record is **in place**: it never reloads the page,
+never closes an open sheet or popup, and never moves the reader.
+A Paath record updates that Paath's stored resume point; if it is
+this device's current Paath and playback is paused, the live
+records move underneath the reader (the view does not — the
+Kindle rule); while playback is running, only the stored point
+updates and this session's own next save supersedes. A list record
+that drops a Paath removes its local snapshot and repairs
+`current` if needed; a Paath record for an id the list does not
+name is ignored. Settings records re-apply the settings underneath
+whatever is on screen.
+
+A failed push or listen says so in the Account note **with the
+Firebase error's short code** ("Couldn't sync (permission-denied)
+— your reading is safe on this device and will retry."), the full
+error in the console under `[reader-sync]`; a failed push retries
+after 20 s and on the next reconcile. Sign-in is popup-first with
+a redirect fallback when the popup is blocked or closed, and a
+redirect result's error surfaces in the note. Signed out, SDK
+blocked, or offline: local-only, exactly as before. The legacy
+whole-state `readerJson` field is no longer written or read; old
+builds keep their frozen copy and never touch the record fields.
 
 ## 10. Design language
 
