@@ -248,7 +248,7 @@
   .ang-pop.open .ang-pop-card{opacity:1;transform:none}
   .ang-pop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
   .ang-pop-head h2{font-size:16.5px;margin:0;font-weight:700}
-  .ang-pop-cur{font-size:13px;color:var(--muted);margin:0 0 11px;font-family:"Noto Sans Gurmukhi",sans-serif}
+  .ang-pop-cur{font-size:13px;color:var(--muted);margin:0 0 11px;font-family:"Noto Sans Gurmukhi",sans-serif;white-space:pre-line}
   .step-row{display:flex;gap:8px;margin-top:10px}
   .step-btn{
     flex:1;border:1px solid var(--hairline);background:var(--paper);min-height:38px;
@@ -272,6 +272,9 @@
   .paath-row.current{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
   .paath-dot{width:8px;height:8px;border-radius:50%;background:var(--hairline);flex:none}
   .paath-row.current .paath-dot{background:var(--accent)}
+  .paath-row.paath-free{border:none;border-bottom:1px solid var(--hairline);border-radius:0;background:transparent;margin:0 0 10px;padding:8px 12px 12px}
+  .paath-row.paath-free.current{box-shadow:none}
+  .paath-row.paath-free.current .paath-name{color:var(--accent-strong)}
   .paath-text{flex:1;min-width:0;display:flex;flex-direction:column}
   .paath-name{font-size:14.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .paath-sub{font-size:12px;color:var(--muted);margin-top:1px;font-family:"Noto Sans Gurmukhi",sans-serif}
@@ -382,14 +385,38 @@
     .topbar-in{max-width:700px}
     .pager{max-width:700px}
     .sheet-in{max-width:700px}
-  }
-  /* wide screens: the Menu is a centred panel, not a full-width
-     curtain, and the quick cluster anchors to the reading column
-     (its right edge + a 16px gap) instead of the viewport edge */
-  @media (min-width:1024px){
+    /* tablet: the Menu is a centred panel, not a full-width curtain */
     .sheet{left:50%;right:auto;width:min(700px,100%);transform:translate(-50%,-106%);border-left:1px solid var(--hairline);border-right:1px solid var(--hairline)}
     .sheet.open{transform:translate(-50%,0)}
-    .quick{right:calc(50% - 412px)}
+  }
+  /* desktop: the reading measure widens (800px) and the Menu becomes a
+     compact panel in the top-right corner — desktop intent, not the
+     phone sheet scaled up. The quick cluster and the Paath popup anchor
+     to the reading column's right edge; toasts sit bottom-right, clear
+     of the centred player. */
+  @media (min-width:1024px){
+    main{max-width:800px}
+    .topbar-in{max-width:800px}
+    .pager{max-width:800px}
+    .sheet{left:auto;right:20px;top:64px;width:400px;max-height:calc(100dvh - 84px);
+      transform:translateY(-10px);opacity:0;pointer-events:none;
+      border:1px solid var(--hairline);border-radius:22px;
+      transition:transform .22s cubic-bezier(.32,.72,.24,1),opacity .22s}
+    .sheet.open{transform:none;opacity:1;pointer-events:auto}
+    .sheet-in{max-width:none}
+    .quick{right:calc(50% - 462px)}
+    #angPop .ang-pop-card{max-width:560px}
+    #paathPop{place-items:end end;padding:14px calc(50% - 462px) 104px 14px}
+    #paathPop .ang-pop-card{max-width:360px}
+    .pv-toast{left:auto;right:20px;bottom:20px;transform:translateY(10px)}
+    .pv-toast.show{transform:none}
+  }
+  @media (min-width:1600px){
+    main{max-width:840px}
+    .topbar-in{max-width:840px}
+    .pager{max-width:840px}
+    .quick{right:calc(50% - 482px)}
+    #paathPop{padding-right:calc(50% - 482px)}
   }
   .book-head{text-align:center;padding:34px 0 10px}
   .ornament{color:var(--accent);font-size:14px;letter-spacing:.55em;text-indent:.55em;user-select:none;opacity:.8}
@@ -516,6 +543,8 @@
     padding:7px 14px 8px;
   }
   @media (min-width:761px){ .player-in{max-width:700px} }
+  @media (min-width:1024px){ .player-in{max-width:800px} }
+  @media (min-width:1600px){ .player-in{max-width:840px} }
   .seek-row{display:flex;align-items:center;gap:10px}
   .time{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
   input[type="range"]{
@@ -655,7 +684,7 @@
     <div class="menu-row">
       <div>
         <span class="menu-label">Layout</span>
-        <p class="menu-note">Paragraphs flow like print, as on readgurbani.com. Saved per screen size, on this device only.</p>
+        <p class="menu-note">Flows like print.</p>
       </div>
       <span class="menu-spacer"></span>
       <div class="seg" id="layoutSeg" role="group" aria-label="Layout">
@@ -666,7 +695,6 @@
     <div class="menu-row" id="paraHdrRow">
       <div>
         <span class="menu-label">Paragraph headers</span>
-        <p class="menu-note">Section lines (raag / mahala) inside paragraphs.</p>
       </div>
       <span class="menu-spacer"></span>
       <div class="seg" id="paraHdrSeg" role="group" aria-label="Paragraph headers">
@@ -678,7 +706,6 @@
     <div class="menu-row">
       <div>
         <span class="menu-label">Follow-along highlight</span>
-        <p class="menu-note">Moves with the audio.</p>
       </div>
       <span class="menu-spacer"></span>
       <div class="seg" id="hlSeg" role="group" aria-label="Follow-along highlight">
@@ -690,7 +717,7 @@
     <div class="menu-row">
       <div>
         <span class="menu-label">Advanced mode</span>
-        <p class="menu-note">Unlocks playback speeds up to 3×.</p>
+        <p class="menu-note">Speeds up to 4×.</p>
       </div>
       <span class="menu-spacer"></span>
       <div class="seg" id="advSeg" role="group" aria-label="Advanced mode">
@@ -838,7 +865,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><text x="12" y="16.5" text-anchor="middle" font-size="8.5" fill="currentColor" stroke="none" font-weight="700">5</text></svg>
       </button>
       <button class="skip-btn auto-btn active" id="autoScrollBtn" aria-label="Auto-scroll with audio" aria-pressed="true" title="Auto-scroll — follow the audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 10h13"/><path d="m8.5 15.5 3.5 3.5 3.5-3.5"/></svg></button>
-      <div class="now-playing" id="nowPlaying">ਜਪੁਜੀ ਸਾਹਿਬ<small>Tap a word to listen from there</small></div>
+      <div class="now-playing" id="nowPlaying">ਜਪੁਜੀ ਸਾਹਿਬ<small>Double-tap a word to listen from there</small></div>
     </div>
   </div>
 </div>
@@ -994,15 +1021,22 @@
   try{ glf = JSON.parse(localStorage.getItem(FOCUS_KEY) || "null"); }catch(e){ glf = null; }
   function previewText(text){
     if(!text) return null;
-    var toks = String(text).split(/\s+/), words = [];
+    var toks = String(text).split(/\s+/), out = [], words = 0;
     for(var i=0;i<toks.length;i++){
       var w = toks[i];
-      if(!w || !/[\u0A01-\u0A5E\u0A70-\u0A76]/.test(w)) continue; /* markers (॥੧॥, ;) carry no letters */
-      words.push(w.replace(/[;,.]+$/, ""));
-      if(words.length >= 6) break;
+      if(!w) continue;
+      if(/^॥([੦-੯]+॥)?$/.test(w)){ if(words) out.push(w); continue; } /* the dandi (॥) belongs to the pankti — never skip it */
+      if(!/[\u0A01-\u0A5E\u0A70-\u0A76]/.test(w)) continue; /* other markers (;) carry no letters */
+      out.push(w.replace(/[;,.]+$/, ""));
+      words++;
+      if(words >= 6){
+        var nx = toks[i + 1];
+        if(nx && /^॥([੦-੯]+॥)?$/.test(nx)) out.push(nx);
+        break;
+      }
     }
-    if(!words.length) return null;
-    var s = words.join(" ");
+    if(!words) return null;
+    var s = out.join(" ");
     if(s.length > 44) s = s.slice(0, 44).replace(/\s+\S*$/, "");
     return s + " …";
   }
@@ -1193,6 +1227,10 @@
      the audio clock alone and popped up at every line change). */
   function updateRecenter(){
     var btn = $("recenterBtn"); if(!btn) return;
+    /* the assign (bookmark) button exists only where assigning means
+       something: an Ang pankti can become a Paath's place; a Bani is
+       Nitnem and can never be saved into a Sehaj Paath */
+    var sb = $("saveBtn"); if(sb) sb.style.display = state.mode === "bani" ? "none" : "";
     var show = false, up = false, arrow = true;
     var fg = effFocus();
     if(fg && !autoScrolling && !audioSwitching && (state.mode === "ang" || state.mode === "bani") &&
@@ -1299,10 +1337,13 @@
     var assign = paathPopMode === "assign";
     $("paathPopTitle").textContent = assign ? "Set a Paath to this pankti" : "Sehaj Paath";
     var curRec = !detour ? paathById(paathData.current) : null;
+    var ctxLine = detour
+      ? (state.mode === "bani" ? "You are reading " + state.titlePa + " (Nitnem) — not in a Paath."
+                               : "You are in Default — just reading, not in a Paath.")
+      : "Current · " + (curRec ? curRec.name : "");
     $("paathPopCur").textContent = assign
-      ? "You stay right here — the chosen Paath will resume at the pankti you are on."
-      : (detour ? "You are in Default — just reading, not in a Paath."
-                : "Current · " + (curRec ? curRec.name : (paathData.defName || "Default")));
+      ? ctxLine + "\nYou stay right here — the chosen Paath will resume at the pankti you are on."
+      : ctxLine;
     var html = "";
     var row = function(key, name, sub, pv, isCur){
       html += '<div class="paath-row' + (isCur ? " current" : "") + '" data-pop-row="' + key + '">';
@@ -1313,10 +1354,8 @@
       html += '</div>';
     };
     if(!assign) row("free", "Default", "Just reading · not a Paath", null, !!detour);
-    var ids = [null].concat(paathData.list.map(function(x){ return x.id; }));
-    ids.forEach(function(id){
-      var name = id ? paathById(id).name : (paathData.defName || "Default");
-      row(id || "default", name, paathPlaceLabel(id), paathPreview(id), !assign && !detour && paathData.current === id);
+    paathData.list.forEach(function(pt){
+      row(pt.id, pt.name, paathPlaceLabel(pt.id), paathPreview(pt.id), !assign && !detour && paathData.current === pt.id);
     });
     $("paathPopList").innerHTML = html;
   }
@@ -1327,7 +1366,7 @@
     closeSheet(); closeAngPop(); closePaathPop();
     if(detour) return;
     try{ savePlace(); }catch(e){}
-    writeCtx(paathData.current, { place: readPlace(), glf: glf });
+    snapshotCurrentPaath();
     detour = { resumed: true };
     var ds = readDetourStore();
     detourGlf = ds && ds.glf ? ds.glf : (ds && ds.place && ds.place.fl ? { mode: ds.place.mode, item: ds.place.fl.item, idx: ds.place.fl.idx, start: ds.place.fl.start, t: ds.place.t || 0, ts: Date.now(), pv: null } : null);
@@ -1374,13 +1413,14 @@
     var f = assignRec || currentFocusRec();
     assignRec = null;
     if(!f){ toastMsg("Open a pankti first, then set it"); return; }
+    if(f.mode === "bani"){ closePaathPop(); toastMsg("Sehaj Paath tracks Ang reading — this is Nitnem"); return; }
     var pv = null;
     try{ pv = previewText(lineTextAt(f.item, f.idx)); }catch(e){}
     var frec = { mode: f.mode, item: f.item, idx: f.idx, start: f.start, t: f.t, ts: Date.now(), pv: pv };
     var place = { mode: f.mode, id: f.mode === "bani" ? f.item : null, ang: f.mode === "ang" ? f.item : null,
       y: 0, t: f.t, ts: Date.now(), fl: { item: f.item, idx: f.idx, start: f.start, src: "view" } };
-    var rec = id ? paathById(id) : null;
-    var name = rec ? rec.name : (paathData.defName || "Default");
+    var rec = paathById(id);
+    var name = rec ? rec.name : "";
     if(!detour && paathData.current === id){
       glf = frec; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
       try{ localStorage.setItem(LAST_KEY, JSON.stringify(place)); }catch(e){}
@@ -1398,10 +1438,10 @@
   $("paathPopList").addEventListener("click", function(e){
     var r = e.target.closest("[data-pop-row]"); if(!r) return;
     var key = r.getAttribute("data-pop-row");
-    if(paathPopMode === "assign"){ assignFocusToPaath(key === "default" ? null : key); return; }
+    if(paathPopMode === "assign"){ assignFocusToPaath(key); return; }
     closePaathPop();
     if(key === "free"){ enterFree(); return; }
-    var id = key === "default" ? null : key;
+    var id = key;
     if(!detour && paathData.current === id) return;   /* already there */
     switchPaath(id);
   });
@@ -1585,9 +1625,58 @@
   paathData.list.forEach(function(x){ var mm = /^Sehaj Paath (\d+)$/.exec(x.name); if(mm) x.name = "Sehaj Paath " + paNum(parseInt(mm[1], 10)); });
   savePaathData();
   function paathById(id){ for(var i=0;i<paathData.list.length;i++) if(paathData.list[i].id === id) return paathData.list[i]; return null; }
-  function ctxKey(id){ return "gurbani-reader:ctx-" + (id || "default"); }
+  function ctxKey(id){ return "gurbani-reader:ctx-" + id; }
   function readCtx(id){ try{ return JSON.parse(localStorage.getItem(ctxKey(id)) || "null"); }catch(e){ return null; } }
   function writeCtx(id, snap){ try{ localStorage.setItem(ctxKey(id), JSON.stringify(snap)); }catch(e){} }
+  /* snapshot the live records into the current Paath — Ang state only:
+     a Bani (Nitnem) place or focus NEVER enters a Paath snapshot; the
+     snapshot keeps whatever Ang state it already held instead */
+  function snapshotCurrentPaath(){
+    if(!paathData.current) return;
+    var lp = readPlace(), prev = readCtx(paathData.current) || {}, snap = {};
+    snap.place = (lp && lp.mode === "bani") ? (prev.place || null) : lp;
+    snap.glf = (glf && glf.mode === "bani") ? (prev.glf || null) : glf;
+    writeCtx(paathData.current, snap);
+  }
+  /* Migration — there is no "Default" Paath. The first tracker is
+     Sehaj Paath ੧ like any other; "Default" names only the free
+     reading mode. Older builds kept a nameless tracker (id null,
+     snapshot at ctx-default, display name in defName) alongside the
+     list: fold its journey into the list — into Sehaj Paath ੧ when
+     that tracker is untouched, otherwise into a new tracker with the
+     next free numeral — scrub any Bani state out of every Paath
+     snapshot, and make current a real tracker id. */
+  (function migratePaaths(){
+    var started = function(s){ return !!(s && ((s.place && (s.place.ang > 1 || s.place.t > 0)) || s.glf)); };
+    var defSnap = null;
+    try{ defSnap = JSON.parse(localStorage.getItem("gurbani-reader:ctx-default") || "null"); }catch(e){}
+    var defName = (paathData.defName && paathData.defName !== "Default") ? paathData.defName : null;
+    var defMovedTo = null;
+    if(defSnap && started(defSnap)){
+      var p1 = paathById("p1");
+      if(p1 && !started(readCtx("p1"))){
+        writeCtx("p1", defSnap); if(defName) p1.name = defName; defMovedTo = "p1";
+      } else {
+        var n = paathData.list.length + 1, names = {};
+        paathData.list.forEach(function(x){ names[x.name] = true; });
+        while(names["Sehaj Paath " + paNum(n)]) n++;
+        var nid = "p" + Date.now().toString(36);
+        paathData.list.push({ id: nid, name: defName || ("Sehaj Paath " + paNum(n)) });
+        writeCtx(nid, defSnap); defMovedTo = nid;
+      }
+    }
+    try{ localStorage.removeItem("gurbani-reader:ctx-default"); }catch(e){}
+    if(!paathData.current) paathData.current = defMovedTo || (paathData.list.length ? paathData.list[0].id : null);
+    if(paathData.current && !paathById(paathData.current)) paathData.current = paathData.list.length ? paathData.list[0].id : null;
+    delete paathData.defName;
+    paathData.list.forEach(function(pt){
+      var s = readCtx(pt.id); if(!s) return; var dirty = false;
+      if(s.place && s.place.mode === "bani"){ delete s.place; dirty = true; }
+      if(s.glf && s.glf.mode === "bani"){ delete s.glf; dirty = true; }
+      if(dirty) writeCtx(pt.id, s);
+    });
+    savePaathData();
+  })();
   var paathsOpen = false;
   try{ paathsOpen = localStorage.getItem("gurbani-reader:paaths-open") === "1"; }catch(e){}
   function setPaathsOpen(open){
@@ -1604,10 +1693,9 @@
   function paathPlaceLabel(id){
     var place = (paathData.current === id) ? readPlace() : (readCtx(id) || {}).place;
     if(!place) return "Not started";
-    if(place.mode === "bani"){ var bb = baniById((place.fl && place.fl.item) || place.id); return bb ? bb.pa : "ਨਿਤਨੇਮ"; }
+    if(place.mode === "bani") return "Not started";   /* a Paath tracks Ang reading only — a Bani place is never its label */
     var a = (place.fl && place.fl.item) || place.ang;
     if(!a) return "Not started";
-    if(!id) return "ਅੰਗ " + paNum(a);
     if(paathData.current === id) return "ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
     return "Resume at ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
   }
@@ -1630,7 +1718,7 @@
   function buildPaathLists(){
     var notes = document.querySelectorAll("[data-paath-note]");
     var cur = paathData.current ? paathById(paathData.current) : null;
-    for(var n=0;n<notes.length;n++) notes[n].textContent = "Current · " + (cur ? cur.name : (paathData.defName || "Default"));
+    for(var n=0;n<notes.length;n++) notes[n].textContent = detour ? "Default — just reading · not in a Paath" : ("Current · " + (cur ? cur.name : ""));
     var lists = document.querySelectorAll("[data-paath-list]");
     for(var c=0;c<lists.length;c++){
       var html = "";
@@ -1638,7 +1726,7 @@
         var isCur = paathData.current === id;
         html += '<div class="paath-row' + (isCur ? " current" : "") + '" data-paath-row="' + (id || "") + '">';
         html += '<span class="paath-dot" aria-hidden="true"></span>';
-        if(paathEditing !== null && paathEditing === (id || "@default")){
+        if(paathEditing !== null && paathEditing === id){
           html += '<input class="paath-input" data-paath-input value="' + esc(name) + '" aria-label="Paath name" />';
           html += '<button class="paath-edit" data-paath-save aria-label="Save name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></button>';
         } else {
@@ -1648,7 +1736,7 @@
         }
         html += '</div>';
       };
-      row(null, paathData.defName || "Default");
+      html += '<div class="paath-row paath-free' + (detour ? " current" : "") + '" data-paath-free><span class="paath-text"><span class="paath-name">Default</span><span class="paath-sub">Just reading · not a Paath</span></span></div>';
       paathData.list.forEach(function(pt){ row(pt.id, pt.name); });
       lists[c].innerHTML = html;
     }
@@ -1678,7 +1766,7 @@
       return;
     }
     try{ savePlace(); }catch(e){}
-    writeCtx(paathData.current, { place: readPlace(), glf: glf });
+    snapshotCurrentPaath();
     paathData.current = id; savePaathData(); setMode("paath");
     var snap = readCtx(id);
     if(snap && snap.place){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(snap.place)); }catch(e){} }
@@ -1704,9 +1792,12 @@
     if(inp){
       var v = inp.value.replace(/\s+/g, " ").trim();
       if(v){
-        if(paathEditing === "@default") paathData.defName = v;
-        else { var pt = paathById(paathEditing); if(pt) pt.name = v; }
-        savePaathData();
+        var dup = null;
+        paathData.list.forEach(function(x){ if(x.id !== paathEditing && x.name === v) dup = x; });
+        if(v.toLowerCase() === "default"){ toastMsg("\u201CDefault\u201D is the free-reading mode \u2014 a Paath can\u2019t take that name"); }
+        else if(v.length > 40){ toastMsg("That name is too long"); }
+        else if(dup){ toastMsg("Another Sehaj Paath already has that name"); }
+        else { var pt = paathById(paathEditing); if(pt) pt.name = v; savePaathData(); }
       }
     }
     paathEditing = null;
@@ -1719,9 +1810,10 @@
       if(saveBtn){ commitPaathRename(saveBtn.closest("[data-paath-list]")); return; }
       var editBtn = e.target.closest("[data-paath-edit]");
       var rowEl = e.target.closest("[data-paath-row]");
-      if(editBtn && rowEl){ paathEditing = rowEl.getAttribute("data-paath-row") || "@default"; buildPaathLists(); return; }
+      if(editBtn && rowEl){ paathEditing = rowEl.getAttribute("data-paath-row"); buildPaathLists(); return; }
       if(e.target.closest("[data-paath-input]")) return;
-      if(rowEl) switchPaath(rowEl.getAttribute("data-paath-row") || null);
+      if(e.target.closest("[data-paath-free]")){ enterFree(); return; }
+      if(rowEl) switchPaath(rowEl.getAttribute("data-paath-row"));
     });
     paathLists[pl2].addEventListener("keydown", function(e){
       if(e.key === "Enter" && e.target.closest("[data-paath-input]")){ e.preventDefault(); commitPaathRename(e.target); }
@@ -1987,7 +2079,7 @@
     if(na) na.addEventListener("click", function(){ loadAng(state.ang+1); });
 
     brandSub.textContent = state.mode === "ang" ? "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ" : "ਨਿਤਨੇਮ"; resetView(); updatePager(); updateRecenter();
-    nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Tap a word to listen from there</small>";
+    nowPlaying.innerHTML = esc(opts.titlePa) + "<small>Double-tap a word to listen from there</small>";
     markActiveBani();
     if(pendingRestore){
       var pr = pendingRestore; pendingRestore = null;
@@ -2181,6 +2273,19 @@
   /* ---------- loading ---------- */
   function loadBani(b, autoplay){
     if(!b) return;
+    if(!detour){
+      /* entering a Bani leaves the Paath world: the Paath is snapshotted
+         (Ang state only) and the Bani opens in Default free reading,
+         where its own resume lives — Nitnem is never tracked as a
+         Sehaj Paath */
+      try{ savePlace(); }catch(e){}
+      snapshotCurrentPaath();
+      detour = { resumed: true };
+      var dsx = readDetourStore();
+      detourGlf = dsx && dsx.glf ? dsx.glf : (dsx && dsx.place && dsx.place.fl ? { mode: dsx.place.mode, item: dsx.place.fl.item, idx: dsx.place.fl.idx, start: dsx.place.fl.start, t: dsx.place.t || 0, ts: Date.now(), pv: null } : null);
+      setMode("free");
+      if(dsx && dsx.place && dsx.place.mode === "bani" && ((dsx.place.fl && dsx.place.fl.item === b.id) || dsx.place.id === b.id)) pendingRestore = dsx.place;
+    }
     navSettleUntil = Date.now() + 2000;
     var token = ++state.loadToken;
     state.mode = "bani"; state.id = b.id; state.ang = null;
@@ -2370,7 +2475,7 @@
     state.titlePa = "ਅੰਗ " + paNum(ang); state.titleEn = "Ang " + ang;
     state.duration = state.angDur[ang] || 0;
     brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"; resetView(); updatePager();
-    nowPlaying.innerHTML = esc(state.titlePa) + "<small>Tap a word to listen from there</small>";
+    nowPlaying.innerHTML = esc(state.titlePa) + "<small>Double-tap a word to listen from there</small>";
     var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
     audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
     applySpeed();
@@ -2626,7 +2731,7 @@
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
     brandSub.textContent = "ਨਿਤਨੇਮ"; resetView(); updatePager();
-    nowPlaying.innerHTML = esc(b.pa) + "<small>Tap a word to listen from there</small>";
+    nowPlaying.innerHTML = esc(b.pa) + "<small>Double-tap a word to listen from there</small>";
     audio.src = baniAudioUrl(b);
     applySpeed();
     audio.load(); resetProgress(); clearHighlight();
@@ -3644,8 +3749,14 @@
      the reader's own field (readerJson) of the user's doc in the same
      Firebase project/collection the Nitnem Tracker uses, so the rules
      that already let the Tracker sync let this sync too, and neither
-     app touches the other's field. Newer state wins wholesale (per-key
-     stamps live in the sync meta); applying cloud state reloads once.
+     app touches the other's field. Newer READING wins wholesale: every
+     device stamps its last local change (meta.localAt, bumped by the
+     poll below whenever the collected keys change, signed in or not),
+     and a push carries that change's stamp — so a device applies the
+     cloud only when the cloud state postdates its own last change,
+     and a live subscription applies newer cloud state as it arrives.
+     The first device to sign in can no longer clobber a second device
+     whose reading is more recent. Applying cloud state reloads once.
      SDK blocked/offline -> local-only, exactly like the Tracker. */
   (function(){
     /* apply-guard: if the previous page just wrote cloud state and
@@ -3668,7 +3779,7 @@
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
     catch(e){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
     var META = "gurbani-reader:sync-v1";
-    var user = null, lastSent = null, applying = false, timer = null, syncReady = false;
+    var user = null, lastSent = null, applying = false, timer = null, syncReady = false, unsub = null, lastSeenJson = null;
     function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
     function collectKeys(){
       var keys = {};
@@ -3689,17 +3800,31 @@
       if(!user || applying || !syncReady) return;
       var keys = collectKeys(), keysJson = JSON.stringify(keys), m = meta();
       if(keysJson === m.keysJson){ lastSent = JSON.stringify({ keys: keys, savedAt: m.savedAt || 0 }); return; }
-      var at = Date.now();
+      /* the blob's stamp is the last CHANGE's time, not the push time —
+         devices compare change against change */
+      var at = Math.max(m.localAt || 0, m.savedAt || 0);
+      if(keysJson !== m.keysJson && (m.localAt || 0) <= (m.savedAt || 0)) at = Date.now();
       var stamped = JSON.stringify({ keys: keys, savedAt: at });
-      try{ localStorage.setItem(META, JSON.stringify({ savedAt: at, keysJson: keysJson })); }catch(e){}
+      try{ localStorage.setItem(META, JSON.stringify({ savedAt: at, keysJson: keysJson, localAt: m.localAt || 0 })); }catch(e){}
       lastSent = stamped;
       db.collection("progress").doc(user.uid).set({ readerJson: stamped, readerAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
         .then(function(){ if(user) setNote("Synced ✓ — signed in as " + (user.email || "")); })
         .catch(function(){ lastSent = null; });
     }
+    /* the poll runs signed in or not: its first job is stamping this
+       device's last local change (localAt) so a later sign-in can tell
+       whose reading is actually newer; its second is scheduling pushes */
     setInterval(function(){
+      var j = JSON.stringify(collectKeys());
+      if(lastSeenJson === null){ lastSeenJson = j; return; }
+      if(j === lastSeenJson) return;
+      lastSeenJson = j;
+      if(!applying){
+        var m = meta(); m.localAt = Date.now(); m.keysJson = j;
+        try{ localStorage.setItem(META, JSON.stringify(m)); }catch(e){}
+      }
       if(!user || applying || !syncReady) return;
-      if(JSON.stringify(collectKeys()) !== (meta().keysJson || "")){ clearTimeout(timer); timer = setTimeout(saveNow, 1200); }
+      clearTimeout(timer); timer = setTimeout(saveNow, 1200);
     }, 2500);
     window.addEventListener("pagehide", saveNow);
     btn.addEventListener("click", function(){
@@ -3707,9 +3832,21 @@
       var prov = new firebase.auth.GoogleAuthProvider();
       auth.signInWithPopup(prov).catch(function(){ auth.signInWithRedirect(prov); });
     });
+    function applyCloud(cloudKeys, cloudAt, raw){
+      applying = true;
+      try{
+        Object.keys(cloudKeys).forEach(function(k){ if(cloudKeys[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, cloudKeys[k]); });
+        localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: cloudAt }));
+      }catch(e){}
+      lastSent = raw;
+      try{ sessionStorage.setItem("gurbani-reader:apply-guard", raw); }catch(e){}
+      setNote("Found your synced reading — refreshing…");
+      setTimeout(function(){ location.reload(); }, 700);
+    }
     auth.onAuthStateChanged(function(u){
       user = u;
       syncReady = false;
+      if(unsub){ unsub(); unsub = null; }
       if(!u){ paint(); lastSent = null; return; }
       paint();
       setNote("Signed in — syncing…");
@@ -3720,23 +3857,27 @@
         if(cloud){ try{ var cj = JSON.parse(cloud); cloudAt = cj.savedAt || 0; cloudKeys = cj.keys || null; }catch(e){} }
         var m = meta();
         syncReady = true;
-        if(cloudKeys && cloudAt > (m.savedAt || 0)){
-          applying = true;
-          try{
-            Object.keys(cloudKeys).forEach(function(k){ if(cloudKeys[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, cloudKeys[k]); });
-            localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys) }));
-          }catch(e){}
-          lastSent = cloud;
-          try{ sessionStorage.setItem("gurbani-reader:apply-guard", cloud); }catch(e){}
-          setNote("Found your synced reading — refreshing…");
-          setTimeout(function(){ location.reload(); }, 700);
+        if(cloudKeys && cloudAt > (m.localAt || 0) && JSON.stringify(cloudKeys) !== JSON.stringify(collectKeys())){
+          applyCloud(cloudKeys, cloudAt, cloud);
         } else {
           if(cloudKeys && JSON.stringify(cloudKeys) === JSON.stringify(collectKeys())){
-            try{ localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys) })); }catch(e){}
+            try{ localStorage.setItem(META, JSON.stringify({ savedAt: cloudAt, keysJson: JSON.stringify(cloudKeys), localAt: m.localAt || 0 })); }catch(e){}
             lastSent = cloud;
             setNote("Synced ✓ — signed in as " + (u.email || ""));
           } else saveNow();
         }
+        /* live pull: when another device pushes newer reading, it
+           arrives here and applies the same way — no re-sign-in needed */
+        unsub = ref.onSnapshot(function(snap2){
+          if(!user || applying) return;
+          var c2 = snap2.exists ? (snap2.data().readerJson || null) : null;
+          if(!c2 || c2 === lastSent) return;
+          var cj2 = null; try{ cj2 = JSON.parse(c2); }catch(e){}
+          if(!cj2 || !cj2.keys) return;
+          var m2 = meta();
+          if((cj2.savedAt || 0) > (m2.savedAt || 0) && (cj2.savedAt || 0) > (m2.localAt || 0) && JSON.stringify(cj2.keys) !== JSON.stringify(collectKeys()))
+            applyCloud(cj2.keys, cj2.savedAt, c2);
+        });
       }).catch(function(){ syncReady = true; saveNow(); });
     });
   })();
