@@ -1118,7 +1118,9 @@
   /* The focus mark: the landed/recentred pankti keeps the soft lite wash
      for as long as the app sits idle at that focus — it is how anyone
      picking the phone up sees "this was the one". It clears the moment
-     reading actually starts: a hand scroll, a play, a new tap. */
+     anything else happens: a hand scroll, a press/tap elsewhere, a
+     play, follow-along moving on to another pankti, or any glide
+     away from the marked line. It never lingers behind playback. */
   var focusMarkLi = -1;
   function markFocus(li){
     clearTimeout(liteTimer); liteTimer = null;   /* a pending tap-wash fade must not strip the held mark */
@@ -1301,6 +1303,9 @@
     }
   }
   function glideToLine(el, onDone){
+    /* a glide AWAY from the held focus mark ends the mark's job: it
+       only ever means "you landed here", never "still here" */
+    if(focusMarkLi >= 0 && Number(el.getAttribute("data-li")) !== focusMarkLi) clearFocusMark();
     var startY = window.scrollY;
     zoneRefresh();   /* land the pankti's first word at the focus section's top */
     var target = Math.max(0, anchorTopOf(el) + startY - zoneA);
@@ -1998,6 +2003,10 @@
   window.addEventListener("touchstart", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); }, {passive:true});
   window.addEventListener("keydown", function(e){ if(e.key === " " || e.key.indexOf("Arrow") === 0 || e.key === "PageDown" || e.key === "PageUp"){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); } });
   window.addEventListener("wheel", function(){ manualScrollAt = Date.now(); lastGestureAt = Date.now(); manualHold = true; clearFocusMark(); }, {passive:true});
+  /* any touch/press elsewhere ends the held mark too (desktop mouse
+     included — wheel/touchmove never fire for a drag or a tap);
+     Recenter's own press is exempt: its click is about to re-mark */
+  window.addEventListener("pointerdown", function(e){ if(e.target.closest && e.target.closest("#recenterBtn")) return; clearFocusMark(); }, {passive:true});
   document.addEventListener("click", function(e){
     if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#paathBtn") || e.target.closest("#saveBtn") || e.target.closest("#angPop") || e.target.closest("#paathPop") || e.target.closest(".ang-island")) return;
     /* the third tap of a preview triple-tap belongs to the preview */
@@ -3643,6 +3652,10 @@
     var r = wordRect(wEl), wordMode = !!r;
     if(!wordMode) r = found.el.getBoundingClientRect();   /* word not in the DOM this frame — line fallback below */
     var li = found.li;
+    /* follow-along has taken over and moved past the landed pankti:
+       the held focus mark (Recenter / restore landing) is spent —
+       it must not linger on a line playback has left behind */
+    if(focusMarkLi >= 0 && li !== focusMarkLi) clearFocusMark();
     /* generation change = an item load/switch: G0 reset accounting */
     var gen = trackGenNow();
     if(gen !== trackGen){
@@ -4004,7 +4017,7 @@
     var CFG = { apiKey: "AIzaSyADH6-AzMWjDLPzoxu7WZy1-vvYNsHXtxk", authDomain: "nitnem-tracker.firebaseapp.com", projectId: "nitnem-tracker", storageBucket: "nitnem-tracker.firebasestorage.app", messagingSenderId: "712584913445", appId: "1:712584913445:web:a7f0fd0d2082fc6e7755cc" };
     var auth, db;
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
-    catch(e){ if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
+    catch(e){ try{ console.error("[reader-sync] init:", e); }catch(_){} if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
     var META = "gurbani-reader:sync-v1";
     var user = null, lastSent = null, applying = false, timer = null, syncReady = false, unsub = null, lastSeenJson = null, lastPullAt = 0;
     function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
@@ -4064,6 +4077,18 @@
        sync paths need a real account and cannot run in a sandbox) */
     window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich };
     function setNote(s){ if(note) note.textContent = s; }
+    /* bug zero was silence: every sync failure used to swallow its
+       error, so a screenshot could never say WHY sync failed. Now
+       every catch logs the Firebase error and returns its short code,
+       and the failure notes carry that code — a screenshot of the
+       Account section names the cause (e.g. permission-denied). */
+    function syncErr(tag, e){
+      var code = (e && (e.code || e.message)) || "unknown";
+      try{ console.error("[reader-sync] " + tag + ":", e); }catch(_){}
+      code = String(code).replace(/^.*\//, "").replace(/[^a-z0-9-]/gi, "").slice(0, 40);
+      return code || "unknown";
+    }
+    function failNote(tag, e){ setNote("Couldn't sync (" + syncErr(tag, e) + ") — your reading is safe on this device and will retry."); }
     function paint(){
       if(user){ btn.textContent = "Sign out"; setNote("Signed in as " + (user.email || "") + " — place, Paaths & settings sync to your account."); }
       else { btn.textContent = "Sign in with Google"; setNote("Optional — sync your place, Sehaj Paaths & settings across devices."); }
@@ -4085,7 +4110,7 @@
             applyCloud(cj.keys, cj.savedAt, c); return;
           }
           doPush();
-        }).catch(function(){ doPush(); });
+        }).catch(function(e){ syncErr("reread", e); doPush(); });
         return;
       }
       doPush();
@@ -4111,9 +4136,9 @@
           try{ var mm = meta(); mm.savedAt = at; mm.keysJson = keysJson; localStorage.setItem(META, JSON.stringify(mm)); }catch(e){}
           if(user) setNote("Synced ✓ — signed in as " + (user.email || ""));
         })
-        .catch(function(){
+        .catch(function(e){
           lastSent = null;
-          if(user) setNote("Couldn't sync — your reading is safe on this device and will retry.");
+          if(user) failNote("push", e);
           /* bounded retry with backoff: a failed push is retried, not
              forgotten (an offline train ride no longer loses the
              session's sync when the tab closes) */
@@ -4145,14 +4170,37 @@
       clearTimeout(timer); timer = setTimeout(saveNow, 1200);
     }, 2500);
     window.addEventListener("pagehide", saveNow);
+    /* Firebase's own guidance: popups are unreliable in mobile
+       browsers — touch devices go redirect-first, desktop keeps
+       popup-first with a redirect fallback. (Sign-in was never the
+       failing half here; this is robustness, not the sync fix.) */
+    var isTouch = false;
+    try{ isTouch = (window.matchMedia && matchMedia("(pointer: coarse)").matches) || /Android|iPhone|iPad/i.test(navigator.userAgent || ""); }catch(e){}
     btn.addEventListener("click", function(){
-      if(user){ auth.signOut(); return; }
+      if(user){ var so = auth.signOut(); if(so && so.catch) so.catch(function(e){ syncErr("signout", e); }); return; }
       var prov = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(prov).catch(function(){
+      var viaRedirect = function(e1){
+        syncErr("popup", e1);
         setNote("Sign-in didn't complete — trying another way…");
-        auth.signInWithRedirect(prov).catch(function(){ setNote("Sign-in didn't complete — tap to try again. Everything still saves on this device."); });
-      });
+        auth.signInWithRedirect(prov).catch(function(e2){ setNote("Sign-in didn't complete (" + syncErr("redirect-signin", e2) + ") — tap to try again. Everything still saves on this device."); });
+      };
+      if(isTouch){
+        auth.signInWithRedirect(prov).catch(function(e1){
+          syncErr("redirect-signin", e1);
+          setNote("Sign-in didn't complete — trying another way…");
+          auth.signInWithPopup(prov).catch(function(e2){ setNote("Sign-in didn't complete (" + syncErr("popup", e2) + ") — tap to try again. Everything still saves on this device."); });
+        });
+      } else {
+        auth.signInWithPopup(prov).catch(viaRedirect);
+      }
     });
+    /* a redirect sign-in lands back here: surface its result's error
+       instead of letting it vanish (the popup flow never uses this) */
+    if(auth.getRedirectResult){
+      auth.getRedirectResult().catch(function(e){
+        setNote("Sign-in didn't complete (" + syncErr("redirect-result", e) + ") — tap to try again. Everything still saves on this device.");
+      });
+    }
     function applyCloud(cloudKeys, cloudAt, raw){
       applying = true;
       var guardKeys = {};
@@ -4223,7 +4271,14 @@
           var wins = (cj2.savedAt || 0) > (m2.savedAt || 0) && (cj2.savedAt || 0) > (m2.localAt || 0);
           if(!wins && Math.abs((cj2.savedAt || 0) - (m2.localAt || 0)) < 600000 && placeTsOf(cj2.keys) > placeTsOf(localNow)) wins = true;
           if(wins) applyCloud(cj2.keys, cj2.savedAt, c2);
-        }, function(){ if(user) setNote("Couldn't sync — your reading is safe on this device and will retry."); });
+        }, function(e){
+          /* a dead listener used to stay "subscribed" forever (unsub
+             non-null), so the session never retried it. Name the
+             error, free the slot, and re-subscribe once shortly. */
+          unsub = null;
+          if(user) failNote("listen", e);
+          setTimeout(function(){ if(user && user.uid === myUid) subscribe(); }, 15000);
+        });
       };
       ref.get().then(function(snap){
         if(!user || user.uid !== myUid) return;
@@ -4254,12 +4309,12 @@
           } else saveNow();
         }
         subscribe();
-      }).catch(function(){
+      }).catch(function(e){
         if(!user || user.uid !== myUid) return;
         /* a failed first read says so — and live pull still starts,
            so the session is not silently deaf to the other device */
         syncReady = true;
-        setNote("Couldn't reach sync — your reading is safe on this device and will retry.");
+        setNote("Couldn't reach sync (" + syncErr("get", e) + ") — your reading is safe on this device and will retry.");
         subscribe();
         saveNow();
       });

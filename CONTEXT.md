@@ -355,8 +355,10 @@ the line at the 35% anchor, is the one saved, not a stale spoken line).
 7. **The focus mark:** the landed pankti is marked with the app's soft
    "lite" wash (§9 tap model) — but HELD, not faded: it stays for as
    long as the app sits idle at that focus, so anyone picking the
-   phone up sees "this was the one". It clears the moment reading
-   actually starts: a hand-scroll gesture, a play, or a new tap.
+   phone up sees "this was the one". It clears the moment anything
+   else happens: a hand-scroll gesture, any press/tap elsewhere, a
+   play, follow-along moving on to another pankti, or any glide away
+   from the marked line. It never lingers behind playback.
 
 ## 9. UI elements & interaction rules
 
@@ -744,10 +746,19 @@ minute old re-reads first and applies a newer cloud instead of
 overwriting it. The apply-guard is bound to the account that wrote
 it — a guard from another account's session is discarded, never
 applied. A failed push or pull says so in the Account note
-("Couldn't sync — your reading is safe on this device and will
-retry.") instead of failing silently. Signed out, SDK blocked, or
-offline: local-only, exactly as before — sign-in is invisible
-unless wanted.
+instead of failing silently — and the note carries the Firebase
+error's short code ("Couldn't sync (permission-denied) — your
+reading is safe on this device and will retry."), with the full
+error in the console under `[reader-sync]`, so a screenshot of the
+Account section names the cause. A dead listener frees its slot
+and re-subscribes once shortly instead of staying deaf all
+session. Sign-in follows Firebase's platform guidance: touch
+devices use `signInWithRedirect` first (popups are unreliable in
+mobile browsers), desktop keeps popup-first with a redirect
+fallback, and a redirect result's error is surfaced in the note
+rather than vanishing. Signed out, SDK blocked, or offline:
+local-only, exactly as before — sign-in is invisible unless
+wanted.
 
 Sync meta discipline: `sync-v1.keysJson` is the last **synced**
 fingerprint — written only by a successful push, an apply, or an
