@@ -732,7 +732,8 @@ whatever comes next (meanings, notes):
   per control. The rail slides away with the bars, like the
   phone's. The **Menu/Library/Search panel grows out of the
   rail** — parked immediately left of it, top-aligned, one visual
-  unit, floating over the right margin — and inside it is the
+  unit, floating over the right margin, capped at 520px tall
+  with its content scrolling inside — and inside it is the
   compact cut of the menu: small section headings, tight rows,
   each control full-width under its label, nothing oversized; the
   sync button is Google's own button (white, the four-colour G).
