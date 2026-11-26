@@ -420,7 +420,11 @@ tap could land on the Ang switcher. Landscape earns extra
 buttons per size tier, only where they fit (the rails, §10).
 The Ang unit's home follows the chrome: at the very top when
 the bars are hidden (full screen), tucked just below the top
-bar while the bar is showing — it glides between the two.
+bar while the bar is showing — it glides between the two. And
+if the unit is already up when a tap calls the bars, it simply
+disappears: the bar carries its own Ang switcher, so the unit
+hands over instead of duplicating it (a fresh tap with no unit
+up still flashes it below the bar).
 
 **Pager (in the top bar).** Previous/next item as **chevron-only ghost
 buttons — no text labels**; at the ends they disable faded. The centre

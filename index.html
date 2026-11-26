@@ -2428,7 +2428,13 @@
     if(!document.body.classList.contains("bars-hidden")){
       hideBars(); return;
     }
-    showBars(); islandPing();
+    /* the bar carries its own Ang switcher, so a unit that was
+       already up when the bar is called simply goes away — the
+       bar takes over. A fresh tap with no unit up still flashes
+       it, tucked below the bar. */
+    var islWas = $("angUnit").classList.contains("show");
+    showBars();
+    if(islWas) islandHide(); else islandPing();
   });
 
   /* ---------- helpers ---------- */
