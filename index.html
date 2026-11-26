@@ -870,8 +870,10 @@
     body.bars-hidden .topbar{transform:translateX(-110%)}
     .topbar-in{flex:none;flex-direction:column;gap:8px;padding:10px 0 4px;align-items:center;max-width:none}
     .brand{flex:none}
-    .pager{flex:none;flex-direction:column;border-top:0;gap:2px;padding:6px 0 10px;margin-top:auto;align-items:center;max-width:none;align-self:auto}
-    .pager-cur{font-size:11px;text-align:center;min-height:0}
+    .pager{display:none}
+    /* with no switcher in the side bar, the pill carries its
+       chevrons here too — it is the Ang switcher in this layout */
+    .ang-pill-btn{display:grid}
     main{padding-left:60px;padding-top:10px}
     .player{left:60px}
     .float-pair{left:calc(50% + 30px)}
@@ -2366,6 +2368,7 @@
     if(audio.paused) return;
     barsTimer = setTimeout(function(){ if(!audio.paused) hideBars(); }, 3000);
   }
+  function sideBars(){ return window.matchMedia("(orientation:landscape) and (max-height:500px)").matches || window.matchMedia("(min-width:1024px) and (orientation:landscape)").matches; }
   function showBars(){ hideOrb(); document.body.classList.remove("bars-hidden"); scheduleAutoHide(); }
   var orbTimer = null;
   var qcToggleAt = 0;   /* when the cluster's own play/pause was last tapped — its toggles are exempt from the bars' pause/play reflexes */
@@ -2428,13 +2431,15 @@
     if(!document.body.classList.contains("bars-hidden")){
       hideBars(); return;
     }
-    /* the bar carries its own Ang switcher, so a unit that was
-       already up when the bar is called simply goes away — the
-       bar takes over. A fresh tap with no unit up still flashes
-       it, tucked below the bar. */
+    /* the top bar carries its own Ang switcher, so a unit that
+       was already up when the bar is called simply goes away —
+       the bar takes over. A fresh tap with no unit up still
+       flashes it, tucked below the bar. In the side-bar
+       landscapes the bar carries no switcher — the unit is it —
+       so there the unit simply stays. */
     var islWas = $("angUnit").classList.contains("show");
     showBars();
-    if(islWas) islandHide(); else islandPing();
+    if(islWas && !sideBars()) islandHide(); else islandPing();
   });
 
   /* ---------- helpers ---------- */

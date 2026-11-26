@@ -424,9 +424,13 @@ bar while the bar is showing — it glides between the two. And
 if the unit is already up when a tap calls the bars, it simply
 disappears: the bar carries its own Ang switcher, so the unit
 hands over instead of duplicating it (a fresh tap with no unit
-up still flashes it below the bar).
+up still flashes it below the bar). That handover belongs to
+the top-bar layouts; in the side-bar landscapes the unit stays.
 
-**Pager (in the top bar).** Previous/next item as **chevron-only ghost
+**Pager (in the top bar).** In the side-bar landscapes the bar
+carries no pager at all — the pill unit is the Ang switcher
+there, chevrons included, and it simply stays when the bars
+show. Previous/next item as **chevron-only ghost
 buttons — no text labels**; at the ends they disable faded. The centre
 label is serif, shows the current item (ਅੰਗ in Gurmukhi digits, or the
 Bani name), carries a caret, and **opens the switcher popup** (not the
