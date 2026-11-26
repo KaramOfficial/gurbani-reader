@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- reader-build:2026-11-25-sync2 -->
+<!-- reader-build:2026-11-25-sync3 -->
 <html lang="pa">
 <head>
 <meta charset="utf-8" />
@@ -1300,11 +1300,12 @@
        those windows; render's own post-landing save passes force. */
     if(!force && (Date.now() < navSettleUntil || Date.now() < resizeSettleUntil || state.prepending || state.prependingBani)) return;
     try{
-      /* ts is the READING time of this position (sync's bootstrap orders
-         by it): re-saving an unchanged position — a boot landing, a
-         resize, a scroll settle — must keep the original ts, or merely
-         opening the app on another device would make its stale line
-         look like the newest reading and win the merge */
+      /* ts is the READING time of this position: re-saving an
+         unchanged position — a boot landing, a resize, a scroll
+         settle — keeps the original ts, so a mere re-save never
+         masquerades as fresh reading. (This place is the device's
+         own session record only; Paath records store the focus
+         line alone and sync never sees this.) */
       var flNow = focusedLine();
       var prevPlace = detour ? (readDetourStore() || {}).place : readPlace();
       var samePos = !!(prevPlace && prevPlace.mode === state.mode && prevPlace.id === state.id && prevPlace.ang === state.ang
@@ -1711,6 +1712,7 @@
     setMode("free");
     restoreFromPlace(ds && ds.place);
     updateRecenter();
+    try{ paintJumpBtns(); }catch(e){}
   }
   var toastTimer = null;
   function toastMsg(msg){
@@ -1763,8 +1765,9 @@
       glf = frec; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
       try{ localStorage.setItem(LAST_KEY, JSON.stringify(place)); }catch(e){}
     } else {
-      var snap = readCtx(id) || {};
-      snap.glf = frec; snap.place = place; writeCtx(id, snap);
+      /* the snapshot is the head alone — the place above exists only
+         as the current Paath's live landing, never as stored state */
+      writeCtx(id, { glf: frec });
     }
     buildPaathLists();
     syncDirty();
@@ -1898,14 +1901,14 @@
   var _updatePager0 = updatePager;
   updatePager = function(){ _updatePager0(); paintAngSides(); };
   $("prevBtn").addEventListener("click", function(){
-    if(state.mode === "ang"){ var pa = viewAng || state.ang; if(pa > 1) loadAng(pa - 1); }
+    if(state.mode === "ang"){ var pa = viewAng || state.ang; if(pa > 1) userLoadAng(pa - 1); }
     else if(state.mode === "bani"){
       var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
       if(i > 0) loadBani(BANIS[i - 1]);
     }
   });
   $("nextBtn").addEventListener("click", function(){
-    if(state.mode === "ang"){ var na = viewAng || state.ang; if(na < 1430) loadAng(na + 1); }
+    if(state.mode === "ang"){ var na = viewAng || state.ang; if(na < 1430) userLoadAng(na + 1); }
     else if(state.mode === "bani"){
       var i = BANIS.findIndex(function(b){ return b.id === (viewBaniId || state.id); });
       if(i >= 0 && i < BANIS.length - 1) loadBani(BANIS[i + 1]);
@@ -1957,7 +1960,7 @@
   function goAng(){
     var v = parseInt($("angInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("angInput").focus(); $("angInput").select(); toastMsg("Angs run " + paNum(1) + " – " + paNum(1430)); return; }
-    closeSheet(); loadAng(v);
+    closeSheet(); userLoadAng(v);
   }
 
   /* ---------- ang switcher popup + shared nitnem expander ---------- */
@@ -2007,24 +2010,38 @@
     if(!detour){ var r = paathById(paathData.current); if(r){ brandSub.textContent = "ਸਹਜ ਪਾਠ · " + r.name; return; } }
     brandSub.textContent = "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ";
   }
+  /* a place that lands the reader exactly on a focus line — the
+     only kind of place a Paath record may ever produce (a Paath
+     record stores the head alone; wherever a place is needed to
+     resume the Paath, it is derived from the head, never stored) */
+  function placeFromFocus(g){
+    if(!g) return null;
+    return { mode: g.mode, id: g.mode === "bani" ? g.item : null, ang: g.mode === "ang" ? g.item : null,
+      y: 0, t: g.t || 0, ts: g.ts || Date.now(), fl: { item: g.item, idx: g.idx, start: g.start, src: "view" } };
+  }
   function ctxKey(id){ return "gurbani-reader:ctx-" + id; }
   function readCtx(id){ try{ return JSON.parse(localStorage.getItem(ctxKey(id)) || "null"); }catch(e){ return null; } }
   function writeCtx(id, snap){ try{ localStorage.setItem(ctxKey(id), JSON.stringify(snap)); }catch(e){} syncDirty(); }
-  /* snapshot the live records into the current Paath — Ang state only:
-     a Bani (Nitnem) place or focus NEVER enters a Paath snapshot; the
-     snapshot keeps whatever Ang state it already held instead */
+  /* snapshot the live head into the current Paath — the snapshot is
+     the focus line ALONE (owner, Nov 25): a Paath never stores a
+     scroll place. Ang state only: a Bani (Nitnem) focus NEVER enters
+     a Paath snapshot; the snapshot keeps whatever Ang head it
+     already held instead */
   function snapshotCurrentPaath(){
     if(!paathData.current) return;
     /* while free reading is live, the current Paath's state IS its ctx
-       snapshot — the live records belong to the free world, and the
-       place key still holds the Paath's pre-detour place. Snapshotting
-       now would rewrite the snapshot from that stale place and destroy
-       a place set by assign-to-Paath in the meantime. Callers snapshot
-       on the way OUT of the Paath world, before detour is set. */
+       snapshot — the live records belong to the free world.
+       Snapshotting now would rewrite the snapshot from the free
+       world's head and destroy a head set by assign-to-Paath in the
+       meantime. Callers snapshot on the way OUT of the Paath world,
+       before detour is set. */
     if(detour) return;
-    var lp = readPlace(), prev = readCtx(paathData.current) || {}, snap = {};
-    snap.place = (lp && lp.mode === "bani") ? (prev.place || null) : lp;
-    snap.glf = (glf && glf.mode === "bani") ? (prev.glf || null) : glf;
+    var prev = readCtx(paathData.current) || {}, snap = {};
+    /* the live Ang head wins; a Bani focus — or no live focus yet
+       (a fresh boot straight into a Bani) — leaves the snapshot's
+       existing head standing, so a snapshot can never erase a head
+       it was only meant to carry */
+    snap.glf = (glf && glf.mode !== "bani") ? glf : (prev.glf || null);
     writeCtx(paathData.current, snap);
   }
   /* Migration — there is no "Default" Paath. The first tracker is
@@ -2036,7 +2053,7 @@
      next free numeral — scrub any Bani state out of every Paath
      snapshot, and make current a real tracker id. */
   (function migratePaaths(){
-    var started = function(s){ return !!(s && ((s.place && (s.place.ang > 1 || s.place.t > 0)) || s.glf)); };
+    var started = function(s){ return !!(s && (s.glf || (s.place && (s.place.ang > 1 || s.place.t > 0)))); };
     var defSnap = null;
     try{ defSnap = JSON.parse(localStorage.getItem("gurbani-reader:ctx-default") || "null"); }catch(e){}
     var defName = (paathData.defName && paathData.defName !== "Default") ? paathData.defName : null;
@@ -2063,8 +2080,19 @@
     delete paathData.defName;
     paathData.list.forEach(function(pt){
       var s = readCtx(pt.id); if(!s) return; var dirty = false;
-      if(s.place && s.place.mode === "bani"){ delete s.place; dirty = true; }
       if(s.glf && s.glf.mode === "bani"){ delete s.glf; dirty = true; }
+      if(s.place){
+        /* a Paath snapshot is the head alone — but a pre-rule snapshot
+           whose ONLY journey record is its place must not lose that
+           journey: the place's own focus line becomes the head, and
+           only then is the place dropped */
+        if(!s.glf && s.place.mode !== "bani"){
+          var fl = s.place.fl;
+          s.glf = fl ? { mode: "ang", item: fl.item, idx: fl.idx, start: fl.start, t: s.place.t || 0, ts: s.place.ts || Date.now(), pv: null }
+                     : { mode: "ang", item: s.place.ang, idx: 0, start: 0, t: s.place.t || 0, ts: s.place.ts || Date.now(), pv: null };
+        }
+        delete s.place; dirty = true;
+      }
       if(dirty) writeCtx(pt.id, s);
     });
     savePaathData();
@@ -2083,10 +2111,11 @@
   var pheads = document.querySelectorAll("[data-paath-head]");
   for(var ph=0;ph<pheads.length;ph++) pheads[ph].addEventListener("click", function(){ setPaathsOpen(!paathsOpen); });
   function paathPlaceLabel(id){
-    var place = (paathData.current === id && !detour) ? readPlace() : (readCtx(id) || {}).place;
-    if(!place) return "Not started";
-    if(place.mode === "bani") return "Not started";   /* a Paath tracks Ang reading only — a Bani place is never its label */
-    var a = (place.fl && place.fl.item) || place.ang;
+    /* the label reads the HEAD (the Paath's focus line) and nothing
+       else — the Ang a Paath is "at" is the Ang its head is on */
+    var g = paathGlf(id);
+    if(!g || g.mode === "bani") return "Not started";   /* a Paath tracks Ang reading only — a Bani head is never its label */
+    var a = g.item;
     if(!a) return "Not started";
     if(paathData.current === id && !detour) return "ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
     return "Resume at ਅੰਗ " + paNum(a) + " · " + Math.max(1, Math.round(a / 1430 * 100)) + "% complete";
@@ -2164,10 +2193,12 @@
          exit free reading, and restore from the snapshot's place */
       if(detour){
         var csnap = readCtx(id);
-        if(csnap && csnap.place){
-          try{ localStorage.setItem(LAST_KEY, JSON.stringify(csnap.place)); }catch(e){}
-          if(csnap.glf){ glf = csnap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){} }
-          exitDetour(); setMode("paath"); restoreFromPlace(csnap.place); updateRecenter();
+        if(csnap && csnap.glf){
+          var cplace = placeFromFocus(csnap.glf);
+          try{ localStorage.setItem(LAST_KEY, JSON.stringify(cplace)); }catch(e){}
+          glf = csnap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
+          exitDetour(); setMode("paath"); restoreFromPlace(cplace); updateRecenter();
+          try{ paintJumpBtns(); }catch(e){}
         } else {
           /* no snapshot: the Paath's live place IS the place key */
           exitDetour(); setMode("paath"); restoreFromPlace(readPlace()); updateRecenter();
@@ -2179,15 +2210,19 @@
     snapshotCurrentPaath();
     paathData.current = id; savePaathData(); setMode("paath");
     var snap = readCtx(id);
-    if(snap && snap.place){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(snap.place)); }catch(e){} }
+    /* the Paath resumes AT its head: the live place is derived from
+       the snapshot's focus line, never stored anywhere */
+    var splace = snap && snap.glf ? placeFromFocus(snap.glf) : null;
+    if(splace){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(splace)); }catch(e){} }
     else { try{ localStorage.removeItem(LAST_KEY); }catch(e){} }
     if(snap && snap.glf){ glf = snap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){} }
     else { glf = null; try{ localStorage.removeItem(FOCUS_KEY); }catch(e){} }
     paathEditing = null;
     buildPaathLists();
     exitDetour();   /* the snapshot above was taken from the untouched Paath records — clean; resuming a Paath ends the detour */
-    restoreFromPlace(snap && snap.place);
+    restoreFromPlace(splace);
     updateRecenter();
+    try{ paintJumpBtns(); }catch(e){}
   }
   function commitPaathRename(fromEl){
     if(!paathEditing) return;
@@ -2275,7 +2310,7 @@
   function goPopAng(){
     var v = parseInt($("popAngInput").value, 10);
     if(!v || v < 1 || v > 1430){ $("popAngInput").focus(); $("popAngInput").select(); toastMsg("Angs run " + paNum(1) + " – " + paNum(1430)); return; }
-    closeAngPop(); loadAng(v);
+    closeAngPop(); userLoadAng(v);
   }
   $("popAngGo").addEventListener("click", goPopAng);
   $("popAngInput").addEventListener("keydown", function(e){ if(e.key==="Enter") goPopAng(); });
@@ -2284,7 +2319,7 @@
     if(state.mode !== "ang" || !state.ang) return;
     var base = popBaseAng || state.ang;
     var v = Math.min(1430, Math.max(1, base + parseInt(this.getAttribute("data-step"), 10)));
-    if(v !== base){ closeAngPop(); loadAng(v); }
+    if(v !== base){ closeAngPop(); userLoadAng(v); }
   });
 
   /* ---------- hide / show bars on scroll ---------- */
@@ -2708,6 +2743,7 @@
   /* ---------- loading ---------- */
   function loadBani(b, autoplay){
     if(!b) return;
+    try{ paintJumpBtns(); }catch(e){}   /* the jump stacks are per-context — repaint for the Bani's own stack */
     if(!detour){
       /* entering a Bani leaves the Paath world: the Paath is snapshotted
          (Ang state only) and the Bani opens in Default free reading,
@@ -3334,6 +3370,21 @@
   }
   setInterval(function(){ pruneStream(); pruneBaniStream(); }, 1500);
 
+  /* Default-mode landing (owner, Nov 25): a deliberate navigation
+     to an Ang while free reading — steppers, the Ang switcher —
+     LANDS there: the free head resets to that Ang's first line,
+     and the head being left stays in the undo history (noteJump),
+     so Undo always brings it back. No exceptions and no special
+     cases: a targeted arrival (a search result, a voice-search
+     link) is not a landing — it sets the head to its own line
+     through the detour seed, and never comes through here.
+     Inside a Paath the same buttons are pure browsing: the
+     Paath's head is never touched by navigation. */
+  var pendingFreeLand = null;
+  function userLoadAng(ang){
+    if(detour){ noteJump(); pendingFreeLand = ang; }
+    loadAng(ang);
+  }
   function loadAng(ang, autoplay){
     navSettleUntil = Date.now() + 2000;
     var token = ++state.loadToken;
@@ -3367,10 +3418,15 @@
       audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
       applySpeed();
       audio.load(); resetProgress();
+      if(pendingFreeLand === ang){
+        pendingFreeLand = null;
+        if(detour){ var fl0 = state.flatLines[0]; writeFocus(ang, 0, fl0 ? fl0.start : 0, 0); updateRecenter(); }
+      }
       if(autoplay) playAudio();
     })
     .catch(function(){
       if(token !== state.loadToken) return;
+      if(pendingFreeLand === ang) pendingFreeLand = null;
       setError("We couldn\u2019t fetch Ang " + ang + ". Check your connection and try again.", function(){ loadAng(ang); });
     });
   }
@@ -3408,33 +3464,67 @@
   /* ---------- jump history: undo / redo for listening jumps ----------
      The classic two-stack undo (the model every text editor uses):
      a deliberate jump \u2014 double-tap a word or line to play from
-     there, or a seek-bar jump \u2014 first pushes where you WERE onto
-     the undo stack and clears the redo stack. Undo steps back
-     through those positions; Redo walks forward again. Three jumps
-     are kept (owner). A position is a listening position \u2014 the
-     item (Ang or Bani), the second, and whether it was playing \u2014
-     and restoring re-uses the ordinary switch/seek machinery, so
-     the focus line, highlight and auto-scroll follow exactly as if
-     you had tapped there. It tracks the listening position, so it
+     there, a seek-bar jump, or landing on an Ang in Default mode
+     \u2014 first pushes where you WERE onto the undo stack and clears
+     the redo stack. Undo steps back through those positions; Redo
+     walks forward again. Three jumps are kept (owner). A position
+     is a LINE \u2014 the item (Ang or Bani), the line index, its
+     start second, and whether it was playing \u2014 and restoring
+     re-uses the ordinary switch/seek machinery, so the focus line,
+     highlight and auto-scroll follow exactly as if you had tapped
+     there, and the audio re-seeks to that line (the history is
+     aligned with the audio jumps by construction). It lives on
+     this device only, in memory. It tracks the listening position, so it
      works the same in free reading and inside a Sehaj Paath. */
-  var JUMP_CAP = 3, jumpUndoStack = [], jumpRedoStack = [], jumpRestoring = false;
+  var JUMP_CAP = 3, jumpStacks = {}, jumpRestoring = false;
+  /* one stack pair per reading context — a Paath, Default (free),
+     or a Bani — so Undo inside a Paath can never drag in a position
+     from free reading or a Bani (and the reverse). On-device only,
+     in memory, never synced. */
+  function jumpCtxKey(){
+    if(detour) return "free";
+    if(state.mode === "bani") return "bani:" + state.id;
+    return "paath:" + (paathData.current || "none");
+  }
+  function jumpStack(){
+    var k = jumpCtxKey();
+    if(!jumpStacks[k]) jumpStacks[k] = { u: [], r: [] };
+    return jumpStacks[k];
+  }
+  /* a jump position is a LINE (owner, Nov 25): the pankti being
+     listened to — its item, its line index, and the line's start
+     second, so restoring re-seeks the audio to exactly that line.
+     Follow-along never records here; only deliberate jumps do
+     (tap-to-play, seek-bar jumps, and Default-mode Ang landings) */
   function jumpPos(){
+    var f = (typeof currentLineEl === "function") ? currentLineEl() : null;
+    if(f && f.el && state.flatLines[f.li]){
+      var item = state.lineAng[f.li];
+      var first = state.mode === "ang" ? state.angFirstLine[item] : state.baniFirstLine[item];
+      if(item != null && typeof first === "number")
+        return { mode: state.mode, item: item, idx: f.li - first, t: state.flatLines[f.li].start, playing: !!(audio && !audio.paused) };
+    }
+    var ef = effFocus();
+    if(ef && ef.item != null && typeof ef.idx === "number")
+      return { mode: ef.mode, item: ef.item, idx: ef.idx, t: ef.start || 0, playing: !!(audio && !audio.paused) };
     if(!audio.getAttribute("src")) return null;
-    var item = state.mode === "bani" ? state.id : state.ang;
-    if(item == null) return null;
-    return { mode: state.mode, item: item, t: audio.currentTime || 0, playing: !audio.paused };
+    var item2 = state.mode === "bani" ? state.id : state.ang;
+    if(item2 == null) return null;
+    return { mode: state.mode, item: item2, t: audio.currentTime || 0, playing: !audio.paused };
   }
   function paintJumpBtns(){
+    var st = jumpStack();
     var u = $("jumpUndo"), r = $("jumpRedo");
-    if(u) u.disabled = !jumpUndoStack.length;
-    if(r) r.disabled = !jumpRedoStack.length;
+    if(u) u.disabled = !st.u.length;
+    if(r) r.disabled = !st.r.length;
   }
   function noteJump(){
     if(jumpRestoring) return;
     var p = jumpPos(); if(!p) return;
-    jumpUndoStack.push(p);
-    while(jumpUndoStack.length > JUMP_CAP) jumpUndoStack.shift();
-    jumpRedoStack.length = 0;
+    var st = jumpStack();
+    st.u.push(p);
+    while(st.u.length > JUMP_CAP) st.u.shift();
+    st.r.length = 0;
     paintJumpBtns();
   }
   function restoreJump(p){
@@ -3443,25 +3533,53 @@
     try{
       if(p.mode === "ang" && state.mode !== "ang"){ loadAng(p.item); pendingSeek = p.t; switchAudioToAng(p.item, false); }
       else if(p.mode === "bani" && state.mode !== "bani"){ var b = baniById(p.item); if(b){ loadBani(b); pendingSeek = p.t; switchAudioToBani(p.item, false); } }
-      else if(p.mode === "ang" && p.item !== state.ang){ pendingSeek = p.t; switchAudioToAng(p.item, false); }
+      else if(p.mode === "ang" && p.item !== state.ang){
+        /* in the stream (appended) the audio switch suffices; a
+           stream that no longer holds the item (a fresh loadAng
+           replaced it) must load it like any other landing */
+        if(state.streamAngs && state.streamAngs.indexOf(p.item) >= 0){ pendingSeek = p.t; switchAudioToAng(p.item, false); }
+        else { pendingSeek = p.t; loadAng(p.item); }
+      }
       else if(p.mode === "bani" && p.item !== state.id){ pendingSeek = p.t; switchAudioToBani(p.item, false); }
       else seekTo(p.t);
       if(p.playing) playAudio(); else pauseAudio();
       showBars();
+      landJumpFocus(p);
       if(!p.playing) setTimeout(function(){ var f = currentLineEl(); if(f && f.el) f.el.scrollIntoView({ block: "center" }); }, 450);
     }catch(e){}
     jumpRestoring = false;
     paintJumpBtns();
   }
+  /* an undo/redo lands the HEAD on the restored line, not just the
+     audio: a paused seek fires no save of its own, so without this
+     the stored focus would stay on the line that was left. Waits
+     out an async load (a cross-Ang restore) before writing. */
+  function landJumpFocus(p){
+    if(!p || typeof p.idx !== "number") return;
+    var tries = 0;
+    var iv = setInterval(function(){
+      tries++;
+      var base = p.mode === "ang" ? state.angFirstLine[p.item] : state.baniFirstLine[p.item];
+      if(typeof base === "number" && state.flatLines[base + p.idx]){
+        clearInterval(iv);
+        saveFocusLine(base + p.idx);
+        markFocus(base + p.idx);
+        updateRecenter();
+      }
+      else if(tries > 24) clearInterval(iv);
+    }, 120);
+  }
   function jumpUndo(){
-    if(!jumpUndoStack.length) return;
-    var cur = jumpPos(); if(cur) jumpRedoStack.push(cur);
-    restoreJump(jumpUndoStack.pop());
+    var st = jumpStack();
+    if(!st.u.length) return;
+    var cur = jumpPos(); if(cur) st.r.push(cur);
+    restoreJump(st.u.pop());
   }
   function jumpRedo(){
-    if(!jumpRedoStack.length) return;
-    var cur = jumpPos(); if(cur) jumpUndoStack.push(cur);
-    restoreJump(jumpRedoStack.pop());
+    var st = jumpStack();
+    if(!st.r.length) return;
+    var cur = jumpPos(); if(cur) st.u.push(cur);
+    restoreJump(st.r.pop());
   }
   if($("jumpUndo")) $("jumpUndo").addEventListener("click", jumpUndo);
   if($("jumpRedo")) $("jumpRedo").addEventListener("click", jumpRedo);
@@ -4558,20 +4676,26 @@
     function recIdOfField(f){ return f === "rec_paaths" ? "paaths" : f === "rec_settings" ? "settings" : "ctx:" + f.slice(8); }
 
     /* ---------- records: what this device would send ----------
-       A Paath record is that Paath's stored resume point (place) and
-       focus line (glf). The free/Default reading place is NEVER part
-       of a record — it stays per-device by design. The list record is
-       the shared list only: which Paath THIS device is reading is a
+       A Paath record is that Paath's HEAD — its last focus line
+       (glf) — and nothing else (owner, Nov 25): scroll position is
+       never stored in a Paath record and never synced. The
+       free/Default reading state is NEVER part of a record — it
+       stays per-device by design. The list record is the shared
+       list only: which Paath THIS device is reading is a
        per-device fact and is not synced. */
     function deriveCtx(id){
       if(id === paathData.current && !detour){
-        var place = null, g = null;
-        try{ place = readPlace(); }catch(e){}
-        try{ g = glf; }catch(e){}
+        /* the head, read fresh from its storage key (writeFocus keeps
+           the key and the in-memory copy in step; reading the key is
+           the same discipline readPlace always used, and can never
+           serve a stale in-memory head) */
+        var g = null;
+        try{ g = JSON.parse(lsGet(FOCUS_KEY) || "null"); }catch(e){}
+        if(!g) g = glf;
         if(g && g.mode === "bani"){ var prev = readCtx(id); g = prev ? prev.glf : null; }
-        return { place: place, glf: g };
+        return { glf: g };
       }
-      return readCtx(id) || { place: null, glf: null };
+      return readCtx(id) || { glf: null };
     }
     function localRecord(recId){
       if(recId === "paaths") return { list: paathData.list.map(function(p){ return { id: p.id, name: p.name }; }) };
@@ -4589,48 +4713,13 @@
        sync meta: sent[recId] — the exact JSON last handed to (or
        applied from) Firestore, a cheap guard so an unchanged record
        is never rewritten; seen[recId] — the newest server stamp
-       applied for the record. No hashes, no baselines, no heuristics
-       beyond one content rule for Paath records (below). */
+       applied for the record. No hashes, no baselines, no merge
+       heuristics: per record, the newest server stamp wins (LWW). */
     function sentMap(){ return meta().sent || {}; }
     function seenMap(){ return meta().seen || {}; }
     function markSent(recId, json){ var s = sentMap(); s[recId] = json; setMeta({ sent: s }); }
     function forgetSent(recId){ var s = sentMap(); delete s[recId]; setMeta({ sent: s }); }
     function markSeen(recId, at){ var s = seenMap(); s[recId] = at; setMeta({ seen: s }); }
-    /* when the user actually read in a Paath record: the newest
-       reading stamp inside its content */
-    function ctxTs(data){
-      if(!data) return 0;
-      var t = 0;
-      if(data.place && data.place.ts) t = Math.max(t, data.place.ts);
-      if(data.glf && data.glf.ts) t = Math.max(t, data.glf.ts);
-      return t;
-    }
-    /* a Paath record's POSITION as a comparable pair [item, line]:
-       the furthest pankti the record names, from its place's focus
-       line, its Ang, or its focus record — position, not clock */
-    function ctxPos(data){
-      if(!data) return null;
-      var best = null;
-      var consider = function(item, idx){
-        if(typeof item !== "number" || !isFinite(item)) return;
-        var p = [item, (typeof idx === "number" && isFinite(idx)) ? idx : 0];
-        if(!best || p[0] > best[0] || (p[0] === best[0] && p[1] > best[1])) best = p;
-      };
-      if(data.place){
-        if(data.place.fl) consider(data.place.fl.item, data.place.fl.idx);
-        if(typeof data.place.ang === "number") consider(data.place.ang, 0);
-      }
-      if(data.glf) consider(data.glf.item, data.glf.idx);
-      return best;
-    }
-    function posCmp(a, b){
-      if(!a && !b) return 0;
-      if(!a) return -1;
-      if(!b) return 1;
-      if(a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
-      if(a[1] !== b[1]) return a[1] < b[1] ? -1 : 1;
-      return 0;
-    }
     function listCustomised(data){
       if(!data || !Array.isArray(data.list)) return false;
       var def = ["Sehaj Paath ੧", "Sehaj Paath ੨", "Sehaj Paath ੩", "Sehaj Paath ੪"];
@@ -4639,21 +4728,28 @@
       return false;
     }
 
-    /* ---------- push: on save, immediately; Firestore queues and
-       retries the write itself. A short debounce coalesces a burst of
-       saves into one merge write; a slow reconcile interval plus
-       visibility/focus/pagehide flushes catch everything else. The
+    /* ---------- push: records change rarely by design (a Paath
+       record is one focus line; the focus moves at reading pace at
+       the fastest), so a gentle throttle is all the coalescing this
+       needs: saves schedule a push at most ~1.5s apart, and the
+       moments that matter — pause, tab hidden, pagehide — flush at
+       once. A slow reconcile interval catches anything else. The
        sent-guard makes every one of these a no-op when nothing
        changed. ---------- */
-    var pushTimer = null;
-    function schedulePush(){ if(pushTimer) return; pushTimer = setTimeout(function(){ pushTimer = null; pushNow(); }, 250); }
+    var pushTimer = null, lastPushAt = 0;
+    function schedulePush(){
+      if(pushTimer) return;
+      var wait = Math.max(0, 1500 - (Date.now() - lastPushAt));
+      pushTimer = setTimeout(function(){ pushTimer = null; pushNow(); }, wait);
+    }
+    function flushPush(){ if(pushTimer){ clearTimeout(pushTimer); pushTimer = null; } pushNow(); }
     function retryPush(){ if(retryTimer) return; retryTimer = setTimeout(function(){ retryTimer = null; pushNow(); }, 20000); }
     function pushNow(){
       if(!user || !db || applying || !hydrated) return;
       var upd = {}, sentJson = {};
       recIdsLocal().forEach(function(recId){
         var data = localRecord(recId); if(!data) return;
-        if(recId.indexOf("ctx:") === 0 && !data.place && !data.glf) return;
+        if(recId.indexOf("ctx:") === 0 && !data.glf) return;
         var json = JSON.stringify(data);
         if(sentMap()[recId] === json) return;
         var f = fieldOf(recId);
@@ -4672,6 +4768,7 @@
         upd[f + "_by"] = firebase.firestore.FieldValue.delete();
       });
       if(!Object.keys(upd).length) return;
+      lastPushAt = Date.now();
       db.collection("progress").doc(user.uid).set(upd, { merge: true }).then(function(){
         Object.keys(sentJson).forEach(function(recId){ markSent(recId, sentJson[recId]); });
         setMeta({ knownCtx: paathData.list.map(function(p){ return p.id; }) });
@@ -4681,10 +4778,31 @@
       }).catch(function(e){ failNote("push", e); retryPush(); });
     }
     document.addEventListener("reader-dirty", schedulePush);
-    document.addEventListener("visibilitychange", function(){ if(!document.hidden) pushNow(); });
-    window.addEventListener("focus", pushNow);
-    window.addEventListener("pagehide", pushNow);
+    document.addEventListener("visibilitychange", function(){ if(document.hidden) flushPush(); else regate(); });
+    window.addEventListener("online", function(){ regate(); });
+    window.addEventListener("focus", schedulePush);
+    window.addEventListener("pagehide", flushPush);
     setInterval(pushNow, 2500);
+    /* a real pause is a save point (the pause handler has already
+       written the focus by the time this listener runs) — flush it */
+    try{ audio.addEventListener("pause", function(){ setTimeout(flushPush, 350); }); }catch(e){}
+
+    /* ---------- reactivation gate (the Readest pull-on-open rule):
+       a device that slept or sat in a background tab may hold a
+       stale head. When it becomes visible again, pushes lock until
+       a fresh server snapshot has been pulled and applied — the
+       pull is a one-shot server get() fed through the same handler,
+       so any newer cloud state lands BEFORE this device can write.
+       A watchdog lifts the gate if no server answer ever comes
+       (offline wake), so the gate can never wedge shut. ---------- */
+    var wakeGateTimer = null;
+    function regate(){
+      if(!user || !db) return;
+      hydrated = false;
+      if(wakeGateTimer) clearTimeout(wakeGateTimer);
+      wakeGateTimer = setTimeout(function(){ hydrated = true; schedulePush(); }, 8000);
+      db.collection("progress").doc(user.uid).get().then(function(s){ handleDoc(s); }).catch(function(){});
+    }
 
     /* ---------- apply: the snapshot listener is the only reader.
        Applying is IN PLACE and can never reload the page, close a
@@ -4703,14 +4821,20 @@
     function applyCtxRecord(id, data){
       if(!data) return;
       var local = deriveCtx(id);
-      if(!data.place && !data.glf && local && (local.place || local.glf)) return;   /* a "not started" record never erases a started journey */
-      writeCtx(id, data);
+      if(!data.glf && local && local.glf) return;   /* a "not started" record never erases a started journey */
+      /* the stored snapshot is the head alone — a legacy cloud record
+         may still carry a place; it is stripped, never stored */
+      writeCtx(id, { glf: data.glf || null });
       var playing = false;
       try{ playing = !!(audio && !audio.paused && !audio.ended); }catch(e){}
       if(id === paathData.current && !detour && !playing){
-        if(data.place) lsSet(LAST_KEY, JSON.stringify(data.place)); else lsSet(LAST_KEY, null);
-        if(data.glf){ glf = data.glf; lsSet(FOCUS_KEY, JSON.stringify(data.glf)); }
-        else { glf = null; lsSet(FOCUS_KEY, null); }
+        if(data.glf){
+          glf = data.glf; lsSet(FOCUS_KEY, JSON.stringify(data.glf));
+          /* the live place is re-derived from the head: on this
+             device the Paath now resumes AT its focus line */
+          lsSet(LAST_KEY, JSON.stringify(placeFromFocus(data.glf)));
+        }
+        else { glf = null; lsSet(FOCUS_KEY, null); lsSet(LAST_KEY, null); }
       }
     }
     function applyListRecord(data){
@@ -4743,14 +4867,18 @@
     }
 
     /* ---------- the merge: one snapshot handler for everything.
-       Own writes (writer id = this device) are adopted, never
-       applied. For every other record the server stamp decides —
-       with ONE content rule for Paath records: a record is applied
-       only when its reading time is at least the local record's;
-       an older-reading record never overwrites a newer local
-       reading, the local one is (re)published instead. The list is
-       protected the same way at first contact only: a customised
-       local list is never replaced by a factory-default cloud list.
+       Plain last-writer-wins, the standard rule: own writes (writer
+       id = this device) are adopted, never applied; for every other
+       record the newest server stamp wins and is applied — ahead,
+       behind, it makes no difference, because the head is one line
+       and the newest write IS the reader's latest intent (an undo
+       is a newer write, not a stale one). No position heuristics,
+       no client-clock comparisons. Two guards only: a record for a
+       Paath this device's list does not carry is left unseen (a
+       later list that names it evaluates it fresh), and at first
+       contact a customised local list is never replaced by a
+       factory-default cloud list. Pending-write echoes carry a
+       null stamp and are skipped record by record below.
        ---------------------------------------------------------- */
     function handleDoc(doc){
       /* cache-only deliveries are this device's own disk state, not
@@ -4791,29 +4919,6 @@
         var first = seenMap()[recId] == null;
         if(!first && at <= prevSeen) return;
         if(recId.indexOf("ctx:") === 0){
-          var local = localRecord(recId);
-          /* the win is decided by POSITION first (Readest's
-             forward-only receiver rule), never by client clock alone:
-             an incoming record ahead of the local position always
-             applies, however old its reading stamp; at the same
-             position the newer stamp applies. An incoming record
-             BEHIND the local position applies only when its reading
-             stamp is newer by a wide margin (2 minutes — far beyond
-             clock skew or a casual scroll on a stale device), which
-             is what a genuine intentional move backward looks like.
-             Anything else is a stale device touching an old position:
-             the local record stands and is republished. The cloud
-             stamp is deliberately NOT marked seen on a veto — if this
-             device's push never lands, the cloud record must stay
-             eligible for re-evaluation instead of being blacklisted. */
-          var cmp = posCmp(ctxPos(data), ctxPos(local));
-          var behindButGenuine = cmp < 0 && ctxTs(data) > ctxTs(local) + 120000;
-          if(local && (local.place || local.glf) && cmp < 0 && !behindButGenuine){
-            forgetSent(recId); schedulePush(); return;
-          }
-          if(local && (local.place || local.glf) && cmp === 0 && ctxTs(local) > ctxTs(data)){
-            forgetSent(recId); schedulePush(); return;
-          }
           var known = {}; paathData.list.forEach(function(p){ known[p.id] = 1; });
           if(!known[recId.slice(4)]) return;   /* a Paath this device's list does not carry — left unseen so a later list that names it evaluates it fresh */
         }
@@ -4872,7 +4977,7 @@
        (throttled) the page fetches its own URL bypassing cache and
        compares. A mismatch never forces a reload mid-reading — it
        names itself in the Account note so the reader refreshes. */
-    var BUILD = "2026-11-25-sync2", buildCheckedAt = 0;
+    var BUILD = "2026-11-25-sync3", buildCheckedAt = 0;
     function checkBuild(){
       if(!user) return;
       var now = Date.now();
