@@ -418,6 +418,9 @@ Menu), and no pager — the Ang lives in the pill, whose chevrons
 travel with it in portrait too. A crowded strip is how a Search
 tap could land on the Ang switcher. Landscape earns extra
 buttons per size tier, only where they fit (the rails, §10).
+The Ang unit's home follows the chrome: at the very top when
+the bars are hidden (full screen), tucked just below the top
+bar while the bar is showing — it glides between the two.
 
 **Pager (in the top bar).** Previous/next item as **chevron-only ghost
 buttons — no text labels**; at the ends they disable faded. The centre
