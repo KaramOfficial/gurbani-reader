@@ -189,7 +189,13 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   from there, a seek-bar jump, or landing on an Ang (in any mode)
   — first pushes the line being left (item, line index, its start
   second, playing or paused) onto the undo stack and clears the
-  redo stack; Undo and Redo walk the stacks, restoring through the
+  redo stack; a head that arrives by SYNC is a landing too
+  (owner, Nov 26): when a remote apply replaces the live head,
+  the head it replaces is pushed onto this device's undo
+  stack — the stacks themselves still never sync, but a sync
+  landing is history, so the pankti the reader was on before
+  another device moved is one Undo away instead of gone.
+  Undo and Redo walk the stacks, restoring through the
   ordinary switch/seek machinery, so the audio re-seeks to that
   line and the head lands on it (a restore writes the focus record
   for the restored line explicitly, and the VIEW goes with the
