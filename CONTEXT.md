@@ -222,7 +222,12 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   second time; the explicit target removes that class. The
   landing's base on a fresh load is 0 (the restored item is
   the first section; the first-line maps still hold the
-  previous stream's bases during render).
+  previous stream's bases during render). The island's verdict
+  is also re-asked at the one funnel where a remote apply
+  replaces the live head (`applyCtxRecord`), so on an older
+  device the Recenter pill shows itself on open — the state
+  already knew the head was elsewhere; it was never re-asked
+  until the reader scrolled.
 - Wake Lock is held while playing so the screen stays awake.
 - Fullscreen: attempted once playback is flowing and auto-scroll is
   carrying the reading (not on the bare play tap); exiting is manual.

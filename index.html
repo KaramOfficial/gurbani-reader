@@ -5336,6 +5336,16 @@
           lsSet(LAST_KEY, JSON.stringify(placeFromFocus(data.glf)));
         }
         else { glf = null; lsSet(FOCUS_KEY, null); lsSet(LAST_KEY, null); }
+        /* the head just moved underneath the reader (owner,
+           Nov 26): re-ask the island for its verdict NOW. The
+           verdict logic already knows the view is away from the
+           head — it was simply never re-asked after a remote
+           apply, so on an older device the Recenter pill stayed
+           hidden until the reader happened to scroll. Every
+           remote arrival — first hydration on open, the wake
+           pull, a live snapshot — funnels through here, so this
+           one call covers them all. */
+        try{ updateRecenter(); }catch(e){}
       }
     }
     function applyListRecord(data){
