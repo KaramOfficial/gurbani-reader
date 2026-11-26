@@ -5530,8 +5530,9 @@
     /* voice: finals only, never displayed — a final result just searches */
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     var recog = null, listening = false;
-    if(!SR){ micBtn.style.display = "none"; }
-    else {
+    function paintMic(){ micBtn.style.display = SR ? "" : "none"; }
+    paintMic();
+    if(SR){
       recog = new SR();
       recog.lang = "pa-IN"; recog.interimResults = false; recog.continuous = false; recog.maxAlternatives = 1;
       recog.onresult = function(ev){
@@ -5568,6 +5569,7 @@
     input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); runSearch(input.value); } });
 
     function openSearch(){
+      paintMic();   /* support is judged when the popup opens, not once at load — environments change */
       closeSheet(); closeAngPop(); closePaathPop(); islandHide();
       sheetEl.classList.add("open"); scrim.classList.add("open");
       showBars(); ensureIndex();
