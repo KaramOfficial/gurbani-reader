@@ -171,11 +171,19 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   focus pankti (vishraam-cleaned, ~14 words; prefixed with the
   Ang when the title is a Paath's name), album = "Gurbani
   Reader", artwork = the ੴ brand mark (`art-512.png` /
-  `art-192.png`, which is also the favicon). It repaints on
+  `art-192.png`, which is also the favicon — the glyph
+  optically centred in its ring, the ring drawn stronger so
+  it survives small sizes; Cook I2, Nov 26). It repaints on
   every head move and transport change; playback and position
   state follow the audio, so the shade's seek bar is real.
-- **Jump history — Undo / Redo** (owner, Nov 25): the player carries
-  Undo and Redo buttons (and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). The
+- **Jump history — Undo / Redo** (owner, Nov 25; buttons moved
+  Nov 26): Undo and Redo live on the Recenter island, flanking
+  the trio in the island's own round icon-button style — Undo
+  left of the book button, Redo right of the bookmark — and
+  each exists only while its stack is non-empty and the island
+  is calm (no sheet or popup open, the follow tracker not
+  driving); the keyboard keeps Ctrl/⌘+Z, Ctrl/⌘+Shift+Z,
+  Ctrl+Y. The
   model is the classic two-stack editor undo, and its entries are
   **lines**: a deliberate jump — double-tap a word or line to play
   from there, a seek-bar jump, or landing on an Ang (in any mode)
@@ -197,6 +205,18 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   drag in a position from free reading or a Bani. Follow-along
   (continuous playback) never enters it and never clears the redo
   stack; the ±5s nudges never enter it either.
+- **Recenter lands on the pankti in ONE click** (owner fix,
+  Nov 26): when the head lives in another item, Recenter loads
+  that item with an explicit target — the head's own line —
+  and the load's landing honours that line exactly. The
+  generic restore landing works the view out from the saved
+  audio second, which can belong to another item's timeline
+  (an assigned head, a head saved mid-seek) and land at the
+  item's start instead, leaving the reader to Recenter a
+  second time; the explicit target removes that class. The
+  landing's base on a fresh load is 0 (the restored item is
+  the first section; the first-line maps still hold the
+  previous stream's bases during render).
 - Wake Lock is held while playing so the screen stays awake.
 - Fullscreen: attempted once playback is flowing and auto-scroll is
   carrying the reading (not on the bare play tap); exiting is manual.
@@ -562,9 +582,31 @@ word/line highlight as a *primary* behaviour belongs to the sister
 Checker app, not here. Tap highlights (above) clear once the word's /
 line's end time passes.
 
+**Follow-along highlight.** In Sentence mode the current
+sentence — the last line whose start the audio has reached —
+stays highlighted for as long as it is the current one
+(owner, Nov 26): through the pause after the line and up to
+the next line's start, and while playback is paused. The
+end-of-line expiry (+0.05s) belongs to the tap highlight in
+the other modes and never strips the sentence highlight;
+the follow painter moves it when the next sentence begins.
+
 **Player layout.** Speed pill left, transport centred, auto-scroll
-toggle right as an icon-only round button whose ON state is an accent
-**ring**, not a filled disc. Auto-scroll defaults ON and persists.
+toggle right as an icon-only round button. Its ON state (owner,
+Nov 26, Cook F1) is the row's own language: the soft accent
+fill every other button shows while pressed, with the
+deep-gold icon — no ring, no special size. Auto-scroll defaults
+ON and persists. On wider layouts (≥761px, and phone landscape)
+the transport gains **shabad skip** buttons flanking the ±5
+pair — previous |◀ outside Back-5, ▶| next outside Fwd-5 —
+which jump the head to the previous / next titled section
+within the current item (a Bani's Paudis / titled groups, an
+Ang's shabad headers, recorded as flat-line indices when the
+lines are built); Previous restarts the current section when
+the head is into it, else goes to the one before. A shabad
+skip is a jump like any other (it enters the jump history,
+seeks or switches item, moves the view) and preserves the
+play / pause state.
 
 **The quick cluster (immersive interruption).** While audio plays
 with auto-scroll on and the bars hidden, a tap ANYWHERE — on a word,
