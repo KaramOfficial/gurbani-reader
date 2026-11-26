@@ -1258,6 +1258,7 @@
 
   /* ---------- remember last opened page (localStorage, device-only) ---------- */
   var LAST_KEY = "gurbani-reader:last-v1", pendingRestore = null, pendingSeek = 0;
+  var pendingRecenterLine = null;   /* set by Recenter's cross-item jump: the head's own line, which the load's landing must honour exactly */
   try{ if("scrollRestoration" in history) history.scrollRestoration = "manual"; }catch(e){}
   state.streamAngs = []; state.lineAng = {}; state.angLines = {};
   state.angFirstLine = {}; state.angFirstWord = {}; state.angHeight = {};
@@ -1765,6 +1766,13 @@
        the restore landing marks the pankti when it lands */
     pendingRestore = { mode: fg.mode, ang: fg.mode === "ang" ? fg.item : null, id: fg.mode === "bani" ? fg.item : null,
       y: 0, t: fg.t || 0, fl: { item: fg.item, idx: fg.idx, start: fg.start, src: "audio" } };
+    /* Recenter's promise is the PANKTI, not the item: the restore
+       below works the landing out from the saved audio second,
+       which can belong to another item's timeline (an assigned
+       head, a head saved mid-seek) and land the view at the
+       item's start instead — the reader then needs a second
+       Recenter. The head's own line overrides the landing. */
+    pendingRecenterLine = { mode: fg.mode, item: fg.item, idx: fg.idx };
     if(fg.mode === "ang") loadAng(fg.item);
     else { var b = baniById(fg.item); if(b) loadBani(b); }
   });
@@ -2698,6 +2706,18 @@
         if(typeof base !== "number") base = 0;
         focusBase = base;
         if(base + pr.fl.idx < state.flatLines.length) focusLi = base + pr.fl.idx;
+      }
+      if(pendingRecenterLine){
+        var rcl = pendingRecenterLine; pendingRecenterLine = null;
+        var rItem = pr.fl ? pr.fl.item : (state.mode === "ang" ? pr.ang : pr.id);
+        if(rcl.mode === state.mode && rcl.item === rItem){
+          /* a restore always lands on a fresh load, whose first
+             section is the restored item and whose lines start at
+             index 0 — the first-line maps still hold the PREVIOUS
+             stream's bases at this point, so the only honest base
+             here is 0 (the same doctrine as the fl fallback above) */
+          if(rcl.idx < state.flatLines.length){ focusLi = rcl.idx; focusBase = 0; }
+        }
       }
       /* the audio parks at the pankti's start — unless the recording had
          already played PAST the viewed pankti (listening with auto-scroll
