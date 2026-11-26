@@ -4268,12 +4268,17 @@
       if(li < 0 || li === state.curLine) return;
       var prevL = contentEl.querySelector(".line.current"); if(prevL) prevL.classList.remove("current");
       var lineEl2 = contentEl.querySelector('.line[data-li="' + li + '"]');
-      if(lineEl2 && curL <= lines[li].end + 0.45) lineEl2.classList.add("current");
-      /* commit only when the line is actually in the DOM (or already
-         past): a pruned section's line has no element — committing
-         anyway made the early return above block the repaint when
-         the section rehydrated under the same spoken line */
-      if(lineEl2 || curL > lines[li].end + 0.45) state.curLine = li;
+      /* Sentence mode means the highlight is ON (owner, Nov 26):
+         the current sentence — the last line whose start the
+         audio has reached — stays lit for as long as it is the
+         current one, through the pause after it and up to the
+         next line's start. No end-of-line expiry window. */
+      if(lineEl2) lineEl2.classList.add("current");
+      /* commit only when the line is actually in the DOM: a
+         pruned section's line has no element — committing anyway
+         made the early return above block the repaint when the
+         section rehydrated under the same spoken line */
+      if(lineEl2) state.curLine = li;
       return;
     }
     var words = state.flatWords;
@@ -4585,7 +4590,11 @@
     var l = contentEl.querySelector(".line.current");
     if(l){ var liN = Number(l.getAttribute("data-li")); var recL = state.flatLines[liN];
       if(state.mode === "ang" && state.lineAng[liN] && state.lineAng[liN] !== state.ang) l.classList.remove("current");
-      else if(recL && cur > recL.end + 0.05) l.classList.remove("current"); }
+      /* in Sentence follow mode the current sentence's highlight
+         never expires on its own (owner, Nov 26) — the follow
+         painter moves it when the next sentence begins. The
+         expiry below is the tap highlight's, in the other modes. */
+      else if(recL && hlMode !== "sentence" && cur > recL.end + 0.05) l.classList.remove("current"); }
   }
   function binSearch(arr, t){
     var lo = 0, hi = arr.length - 1, ans = -1;
