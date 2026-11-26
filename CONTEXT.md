@@ -421,10 +421,11 @@ happened within ~400ms. The reader's own programmatic scrolling must
 never be mistaken for the reader's hand.
 
 **Portrait strip (owner, Nov 26).** In portrait the top strip
-carries only the original three buttons — **Menu, Search, Full
-screen**, in that order: no Appearance button (it lives in the
-Menu), and no pager — the Ang lives in the pill, whose chevrons
-travel with it in portrait too. A crowded strip is how a Search
+carries three buttons — **Menu, Search, Appearance**, in that
+order (the theme button took Full screen's seat later that day;
+Full screen lives in the quick cluster and the Menu), and no
+pager — the Ang lives in the pill, whose chevrons travel with
+it in portrait too. A crowded strip is how a Search
 tap could land on the Ang switcher. Landscape earns extra
 buttons per size tier, only where they fit (the rails, §10).
 The Ang unit's home follows the chrome: at the very top when
@@ -554,11 +555,12 @@ with auto-scroll on and the bars hidden, a tap ANYWHERE — on a word,
 on a line, on empty space — raises only a small floating cluster
 (a vertical column along the right edge, stacked up from the
 bottom-right corner — top to bottom: play/pause, the speed pill,
-the A− / A+ font pair, search, appearance, and the settings orb
-at the corner; the owner's layout calls Nov 24, appearance added
-Nov 26 — the portrait strip no longer carries a theme button,
-so the cluster does; it cycles Day/Auto/Night exactly like the
-strip button and paints the same icon) instead of the whole chrome; a second tap dismisses it, and
+the A− / A+ font pair, search, appearance, full screen, and
+the settings orb at the corner; the owner's layout calls
+Nov 24, appearance and full screen added Nov 26 — the cluster
+appearance button cycles Day/Auto/Night exactly like the strip
+button and paints the same icon, and its full screen button
+rides the strip button's toggle the same way) instead of the whole chrome; a second tap dismisses it, and
 it fades on its own after ~5s. The Ang unit rises with the
 cluster on that tap and shares its lifetime — it stays while
 the cluster stays and leaves when the cluster leaves, instead
