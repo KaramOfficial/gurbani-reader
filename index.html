@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- reader-build:2026-11-25-sync2 -->
 <html lang="pa">
 <head>
 <meta charset="utf-8" />
@@ -1709,6 +1710,7 @@
       snap.glf = frec; snap.place = place; writeCtx(id, snap);
     }
     buildPaathLists();
+    syncDirty();
     closePaathPop();
     toastMsg(name + " · set to this pankti");
   }
@@ -1927,7 +1929,7 @@
   }
   function ctxKey(id){ return "gurbani-reader:ctx-" + id; }
   function readCtx(id){ try{ return JSON.parse(localStorage.getItem(ctxKey(id)) || "null"); }catch(e){ return null; } }
-  function writeCtx(id, snap){ try{ localStorage.setItem(ctxKey(id), JSON.stringify(snap)); }catch(e){} }
+  function writeCtx(id, snap){ try{ localStorage.setItem(ctxKey(id), JSON.stringify(snap)); }catch(e){} syncDirty(); }
   /* snapshot the live records into the current Paath — Ang state only:
      a Bani (Nitnem) place or focus NEVER enters a Paath snapshot; the
      snapshot keeps whatever Ang state it already held instead */
@@ -4341,13 +4343,17 @@
      standard Firestore one: ONE snapshot listener (its first
      delivery is the sign-in merge — there is no separate pull), a
      push on every save, and per record the server stamp decides —
-     with ONE content rule for Paath records: a record is applied
-     only when its reading time (the reading stamp inside the place/
-     focus content) is at least the local record's, so an older
-     reading never overwrites a newer one and the newer side is
-     republished instead. The list gets the same protection at first
-     contact only (a customised list is never replaced by a factory
-     default). Applying a record is IN PLACE and can never reload
+     with ONE content rule for Paath records, decided by POSITION
+     before clock: a record ahead of the local position always
+     applies; at the same position the newer reading stamp applies;
+     a record behind applies only when its stamp is newer by a wide
+     margin (a genuine intentional move backward) — otherwise the
+     local record stands and is republished. Client clocks never
+     veto a further-along reading. Pushes are gated until the
+     listener's first non-cache snapshot has been handled, so a
+     booting device merges before it ever writes. The list gets the
+     same protection at first contact only (a customised list is
+     never replaced by a factory default). Applying a record is IN PLACE and can never reload
      the page, close a surface, or move the reader: a Paath record
      updates that Paath's stored resume point (and, if it is this
      device's current Paath and playback is paused, the live records
@@ -4368,6 +4374,13 @@
     catch(e){ try{ console.error("[reader-sync] init:", e); }catch(_){} if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
     var META = "gurbani-reader:sync-v1";
     var user = null, applying = false, unsub = null, pushRetries = 0, retryTimer = null;
+    /* server hydration gate (Readest's pull-on-open gate, in Firestore
+       terms): until the listener's first NON-CACHE snapshot has been
+       handled, this device has not seen the cloud — every push is held
+       (saves are local state; the reconcile picks them up the moment
+       the gate opens), so a stale device can never overwrite fresher
+       cloud records with its boot state. */
+    var hydrated = false, pendingSince = 0;
     function meta(){ try{ return JSON.parse(localStorage.getItem(META) || "null") || {}; } catch(e){ return {}; } }
     function setMeta(patch){ try{ var m = meta(); for(var k in patch) m[k] = patch[k]; localStorage.setItem(META, JSON.stringify(m)); }catch(e){} }
     /* this device's writer id: random, generated once, persisted in
@@ -4512,6 +4525,32 @@
       if(data.glf && data.glf.ts) t = Math.max(t, data.glf.ts);
       return t;
     }
+    /* a Paath record's POSITION as a comparable pair [item, line]:
+       the furthest pankti the record names, from its place's focus
+       line, its Ang, or its focus record — position, not clock */
+    function ctxPos(data){
+      if(!data) return null;
+      var best = null;
+      var consider = function(item, idx){
+        if(typeof item !== "number" || !isFinite(item)) return;
+        var p = [item, (typeof idx === "number" && isFinite(idx)) ? idx : 0];
+        if(!best || p[0] > best[0] || (p[0] === best[0] && p[1] > best[1])) best = p;
+      };
+      if(data.place){
+        if(data.place.fl) consider(data.place.fl.item, data.place.fl.idx);
+        if(typeof data.place.ang === "number") consider(data.place.ang, 0);
+      }
+      if(data.glf) consider(data.glf.item, data.glf.idx);
+      return best;
+    }
+    function posCmp(a, b){
+      if(!a && !b) return 0;
+      if(!a) return -1;
+      if(!b) return 1;
+      if(a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+      if(a[1] !== b[1]) return a[1] < b[1] ? -1 : 1;
+      return 0;
+    }
     function listCustomised(data){
       if(!data || !Array.isArray(data.list)) return false;
       var def = ["Sehaj Paath ੧", "Sehaj Paath ੨", "Sehaj Paath ੩", "Sehaj Paath ੪"];
@@ -4530,7 +4569,7 @@
     function schedulePush(){ if(pushTimer) return; pushTimer = setTimeout(function(){ pushTimer = null; pushNow(); }, 250); }
     function retryPush(){ if(retryTimer) return; retryTimer = setTimeout(function(){ retryTimer = null; pushNow(); }, 20000); }
     function pushNow(){
-      if(!user || !db || applying) return;
+      if(!user || !db || applying || !hydrated) return;
       var upd = {}, sentJson = {};
       recIdsLocal().forEach(function(recId){
         var data = localRecord(recId); if(!data) return;
@@ -4634,6 +4673,11 @@
        local list is never replaced by a factory-default cloud list.
        ---------------------------------------------------------- */
     function handleDoc(doc){
+      /* cache-only deliveries are this device's own disk state, not
+         the cloud: before hydration they settle nothing and apply
+         nothing (the gate above all) */
+      if(doc && doc.metadata && doc.metadata.fromCache && !hydrated) return;
+      if(doc && !(doc.metadata && doc.metadata.fromCache)) hydrated = true;
       if(!doc || !doc.exists){ schedulePush(); return; }   /* new account: publish what this device has */
       var d = doc.data() || {};
       recIdsLocal().forEach(function(recId){
@@ -4668,11 +4712,26 @@
         if(!first && at <= prevSeen) return;
         if(recId.indexOf("ctx:") === 0){
           var local = localRecord(recId);
-          if(local && (local.place || local.glf) && ctxTs(local) > ctxTs(data)){
-            /* local reading is newer: republish it. The cloud stamp is
-               deliberately NOT marked seen — if this device's push
-               never lands, the cloud record must stay eligible for
-               re-evaluation instead of being blacklisted. */
+          /* the win is decided by POSITION first (Readest's
+             forward-only receiver rule), never by client clock alone:
+             an incoming record ahead of the local position always
+             applies, however old its reading stamp; at the same
+             position the newer stamp applies. An incoming record
+             BEHIND the local position applies only when its reading
+             stamp is newer by a wide margin (2 minutes — far beyond
+             clock skew or a casual scroll on a stale device), which
+             is what a genuine intentional move backward looks like.
+             Anything else is a stale device touching an old position:
+             the local record stands and is republished. The cloud
+             stamp is deliberately NOT marked seen on a veto — if this
+             device's push never lands, the cloud record must stay
+             eligible for re-evaluation instead of being blacklisted. */
+          var cmp = posCmp(ctxPos(data), ctxPos(local));
+          var behindButGenuine = cmp < 0 && ctxTs(data) > ctxTs(local) + 120000;
+          if(local && (local.place || local.glf) && cmp < 0 && !behindButGenuine){
+            forgetSent(recId); schedulePush(); return;
+          }
+          if(local && (local.place || local.glf) && cmp === 0 && ctxTs(local) > ctxTs(data)){
             forgetSent(recId); schedulePush(); return;
           }
           var known = {}; paathData.list.forEach(function(p){ known[p.id] = 1; });
@@ -4683,7 +4742,12 @@
         }
         applyRecord(recId, data, at);
       });
-      if(user){ if(doc.metadata && doc.metadata.hasPendingWrites) setNote("Syncing\u2026"); else syncedNote(); }
+      if(user){
+        if(doc.metadata && doc.metadata.hasPendingWrites){
+          if(!pendingSince) pendingSince = Date.now();
+          setNote(Date.now() - pendingSince > 12000 ? "Still syncing — will keep trying." : "Syncing\u2026");
+        } else { pendingSince = 0; syncedNote(); }
+      }
       schedulePush();
     }
 
@@ -4708,11 +4772,41 @@
       if(user && meta().uid !== user.uid) setMeta({ uid: user.uid, sent: {}, seen: {}, knownCtx: [] });
       paint();
       if(unsub){ try{ unsub(); }catch(e){} unsub = null; }
+      hydrated = false; pendingSince = 0;
       if(!user) return;
       setNote("Syncing…");
-      unsub = db.collection("progress").doc(user.uid).onSnapshot(handleDoc, function(e){ failNote("listen", e); });
+      /* includeMetadataChanges: the Account note is driven by
+         hasPendingWrites, a metadata-only change — without this the
+         listener can stay silent on the very transition that settles
+         the note */
+      unsub = db.collection("progress").doc(user.uid).onSnapshot({ includeMetadataChanges: true }, handleDoc, function(e){ failNote("listen", e); });
       schedulePush();
     });
+
+    /* ---------- build freshness ----------
+       A page left open (or a cached copy) runs whatever sync protocol
+       it was loaded with, indefinitely and silently — the cloud doc
+       still carries fields from a pre-rewrite protocol because a
+       device out there is running it. This build carries a token in
+       an HTML comment at the top of the file; on boot and on focus
+       (throttled) the page fetches its own URL bypassing cache and
+       compares. A mismatch never forces a reload mid-reading — it
+       names itself in the Account note so the reader refreshes. */
+    var BUILD = "2026-11-25-sync2", buildCheckedAt = 0;
+    function checkBuild(){
+      if(!user) return;
+      var now = Date.now();
+      if(now - buildCheckedAt < 600000) return;
+      buildCheckedAt = now;
+      try{
+        fetch(location.href.split("#")[0], { cache: "no-store" }).then(function(r){ return r.text(); }).then(function(t){
+          var m = /reader-build:([a-z0-9-]+)/.exec(t || "");
+          if(m && m[1] !== BUILD) setNote("A newer Reader version is ready — refresh this page to update.");
+        }).catch(function(){});
+      }catch(e){}
+    }
+    window.addEventListener("focus", checkBuild);
+    setTimeout(checkBuild, 5000);
   })();
 
   /* ---------- triple-tap a word: normal-speed preview ----------

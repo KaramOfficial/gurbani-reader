@@ -838,17 +838,45 @@ is republished by the reconcile. Removing a Paath from the list
 deletes its `rec_ctx_*` fields in the same merge write.
 
 Ordering is the server stamp's — with **one content rule for Paath
-records**: a record is applied only when its reading time is at
-least the local record's. A position's `ts` is when that position
-was SET, never when it was re-saved: opening the app, landing,
-resizing or settling re-saves a place without minting a new
-reading time (same rule for the focus record), so a stale line on
-a freshly opened device can never out-rank a genuinely newer
-reading from another device; when the local reading is the newer
-one, the incoming record is adopted-not-applied and the local
-record is republished instead. The list gets the same protection
-at first contact only (a customised local list is never replaced
-by a factory-default cloud list); settings take the cloud's word.
+records, decided by position before clock** (the Readest receiver
+rule): a record whose position (Ang, then line) is ahead of the
+local record always applies, however old its reading stamp; at the
+same position the newer stamp applies; a record behind applies
+only when its stamp is newer by a wide margin (2 minutes — beyond
+clock skew or a casual scroll on a stale device), which is what a
+genuine intentional move backward looks like. Otherwise the local
+record stands and is republished, and the cloud stamp is
+deliberately not marked seen, so a failed republication never
+blacklists the cloud record. A position's `ts` is when that
+position was SET, never when it was re-saved: opening the app,
+landing, resizing or settling re-saves a place without minting a
+new reading time (same rule for the focus record). Client clocks
+never veto a further-along reading. The list gets the same
+protection at first contact only (a customised local list is never
+replaced by a factory-default cloud list); settings take the
+cloud's word.
+
+Pushes are **gated on server hydration**: until the listener's
+first non-cache snapshot has been handled, no push fires — a
+booting device merges before it ever writes, so its stale boot
+state cannot overwrite fresher cloud records (cache-only snapshot
+deliveries settle and apply nothing). Every Paath snapshot write
+(the `writeCtx` funnel, switch-time snapshots, assign-to-Paath)
+announces `reader-dirty` like every other save. The listener is
+attached with `includeMetadataChanges`, because the Account note
+is driven by `hasPendingWrites` — a metadata-only transition; a
+pending state older than ~12 s reads "Still syncing — will keep
+trying." instead of an eternal "Syncing…".
+
+**Build freshness.** The build carries a token (`reader-build:` in
+an HTML comment at the top of `index.html`). On boot and on focus
+(throttled to 10 min) a signed-in page fetches its own URL with
+`cache: no-store` and compares tokens; a mismatch names itself in
+the Account note ("A newer Reader version is ready — refresh this
+page to update.") and never forces a reload mid-reading. A page
+left open or served from cache otherwise runs its loaded sync
+protocol indefinitely and silently — the cloud doc's frozen legacy
+`readerJson` field is the fossil of exactly that.
 The Library's Paath label/preview read the live records only while
 actually in that Paath; in free reading they read the synced
 snapshot. While audio plays, the focus is saved continuously
