@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- reader-build:2026-11-25-sync3 -->
+<!-- reader-build:2026-11-25-sync4 -->
 <html lang="pa">
 <head>
 <meta charset="utf-8" />
@@ -4502,66 +4502,88 @@
      the booted world even before any surface opens */
   buildPaathLists();
 
-  /* ---------- Google sign-in + cloud sync ----------
+  /* ---------- Google sign-in + cloud sync (sync4) ----------
      Optional, and invisible when unused. localStorage stays the source
      of truth on this device. Sync uses the same Firebase project as
      the Nitnem Tracker (nitnem-tracker) and the user's own doc in its
      progress collection — merge writes only; the two apps never touch
      each other's fields.
 
-     Design (owner's model, validated by two Gemini-style juries
-     against the world-standard patterns — Chrome Sync's per-item
-     merge, Kindle's furthest-page, Google Docs' presence-vs-content
-     split — 2026-11-25; full use-case matrix in the session notes):
+     sync4 (2026-11-25) is a ground-up redesign of this engine's
+     internals, after sync3 failed in the field in three ways its
+     stubbed tests could not see: (a) the Account note sat on "Still
+     syncing" forever on every browser — pushes had no in-flight
+     guard, every snapshot echo scheduled another push, and the synced
+     Paath record churned every few seconds during playback because
+     it carried the volatile audio position; a set() that never
+     settled hung the whole engine silently, because the pending
+     watchdog only repainted the note; (b) on browsers that freeze or
+     kill background tabs (Kiwi), queued writes died with the tab —
+     Firestore persistence was never enabled; (c) accounts were not
+     isolated: all reading data lived in one global local dataset, so
+     a new account on the same browser saw — and would have uploaded —
+     the previous account's Sehaj Paath library.
 
-     WHAT IS SHARED is durable progress, as PER-RECORD units, never a
-     whole-state blob:
+     The design follows the battle-tested shape (Readest's production
+     sync, Chrome Sync's per-item model, Antigravity's Reader audit):
+       * PER-RECORD units with SERVER-timestamp ordering (plain LWW —
+         the owner's rule), never a whole-state blob, never a client
+         clock deciding a win.
+       * A canonical record form: a record's synced JSON is byte-stable
+         when its meaningful content is unchanged (the focus line's
+         audio position `t` is presence, not progress, and is stripped
+         from the synced form on both sides), so a quiet app writes
+         nothing and an echo can never re-trigger a push.
+       * ONE write in flight: every push driver (save events, the
+         reconcile interval, snapshot echoes, flushes) funnels through
+         a single guarded push; drivers that arrive mid-flight set a
+         flag and coalesce into one follow-up round.
+       * A write that neither resolves nor rejects within 25 s is
+         declared wedged and the Firestore connection is actively
+         recovered (disable/enable network) — and the same recovery
+         fires if server snapshots report pending writes for over
+         20 s. Sync never hangs silently again.
+       * Transport hardening at init: automatic long-polling detection
+         (for Chromium forks whose streaming channel stalls) and
+         guarded offline persistence with tab synchronisation, so a
+         queued write survives the tab being frozen or killed and
+         lands on the next launch.
+       * Pull-on-open GATING (Readest): no push until the listener's
+         first non-cache snapshot has been handled, and the gate
+         re-arms on reactivation until a fresh server get() has been
+         applied — a booting or waking device merges before it writes.
+       * PER-ACCOUNT DATASETS: the live local dataset belongs to one
+         account (or the guest). Signing in with a different account
+         parks the current dataset under its owner in local storage,
+         installs the incoming account's parked dataset (or a fresh
+         one) IN PLACE — no reload — and re-enters its world; sign-out
+         parks the account's dataset and returns to the guest dataset.
+         The one exception: data that has never belonged to any
+         account (read before the first-ever sign-in) is adopted by
+         that first account. A fresh account opens with a fresh
+         library, and its cloud doc only ever receives its own data.
+
+     WHAT IS SHARED is durable progress, as per-record units:
        * rec_paaths — the Sehaj Paath list ({id, name} only; which
-         Paath is "current" is this device's own business and is not
-         synced);
-       * rec_settings — the shared reading settings (font size, speed,
-         follow-along, appearance, advanced, auto-scroll, paragraph
-         headers). Layout stays per-device per size class, as before;
-       * rec_ctx_<id> — one record per Sehaj Paath: its snapshot
-         {place, glf}, Ang state only. The CURRENT Paath's record is
-         derived from the live records while this device is in the
-         Paath world; in free reading it is the parked snapshot,
-         unchanged — reading free can never dirty a Paath record.
+         Paath is "current" is this device's own business);
+       * rec_settings — the shared reading settings;
+       * rec_ctx_<id> — one record per Sehaj Paath: its HEAD alone
+         ({ glf } — the last focus line; no place, no scroll position,
+         ever). The current Paath's record is derived from the live
+         focus while this device is in the Paath world; in free
+         reading it is the parked snapshot, unchanged.
      WHAT IS NEVER SHARED is session/presence state: free (Default)
      reading's place and focus (detour-v1), the world this device is
      in (mode-v1), and the live records themselves (last-v1,
-     focus-v1). Free reading is per-device, full stop — two devices
-     can never mess with each other's free reading.
+     focus-v1). Free reading is per-device, full stop.
 
-     Each record in the doc carries its own server timestamp
-     (<field>_at, a serverTimestamp — the ONLY ordering clock; client
-     clocks never decide a win) and its writer's device id
-     (<field>_by — a device never applies its own writes). Dirty
-     records batch into ONE merge write. The protocol is the boring,
-     standard Firestore one: ONE snapshot listener (its first
-     delivery is the sign-in merge — there is no separate pull), a
-     push on every save, and per record the server stamp decides —
-     with ONE content rule for Paath records, decided by POSITION
-     before clock: a record ahead of the local position always
-     applies; at the same position the newer reading stamp applies;
-     a record behind applies only when its stamp is newer by a wide
-     margin (a genuine intentional move backward) — otherwise the
-     local record stands and is republished. Client clocks never
-     veto a further-along reading. Pushes are gated until the
-     listener's first non-cache snapshot has been handled, so a
-     booting device merges before it ever writes. The list gets the
-     same protection at first contact only (a customised list is
-     never replaced by a factory default). Applying a record is IN PLACE and can never reload
-     the page, close a surface, or move the reader: a Paath record
-     updates that Paath's stored resume point (and, if it is this
-     device's current Paath and playback is paused, the live records
-     underneath) — the view and playback are never yanked (Kindle
-     rule); the reader's own next save carries a newer reading time
-     and legitimately supersedes.
-     Offline / signed out / SDK blocked: local-only, exactly as
-     before. A failed push or listen names its Firebase error code
-     in the Account note (full error in the console under
-     [reader-sync]) instead of failing silently. */
+     Applying a record is IN PLACE and can never reload the page,
+     close a surface, or move the reader (the Kindle rule); the one
+     deliberate exception is an account switch, which re-enters the
+     incoming account's world exactly as a fresh boot would. A failed
+     push or listen names its Firebase error code in the Account note
+     (full error in the console under [reader-sync]). Offline /
+     signed out / SDK blocked: local-only, exactly as before. */
   (function(){
     var btn = $("syncBtn"), note = $("syncNote");
     if(!btn) return;
@@ -4570,6 +4592,14 @@
     var auth, db;
     try{ firebase.initializeApp(CFG); auth = firebase.auth(); db = firebase.firestore(); }
     catch(e){ try{ console.error("[reader-sync] init:", e); }catch(_){} if(note) note.textContent = "Sign-in unavailable right now — everything still saves on this device."; return; }
+    /* transport hardening — both must be set before the Firestore
+       instance is used for anything else, and both degrade silently:
+       long-polling auto-detection rescues browsers whose streaming
+       (WebChannel) transport stalls; offline persistence makes the
+       mutation queue durable in IndexedDB so a write queued as a tab
+       is frozen or killed still lands on the next launch. */
+    try{ if(db && typeof db.settings === "function") db.settings({ experimentalAutoDetectLongPolling: true }); }catch(e){}
+    try{ if(db && typeof db.enablePersistence === "function"){ var pp0 = db.enablePersistence({ synchronizeTabs: true }); if(pp0 && typeof pp0.catch === "function") pp0.catch(function(){}); } }catch(e){}
     var META = "gurbani-reader:sync-v1";
     var user = null, applying = false, unsub = null, pushRetries = 0, retryTimer = null;
     /* server hydration gate (Readest's pull-on-open gate, in Firestore
@@ -4588,6 +4618,89 @@
     if(!CID){ CID = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); setMeta({ cid: CID }); }
     function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
     function lsSet(k, v){ try{ if(v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
+
+    /* ---------- per-account datasets ----------
+       Every `gurbani-reader:*` key except the sync meta itself is
+       dataset. A dataset belongs to one owner: an account uid, or
+       the guest (slot "guest"). Parking copies the live dataset into
+       its owner's slot; restoring clears the live keys and installs
+       the incoming owner's parked dataset (or leaves the keys clear,
+       which the app reads as a fresh install). The stash keys live
+       under their own prefix and are never themselves parked. */
+    var ACCT_PREFIX = "gurbani-reader:acct:";
+    function datasetKeys(){
+      var ks = [];
+      try{
+        for(var i = 0; i < localStorage.length; i++){
+          var k = localStorage.key(i);
+          if(k && k.indexOf("gurbani-reader:") === 0 && k !== META && k.indexOf(ACCT_PREFIX) !== 0) ks.push(k);
+        }
+      }catch(e){}
+      return ks;
+    }
+    function stashKey(slot){ return ACCT_PREFIX + (slot ? String(slot) : "guest"); }
+    function parkDataset(slot){
+      var o = {};
+      datasetKeys().forEach(function(k){ var v = lsGet(k); if(v !== null) o[k] = v; });
+      try{ localStorage.setItem(stashKey(slot), JSON.stringify(o)); }catch(e){}
+    }
+    function restoreDataset(slot){
+      datasetKeys().forEach(function(k){ lsSet(k, null); });
+      var raw = lsGet(stashKey(slot)); if(!raw) return false;
+      var o = null; try{ o = JSON.parse(raw); }catch(e){}
+      if(!o || typeof o !== "object") return false;
+      Object.keys(o).forEach(function(k){ if(k !== META && k.indexOf(ACCT_PREFIX) !== 0) lsSet(k, o[k]); });
+      return true;
+    }
+    /* re-enter the live dataset's world in place, mirroring the boot
+       decision chain: re-read the Paath data and focus, re-apply the
+       settings, rebuild the lists, and land where this dataset was
+       left — free reading from its own slot, or the Paath world from
+       its saved live place. Nothing of the outgoing dataset is saved
+       here: its storage was already parked by the caller. */
+    function reenterWorld(){
+      var pd = null; try{ pd = JSON.parse(lsGet(PAATHS_KEY) || "null"); }catch(e){}
+      if(pd && Array.isArray(pd.list) && pd.list.length){ paathData.list = pd.list; paathData.current = pd.current || null; paathData.defName = pd.defName || null; }
+      else { paathData.list = [1,2,3,4].map(function(n){ return { id: "p" + n, name: "Sehaj Paath " + paNum(n) }; }); paathData.current = paathData.list[0].id; paathData.defName = null; savePaathData(); }
+      if(!paathById(paathData.current)) paathData.current = paathData.list.length ? paathData.list[0].id : null;
+      try{ glf = JSON.parse(lsGet(FOCUS_KEY) || "null"); }catch(e){ glf = null; }
+      detourGlf = null; paathEditing = null;
+      try{ jumpStacks = {}; }catch(e){}
+      rehydrateSettings();
+      buildPaathLists();
+      var dstore = readDetourStore();
+      if(dstore && dstore.place && modeIsFree()){
+        detour = { resumed: true };
+        detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null);
+        restoreFromPlace(dstore.place);
+      } else if(modeIsFree()){
+        detour = { resumed: true };
+        detourGlf = dstore && dstore.glf ? dstore.glf : null;
+        loadAng(1);
+      } else {
+        exitDetour();
+        var saved = readPlace();
+        if(saved) restoreFromPlace(saved);
+        else { detour = { resumed: true }; detourGlf = null; setMode("free"); loadAng(1); }
+      }
+      updateRecenter();
+      try{ paintJumpBtns(); }catch(e){}
+    }
+    /* switch the live dataset to another owner (an account uid, or
+       null for the guest): park the outgoing dataset under its owner,
+       install the incoming one, re-enter its world. Pushes are muted
+       throughout — the incoming account's merge starts only when its
+       listener attaches, under its own identity. */
+    function switchDatasetTo(slot){
+      applying = true;
+      try{ if(audio) audio.pause(); }catch(e){}
+      parkDataset(meta().ownerUid);
+      restoreDataset(slot);
+      setMeta({ ownerUid: slot || null });
+      reenterWorld();
+      applying = false;
+    }
+
     /* canonical identity of a key set: parsed values with the
        volatile fields stripped — ts/y/t in place records, ts in
        focus records. A boot/restore re-save moves only those fields,
@@ -4648,9 +4761,11 @@
       var deep = function(x){ return !!x && ((x.ang || 0) > 1 || (x.t || 0) >= 30); };
       return deep(pl) || deep(dt && dt.place);
     }
-    /* decision helpers, exposed for the test harness (the live sync
-       paths need a real account and cannot run in a sandbox) */
-    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich, canonKeys: canonKeys };
+    /* decision helpers + sync4 state, exposed for the test harness
+       (the live sync paths need a real account and cannot run in a
+       sandbox) */
+    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich, canonKeys: canonKeys, canonRec: canonRec,
+      state: function(){ return { inFlight: pushInFlight, recovering: recovering, owner: meta().ownerUid || null, everAccount: !!meta().everAccount }; } };
     function setNote(s){ if(note) note.textContent = s; }
     /* bug zero was silence: every sync failure used to swallow its
        error, so a screenshot could never say WHY sync failed. Now
@@ -4674,6 +4789,25 @@
     var SETTINGS_KEYS = ["gurbani-reader:fontsize-v1", "gurbani-reader:speed-v1", "gurbani-reader:hlmode-v1", "gurbani-reader:appearance-v1", "gurbani-reader:advanced-v1", "gurbani-reader:autoscroll-v1", "gurbani-reader:parahead-v1"];
     function fieldOf(recId){ return recId === "paaths" ? "rec_paaths" : recId === "settings" ? "rec_settings" : "rec_ctx_" + recId.slice(4); }
     function recIdOfField(f){ return f === "rec_paaths" ? "paaths" : f === "rec_settings" ? "settings" : "ctx:" + f.slice(8); }
+    /* the canonical synced form of a record: a deep copy with the
+       volatile fields removed. For a Paath record that is the focus
+       line's audio position `t` — where within the line's audio this
+       device happens to be is presence, not progress; the head is
+       the LINE (mode/item/idx/start, with `ts` = when that line was
+       set and `pv` its preview). Without this, playback re-saved the
+       focus every few seconds and every save looked like a new
+       record — the churn that kept sync3's writes permanently
+       pending. Both sides canonicalise: what pushNow builds, what
+       markSent stores, and what an applied record is compared
+       against — so an unchanged head is byte-identical everywhere
+       and never re-pushes. */
+    function canonRec(recId, data){
+      if(!data || typeof data !== "object") return data;
+      var out = null;
+      try{ out = JSON.parse(JSON.stringify(data)); }catch(e){ return data; }
+      if(recId.indexOf("ctx:") === 0 && out.glf && typeof out.glf === "object") delete out.glf.t;
+      return out;
+    }
 
     /* ---------- records: what this device would send ----------
        A Paath record is that Paath's HEAD — its last focus line
@@ -4700,7 +4834,7 @@
     function localRecord(recId){
       if(recId === "paaths") return { list: paathData.list.map(function(p){ return { id: p.id, name: p.name }; }) };
       if(recId === "settings"){ var o = {}; SETTINGS_KEYS.forEach(function(k){ var v = lsGet(k); if(v !== null) o[k] = v; }); return o; }
-      return deriveCtx(recId.slice(4));
+      return canonRec(recId, deriveCtx(recId.slice(4)));
     }
     function recIdsLocal(){
       var ids = ["paaths", "settings"];
@@ -4710,11 +4844,15 @@
 
     /* ---------- sync state ----------
        Per record this device remembers only two things, both in the
-       sync meta: sent[recId] — the exact JSON last handed to (or
-       applied from) Firestore, a cheap guard so an unchanged record
-       is never rewritten; seen[recId] — the newest server stamp
-       applied for the record. No hashes, no baselines, no merge
-       heuristics: per record, the newest server stamp wins (LWW). */
+       sync meta: sent[recId] — the exact canonical JSON last handed
+       to (or applied from) Firestore, a cheap guard so an unchanged
+       record is never rewritten; seen[recId] — the newest server
+       stamp applied for the record. No hashes, no baselines, no
+       merge heuristics: per record, the newest server stamp wins
+       (LWW). The meta also records which account owns the live
+       dataset (ownerUid; null = the guest) and whether any account
+       has ever owned one here (everAccount — the first-ever sign-in
+       adopts the never-owned dataset instead of swapping it away). */
     function sentMap(){ return meta().sent || {}; }
     function seenMap(){ return meta().seen || {}; }
     function markSent(recId, json){ var s = sentMap(); s[recId] = json; setMeta({ sent: s }); }
@@ -4728,15 +4866,24 @@
       return false;
     }
 
-    /* ---------- push: records change rarely by design (a Paath
-       record is one focus line; the focus moves at reading pace at
-       the fastest), so a gentle throttle is all the coalescing this
-       needs: saves schedule a push at most ~1.5s apart, and the
-       moments that matter — pause, tab hidden, pagehide — flush at
-       once. A slow reconcile interval catches anything else. The
-       sent-guard makes every one of these a no-op when nothing
-       changed. ---------- */
+    /* ---------- push: one write in flight, actively recovered ----------
+       Every driver — save events (reader-dirty), the 2.5 s reconcile
+       interval, snapshot echoes, focus/visibility/pagehide flushes —
+       funnels into pushNow, and pushNow issues at most ONE set() at a
+       time. A driver that arrives mid-flight sets pushWanted and
+       coalesces into a single follow-up round; nothing can stack
+       duplicate writes behind a slow acknowledgement (sync3 did
+       exactly that, which is one reason its pending state never
+       cleared). The set() promise is watched: if it neither resolves
+       nor rejects within 25 s the transport is declared wedged, the
+       flight is abandoned (a sequence token makes its late settle a
+       no-op — the snapshot echo and the sent-guard reconcile whatever
+       it actually landed), and the connection is recovered. The
+       sent-guard still makes every round a no-op when nothing
+       changed, so a quiet app writes nothing. ---------- */
     var pushTimer = null, lastPushAt = 0;
+    var pushInFlight = false, pushWanted = false, inFlightTimer = null, flightSeq = 0;
+    var recovering = false, lastRecoverAt = 0, recoveries = 0;
     function schedulePush(){
       if(pushTimer) return;
       var wait = Math.max(0, 1500 - (Date.now() - lastPushAt));
@@ -4744,8 +4891,29 @@
     }
     function flushPush(){ if(pushTimer){ clearTimeout(pushTimer); pushTimer = null; } pushNow(); }
     function retryPush(){ if(retryTimer) return; retryTimer = setTimeout(function(){ retryTimer = null; pushNow(); }, 20000); }
+    /* actively restart the Firestore transport: the standard cure
+       for a wedged streaming channel. Cooldown-limited so a dead
+       network cannot spin it; a safety timer guarantees the
+       recovering flag itself can never wedge. After recovery the
+       listener re-fires and any owed push goes out again. */
+    function recoverConnection(why){
+      if(!db || !user) return;
+      var now = Date.now();
+      if(recovering || now - lastRecoverAt < 30000){ schedulePush(); return; }
+      recovering = true; lastRecoverAt = now; recoveries++;
+      try{ console.error("[reader-sync] recovering connection (" + why + ") — attempt " + recoveries); }catch(_){}
+      setNote("Reconnecting…");
+      var done = function(){ recovering = false; pushWanted = true; schedulePush(); };
+      try{
+        if(typeof db.disableNetwork === "function" && typeof db.enableNetwork === "function"){
+          db.disableNetwork().then(function(){ return db.enableNetwork(); }).then(done, done);
+        } else done();
+      }catch(e){ done(); }
+      setTimeout(function(){ if(recovering){ recovering = false; pushWanted = true; schedulePush(); } }, 15000);
+    }
     function pushNow(){
       if(!user || !db || applying || !hydrated) return;
+      if(pushInFlight){ pushWanted = true; return; }
       var upd = {}, sentJson = {};
       recIdsLocal().forEach(function(recId){
         var data = localRecord(recId); if(!data) return;
@@ -4767,15 +4935,32 @@
         upd[f + "_at"] = firebase.firestore.FieldValue.delete();
         upd[f + "_by"] = firebase.firestore.FieldValue.delete();
       });
-      if(!Object.keys(upd).length) return;
+      if(!Object.keys(upd).length){ pushWanted = false; return; }
       lastPushAt = Date.now();
+      pushInFlight = true; pushWanted = false;
+      var flight = ++flightSeq;
+      if(inFlightTimer) clearTimeout(inFlightTimer);
+      inFlightTimer = setTimeout(function(){
+        if(!pushInFlight || flight !== flightSeq) return;
+        flightSeq++; pushInFlight = false;
+        try{ console.error("[reader-sync] a push never settled — recovering the connection"); }catch(_){}
+        pushWanted = true;
+        recoverConnection("push-timeout");
+      }, 25000);
+      var flightDone = function(){ if(inFlightTimer){ clearTimeout(inFlightTimer); inFlightTimer = null; } pushInFlight = false; };
       db.collection("progress").doc(user.uid).set(upd, { merge: true }).then(function(){
+        if(flight !== flightSeq) return;   /* abandoned flight: its echo reconciles */
+        flightDone();
         Object.keys(sentJson).forEach(function(recId){ markSent(recId, sentJson[recId]); });
         setMeta({ knownCtx: paathData.list.map(function(p){ return p.id; }) });
         pushRetries = 0;
         syncedNote();
-        schedulePush();   /* anything saved mid-flight goes next round */
-      }).catch(function(e){ failNote("push", e); retryPush(); });
+        schedulePush();   /* anything saved mid-flight (pushWanted) goes next round */
+      }, function(e){
+        if(flight !== flightSeq) return;
+        flightDone();
+        failNote("push", e); retryPush();
+      });
     }
     document.addEventListener("reader-dirty", schedulePush);
     document.addEventListener("visibilitychange", function(){ if(document.hidden) flushPush(); else regate(); });
@@ -4852,7 +5037,7 @@
       else if(recId === "settings"){ SETTINGS_KEYS.forEach(function(k){ if(k in data) lsSet(k, data[k]); }); rehydrateSettings(); }
       else if(recId.indexOf("ctx:") === 0) applyCtxRecord(recId.slice(4), data);
       markSeen(recId, at);
-      markSent(recId, JSON.stringify(data));
+      markSent(recId, JSON.stringify(canonRec(recId, data)));
       buildPaathLists();
       try{ window.__applyCount = (window.__applyCount || 0) + 1; }catch(e){}
       syncedNote();
@@ -4906,16 +5091,16 @@
         var at = atOf(d[f + "_at"]);
         if(at == null) return;
         var prevSeen = seenMap()[recId] || 0;
+        var data = null;
+        try{ data = JSON.parse(raw); }catch(e){ return; }
+        if(!data) return;
         if(d[f + "_by"] === CID){
           /* own write, adopted — but a late older echo must never
              regress the stamp or the sent baseline */
           if(at > prevSeen) markSeen(recId, at);
-          if(at >= prevSeen) markSent(recId, raw);
+          if(at >= prevSeen) markSent(recId, JSON.stringify(canonRec(recId, data)));
           return;
         }
-        var data = null;
-        try{ data = JSON.parse(raw); }catch(e){ return; }
-        if(!data) return;
         var first = seenMap()[recId] == null;
         if(!first && at <= prevSeen) return;
         if(recId.indexOf("ctx:") === 0){
@@ -4930,8 +5115,14 @@
       if(user){
         if(doc.metadata && doc.metadata.hasPendingWrites){
           if(!pendingSince) pendingSince = Date.now();
-          setNote(Date.now() - pendingSince > 12000 ? "Still syncing — will keep trying." : "Syncing\u2026");
-        } else { pendingSince = 0; syncedNote(); }
+          var pendMs = Date.now() - pendingSince;
+          setNote(pendMs > 12000 ? "Still syncing — will keep trying." : "Syncing\u2026");
+          /* pending this long with no flight of ours outstanding is
+             a wedged transport (e.g. a persisted queue replaying into
+             a stalled channel), not a slow write: recover it instead
+             of only repainting the note, which is all sync3 ever did */
+          if(pendMs > 20000 && !pushInFlight) recoverConnection("pending-writes");
+        } else { pendingSince = 0; recoveries = 0; syncedNote(); }
       }
       schedulePush();
     }
@@ -4951,13 +5142,37 @@
     /* one listener from sign-in on: its first delivery IS the
        bootstrap (Firestore always opens with a full snapshot of the
        document), and every later write from any device arrives the
-       same way. No polling, no separate pull. */
+       same way. No polling, no separate pull. Identity transitions
+       are handled BEFORE the listener attaches: an account switch
+       parks the outgoing dataset and installs the incoming one, so
+       the listener and every push that follows belong to the new
+       account alone. */
     auth.onAuthStateChanged(function(u){
-      user = u || null;
-      if(user && meta().uid !== user.uid) setMeta({ uid: user.uid, sent: {}, seen: {}, knownCtx: [] });
-      paint();
+      var newUid = u ? u.uid : null;
       if(unsub){ try{ unsub(); }catch(e){} unsub = null; }
       hydrated = false; pendingSince = 0;
+      /* any push still in flight belonged to the previous identity —
+         abandon it; its late settle is a no-op by flight token */
+      flightSeq++; pushInFlight = false; pushWanted = false;
+      if(inFlightTimer){ clearTimeout(inFlightTimer); inFlightTimer = null; }
+      var m0 = meta();
+      if(newUid){
+        if(!m0.everAccount){
+          /* first account ever on this device: the live dataset has
+             never belonged to anyone — this account adopts it */
+          setMeta({ uid: newUid, sent: {}, seen: {}, knownCtx: [], ownerUid: newUid, everAccount: true });
+        } else if(m0.ownerUid !== newUid){
+          switchDatasetTo(newUid);
+          setMeta({ uid: newUid, sent: {}, seen: {}, knownCtx: [] });
+        } else if(m0.uid !== newUid){
+          setMeta({ uid: newUid, sent: {}, seen: {}, knownCtx: [] });
+        }
+      } else {
+        if(m0.everAccount && m0.ownerUid) switchDatasetTo(null);   /* sign-out: park the account's dataset, back to the guest's */
+        if(m0.uid) setMeta({ uid: null, sent: {}, seen: {}, knownCtx: [] });
+      }
+      user = u || null;
+      paint();
       if(!user) return;
       setNote("Syncing…");
       /* includeMetadataChanges: the Account note is driven by
@@ -4977,7 +5192,7 @@
        (throttled) the page fetches its own URL bypassing cache and
        compares. A mismatch never forces a reload mid-reading — it
        names itself in the Account note so the reader refreshes. */
-    var BUILD = "2026-11-25-sync3", buildCheckedAt = 0;
+    var BUILD = "2026-11-25-sync4", buildCheckedAt = 0;
     function checkBuild(){
       if(!user) return;
       var now = Date.now();
@@ -4993,6 +5208,7 @@
     window.addEventListener("focus", checkBuild);
     setTimeout(checkBuild, 5000);
   })();
+
 
   /* ---------- triple-tap a word: normal-speed preview ----------
      Three quick taps on a word play that word and the next few one

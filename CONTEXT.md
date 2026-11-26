@@ -835,6 +835,19 @@ out. It uses the same Firebase project as the Nitnem Tracker
 and the user's own doc in its `progress` collection (merge writes
 only; the two apps never touch each other's fields).
 
+**sync4 (2026-11-25)** is the current engine. sync3 failed in the
+field in three ways its stubbed tests could not see — the Account
+note wedged on "Still syncing" on every browser, Kiwi lost a
+session's progress when its tab was frozen/killed, and a second
+account on the same browser inherited the first account's library.
+sync4 redesigns the engine's internals around the battle-tested
+shape (Readest's production sync, Chrome Sync's per-item model,
+Antigravity's Reader audit) while keeping the owner's product
+rules below unchanged. The regression suite `test_sync4.py` (in
+~/workspace) simulates the hostile conditions — a `set()` that
+never settles, per-account cloud docs, recovery hooks — and fails
+on sync3 (11 checks) while passing on sync4.
+
 Sync is **per record**, never a whole-state blob. What is shared is
 durable progress: `rec_paaths` (the Sehaj Paath list — ids and names
 only; which Paath is current is this device's own business and is
@@ -857,28 +870,54 @@ Firestore `serverTimestamp`) and its writer's device id
 (`<field>_by` — a device never applies its own writes; it adopts
 the stamp and moves on).
 
-The protocol is the standard Firestore shape, deliberately boring
-(the first per-record build carried a custom canonical-hash /
-baseline merge engine; it failed in the field in ways that were
-hard to observe, and was replaced wholesale on 2026-11-25 — do not
-reintroduce it). **One snapshot listener**, attached at sign-in,
-is the only reader: its first delivery IS the sign-in merge (there
-is no separate pull and no read polling), and every later remote
-write arrives the same way. **Pushes fire on the save itself**:
-focus, snapshot and Paath-list saves announce a `reader-dirty`
-event and the sync layer pushes on a gentle ~1.5 s throttle
-(records change at reading pace at the fastest — §7 — so that is
-all the coalescing they need), with immediate flushes on pause,
-tab-hide and pagehide; a 2.5 s reconcile interval catches anything
-else, and every push path is guarded by a per-record "last sent"
-string, so an unchanged record is never rewritten and a quiet app
-writes nothing. Per record the
-device remembers only two things in `sync-v1`: the exact JSON last
-sent or applied, and the newest server stamp applied. That state
-is scoped to the account — a different uid signing in resets it
-(the device id persists). A record that vanishes from the document
-is republished by the reconcile. Removing a Paath from the list
-deletes its `rec_ctx_*` fields in the same merge write.
+**Canonical record form.** A record's synced JSON is byte-stable
+when its meaningful content is unchanged: the focus line's audio
+position (`t`) is presence, not progress, and is stripped from a
+Paath record's synced form on both sides (what is pushed, what the
+sent-baseline stores, what an applied record is compared against).
+`ts` — when the head line was SET — is kept; re-saving an unchanged
+focus keeps it. Playback therefore never churns a record: while a
+line plays, the record is identical, and a quiet app writes
+nothing.
+
+**One snapshot listener**, attached at sign-in, is the only reader:
+its first delivery IS the sign-in merge (there is no separate pull
+and no read polling), and every later remote write arrives the
+same way. The listener is attached with `includeMetadataChanges`,
+because the Account note is driven by `hasPendingWrites`.
+
+**One write in flight.** Every push driver — the `reader-dirty`
+save event (~1.5 s throttle), the 2.5 s reconcile interval,
+snapshot echoes, pause/tab-hide/pagehide flushes — funnels into a
+single guarded push. A driver that arrives mid-flight sets a flag
+and coalesces into one follow-up round; duplicate writes can never
+stack behind a slow acknowledgement. Per record the device
+remembers only two things in `sync-v1`: the exact canonical JSON
+last sent or applied, and the newest server stamp applied. A
+record that vanishes from the document is republished by the
+reconcile. Removing a Paath from the list deletes its `rec_ctx_*`
+fields in the same merge write.
+
+**Wedged-write recovery.** A `set()` that neither resolves nor
+rejects within 25 s is declared wedged: the flight is abandoned
+(a sequence token makes its late settle a no-op; the snapshot echo
+and sent-guard reconcile whatever it landed) and the Firestore
+connection is actively recovered with disable/enable network. The
+same recovery fires when snapshots report pending writes for over
+20 s with no flight outstanding (e.g. a persisted queue replaying
+into a stalled channel). Recovery is cooldown-limited (30 s) and
+its own flag has a safety timer — sync can never hang silently
+again; the 12 s "Still syncing — will keep trying." note still
+appears while a slow write is genuinely in progress, but recovery
+now acts behind it instead of only repainting it.
+
+**Transport hardening.** At init, before any other Firestore use:
+automatic long-polling detection (`experimentalAutoDetectLongPolling`)
+for browsers whose streaming channel stalls, and guarded offline
+persistence (`enablePersistence({ synchronizeTabs: true })`,
+silently degrading where unsupported) so the mutation queue is
+durable in IndexedDB — a write queued as a tab is frozen or killed
+still lands on the next launch.
 
 Ordering is **plain last-writer-wins on the server stamp** — the
 standard rule, with no position heuristics and no client-clock
@@ -886,18 +925,13 @@ comparisons (a position-first + 2-minute-margin rule shipped on
 2026-11-25 and was removed the same night: it classified a
 deliberate undo — a behind head with a seconds-newer stamp — as a
 stale packet, vetoed it, and republished the wrong line back over
-it; and its veto-republish could keep two devices' writes pending
-indefinitely, which is what the Account note's "Still syncing"
-watchdog was seen doing in the field). The head is one line and
-the newest write IS the reader's latest intent, ahead or behind.
-Two guards only: a record for a Paath this device's list does not
-carry is left unseen (a later list that names it evaluates it
-fresh), and at first contact a customised local list is never
-replaced by a factory-default cloud list; settings take the
-cloud's word. A focus record's `ts` is when that line was SET,
-never when it was re-saved (re-saving an unchanged focus keeps its
-`ts`). Pending-write echoes carry a null stamp and are skipped
-record by record.
+it). The head is one line and the newest write IS the reader's
+latest intent, ahead or behind. Two guards only: a record for a
+Paath this device's list does not carry is left unseen (a later
+list that names it evaluates it fresh), and at first contact a
+customised local list is never replaced by a factory-default cloud
+list; settings take the cloud's word. Pending-write echoes carry a
+null stamp and are skipped record by record.
 
 Pushes are **gated on server hydration**: until the listener's
 first non-cache snapshot has been handled, no push fires — a
@@ -912,11 +946,30 @@ before it can write anything — with an 8 s watchdog that lifts
 the gate if no server answer ever comes, so it can never wedge
 shut. Every Paath snapshot write (the `writeCtx` funnel,
 switch-time snapshots, assign-to-Paath) announces `reader-dirty`
-like every other save. The listener is attached with
-`includeMetadataChanges`, because the Account note is driven by
-`hasPendingWrites` — a metadata-only transition; a pending state
-older than ~12 s reads "Still syncing — will keep trying." instead
-of an eternal "Syncing…".
+like every other save.
+
+**Per-account datasets.** The live local dataset (every
+`gurbani-reader:*` key except the sync meta) belongs to one owner:
+an account uid, or the guest. The sync meta records the owner
+(`ownerUid`; null = guest) and whether any account has ever owned
+a dataset here (`everAccount`). Identity transitions are handled
+before the new listener attaches: signing in with a different
+account parks the live dataset under its owner (stash key
+`gurbani-reader:acct:<uid>`, guest under `acct:guest`), installs
+the incoming account's parked dataset — or leaves the keys clear,
+which the app reads as a fresh install — **in place, with no
+reload**, re-enters its world exactly as a fresh boot would
+(Paath data and focus re-read, settings re-applied, lists rebuilt,
+world restored from the dataset's own mode/place), and resets the
+record baselines. Sign-out parks the account's dataset and returns
+to the guest dataset the same way. The one exception: a dataset
+that has never belonged to any account (read before the first-ever
+sign-in) is *adopted* by that first account instead of being
+parked away. A fresh account therefore opens with a fresh library,
+sees nothing of another account's Paaths or heads, and its cloud
+doc only ever receives its own records. Any push still in flight
+at a transition is abandoned by flight token, so the old identity
+can never write under the new one.
 
 **Build freshness.** The build carries a token (`reader-build:` in
 an HTML comment at the top of `index.html`). On boot and on focus
@@ -942,7 +995,10 @@ updates and this session's own next save supersedes. A list record
 that drops a Paath removes its local snapshot and repairs
 `current` if needed; a Paath record for an id the list does not
 name is ignored. Settings records re-apply the settings underneath
-whatever is on screen.
+whatever is on screen. (The one deliberate exception to "never
+reloads" thinking: an *account switch* re-enters the incoming
+dataset's world in place — still no page reload; see Per-account
+datasets above.)
 
 A failed push or listen says so in the Account note **with the
 Firebase error's short code** ("Couldn't sync (permission-denied)
