@@ -547,7 +547,10 @@ on a line, on empty space — raises only a small floating cluster
 bottom-right corner — top to bottom: play/pause, the speed pill,
 the A− / A+ font pair, and the settings orb at the corner; the
 owner's layout calls Nov 24) instead of the whole chrome; a second tap dismisses it, and
-it fades on its own after ~5s. The cluster carries the three things
+it fades on its own after ~5s. The Ang unit rises with the
+cluster on that tap and shares its lifetime — it stays while
+the cluster stays and leaves when the cluster leaves, instead
+of flashing for 1.6s and dying long before the buttons do. The cluster carries the three things
 a listener reaches for: a play/pause button (mirrors the player's,
 icons painted by the same function — but pausing here deliberately
 does NOT call the bars, the owner's ruling Nov 24: the button simply

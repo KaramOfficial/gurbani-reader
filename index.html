@@ -1511,7 +1511,7 @@
      item in state does not move). The island drops in when the viewed
      item changes, keeps updating through fast scrolling, and fades a
      little after the changes stop; tapping it opens the switcher. */
-  var viewAng = null, viewBaniId = null, lastViewKey = null, islandTimer = null, popBaseAng = null, lastBumpAt = 0;
+  var viewAng = null, viewBaniId = null, lastViewKey = null, islandTimer = null, islandHeld = false, popBaseAng = null, lastBumpAt = 0;
   function stateViewKey(){ return state.mode === "ang" ? "a" + state.ang : (state.mode === "bani" ? "b" + state.id : ""); }
   function resetView(){ viewAng = null; viewBaniId = null; lastViewKey = stateViewKey(); islandHide(); manualHold = false; }
   function viewportBani(){
@@ -1535,9 +1535,12 @@
     isl.classList.add("show");
     var un = $("angUnit"); if(un) un.classList.add("show");
     clearTimeout(islandTimer);
-    islandTimer = setTimeout(islandHide, 1600);
+    /* while the unit is held by the quick cluster (the immersive
+       tap raised them together) it shares the cluster's lifetime
+       instead of the 1.6s flash */
+    if(!islandHeld) islandTimer = setTimeout(islandHide, 1600);
   }
-  function islandHide(){ var isl = $("angIsland"); if(isl) isl.classList.remove("show"); var un = $("angUnit"); if(un) un.classList.remove("show"); clearTimeout(islandTimer); }
+  function islandHide(){ islandHeld = false; var isl = $("angIsland"); if(isl) isl.classList.remove("show"); var un = $("angUnit"); if(un) un.classList.remove("show"); clearTimeout(islandTimer); }
   /* raise the Ang unit for the current item — used on landing and
      whenever a tap calls the floating UI up */
   function islandPing(){
@@ -2386,6 +2389,7 @@
   function hideOrb(){
     var b = $("quickCtl"); if(!b) return;
     b.classList.remove("show"); clearTimeout(orbTimer);
+    if(islandHeld) islandHide();   /* the unit leaves with the cluster that raised it */
   }
   $("orbBtn").addEventListener("click", function(){ hideOrb(); showBars(); });
   function hideBars(){ if(sheet.classList.contains("open")) return; document.body.classList.add("bars-hidden"); }
@@ -2420,7 +2424,7 @@
        the small floating button, never the whole chrome; a second tap
        dismisses it. Outside that state, a tap calls the bars as before. */
     if(!audio.paused && autoScrollOn && document.body.classList.contains("bars-hidden")){
-      if($("quickCtl").classList.contains("show")) hideOrb(); else { showOrb(); islandPing(); }
+      if($("quickCtl").classList.contains("show")) hideOrb(); else { showOrb(); islandHeld = true; islandPing(); }
       return;
     }
     /* bars up + a tap ANYWHERE outside the UI itself — on a pankti,
