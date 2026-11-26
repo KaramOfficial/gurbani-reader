@@ -175,7 +175,13 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   redo stack; Undo and Redo walk the stacks, restoring through the
   ordinary switch/seek machinery, so the audio re-seeks to that
   line and the head lands on it (a restore writes the focus record
-  for the restored line explicitly — a paused seek saves nothing on
+  for the restored line explicitly, and the VIEW goes with the
+  audio — gliding to the restored line when it is near (within
+  about a screen and a half), landing on it instantly when it is
+  far — so a restore never leaves the reader to hunt for the new
+  position with Recenter (while the follow tracker is actively
+  driving the view it owns the move, as always). A paused seek
+  saves nothing on
   its own). Three jumps are kept **per reading context** (one stack
   pair per Paath, one for Default, one per Bani), on-device and in
   memory only — never synced — so Undo inside a Paath can never
