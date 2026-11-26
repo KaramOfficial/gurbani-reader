@@ -3705,25 +3705,31 @@
         saveFocusLine(base + p.idx);
         markFocus(base + p.idx);
         updateRecenter();
-        /* the view goes with the audio (owner, Nov 26): glide when
-           the restored line is near, land on it when it is far —
-           the reader is never left to hunt for it with Recenter.
-           While the follow tracker is actively driving the view it
-           already owns this move, so it is left alone. */
-        var el = contentEl.querySelector('.line[data-li="' + (base + p.idx) + '"]');
-        if(el && !(trackMoving && !audio.paused && autoScrollOn)){
-          zoneRefresh();
-          var target = Math.max(0, anchorTopOf(el) + window.scrollY - zoneA);
-          var dist = Math.abs(target - window.scrollY);
-          var glide = dist <= window.innerHeight * 1.5;
-          autoScrolling = true;
-          if(glide) window.scrollTo({ top: target, behavior: "smooth" });
-          else window.scrollTo(0, target);
-          setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, glide ? 650 : 60);
-        }
+        /* the view goes with the audio (owner, Nov 26) */
+        viewToLine(base + p.idx);
       }
       else if(tries > 24) clearInterval(iv);
     }, 120);
+  }
+  /* bring a line into the focus zone: glide when it is near
+     (within about a screen and a half), land on it when far.
+     While the follow tracker is actively driving the view it
+     already owns this move, so it is left alone. */
+  function viewToLine(li){
+    var el = contentEl.querySelector('.line[data-li="' + li + '"]');
+    if(!el) return;
+    if(trackMoving && !audio.paused && autoScrollOn) return;
+    zoneRefresh();
+    var target = Math.max(0, anchorTopOf(el) + window.scrollY - zoneA);
+    var dist = Math.abs(target - window.scrollY);
+    var glide = dist <= window.innerHeight * 1.5;
+    autoScrolling = true;
+    if(glide) window.scrollTo({ top: target, behavior: "smooth" });
+    else window.scrollTo(0, target);
+    /* released on SETTLE, not a fixed timer (the app's own rule):
+       a one-shot timer can fire mid-glide and leave the flag
+       stuck, which froze every autoScrolling reader after it */
+    holdAutoUntilSettled();
   }
   function jumpUndo(){
     var st = jumpStack();
