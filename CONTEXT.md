@@ -411,6 +411,14 @@ and during auto-play a scroll recalls the bars only if a genuine gesture
 happened within ~400ms. The reader's own programmatic scrolling must
 never be mistaken for the reader's hand.
 
+**Portrait strip (owner, Nov 26).** In portrait the top strip
+carries only the original three buttons — **Menu, Search, Full
+screen**, in that order: no Appearance button (it lives in the
+Menu), and no pager — the Ang lives in the pill, whose chevrons
+travel with it in portrait too. A crowded strip is how a Search
+tap could land on the Ang switcher. Landscape earns extra
+buttons per size tier, only where they fit (the rails, §10).
+
 **Pager (in the top bar).** Previous/next item as **chevron-only ghost
 buttons — no text labels**; at the ends they disable faded. The centre
 label is serif, shows the current item (ਅੰਗ in Gurmukhi digits, or the
