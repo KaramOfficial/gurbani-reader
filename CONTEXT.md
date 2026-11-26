@@ -722,24 +722,36 @@ whatever comes next (meanings, notes):
   the bottom, clear of the rail. The rail slides away with the bars.
 - **Landscape ≥1024px** speaks the phone landscape's language —
   the arrangement the owner picked as the best of the set. A slim
-  **60px icon rail down the right edge**: ੴ mark, Search,
-  fullscreen, Appearance, Menu, with the pager stacked at its foot;
-  it slides away with the bars, exactly like the phone's rail. The
-  **Menu/Library/Search panel grows out of the rail** — parked
-  immediately left of it, top-aligned, one visual unit — and inside
-  it is the compact cut of the menu: small section headings, tight
-  rows, each control full-width under its label, nothing oversized.
+  **icon rail down the right edge** carrying what you reach for
+  while reading, in reading order: ੴ mark, Search, Library, Menu —
+  Play/Pause (accent), jump Undo, jump Redo, follow-along — text
+  A−/A+, Appearance, fullscreen — with the current-Ang button at
+  its foot (it still opens the switcher). The rail's buttons drive
+  the real controls and mirror their state; it slides away with
+  the bars, exactly like the phone's rail. The **Menu/Library/
+  Search panel grows out of the rail** — parked immediately left
+  of it, top-aligned, one visual unit — and inside it is the
+  compact cut of the menu: small section headings, tight rows,
+  each control full-width under its label, nothing oversized; the
+  sync button is Google's own button (white, the four-colour G).
   The **audio bar stays the phone's bar** — one compact flat bar
-  along the bottom, centred on the reading measure, hiding and
-  showing with the bars. The **quick cluster** stands just left of
-  the rail above the bar on the phone's own tap-to-show cycle, and
-  the **Recenter trio stands vertically** beside the rail, coming
-  and going exactly as on the phone. At 1024–1399px the measure
-  narrows (592px, 648px from 1200px) and the column centres in the
-  space left of the rail, the audio bar centred on the same axis;
-  at ≥1400px the column is window-centred and the rail never
-  reaches it. There is no separate theme button and no brand text
-  in the rail — just the ੴ mark, like the phone.
+  along the bottom — with the **Ang switchers as big buttons
+  joined to its sides**, in the bar's own surface language,
+  sinking with it when the bars hide. The **quick cluster** stands
+  just left of the rail above the bar on the phone's own
+  tap-to-show cycle, and the **Recenter trio stands vertically**
+  beside the rail, coming and going exactly as on the phone.
+  **The side system can never cover the Gurbani**: the layout
+  reserves its zone (rail + panel + air) up front and the reading
+  column, the audio bar, the side switchers and the Ang island all
+  centre in the space left of it — the panel opens into its own
+  reserved space, so nothing moves and nothing is ever covered.
+  The whole side system is **responsive**: the panel steps
+  280/300/320px and the rail 60/68px across width tiers, and on
+  short landscape windows (≤760px high) the rail, its buttons and
+  the panel all scale down a cut. Measures: 592px at 1024–1199,
+  648px at 1200–1399, 800px at 1400–1599, 840px from 1600. There
+  is no brand text in the rail — just the ੴ mark, like the phone.
 
 **Book mode.** Menu → Display carries a Book row, shown only where a
 book fits: landscape and ≥1024px wide (desktops and tablets; never on
