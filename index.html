@@ -1444,7 +1444,17 @@
     else if(fsRaw === null && window.innerWidth >= 1280) fsIdx = 3;   /* first run on a big screen starts one step up (26px) — reading distance; any saved choice wins */
   }catch(e){}
   function applyFs(){
+    /* a size change reflows every line — without an anchor the
+       reader's line drifts off and the view feels lost. Keep the
+       line crossing the focus anchor (35% down) exactly where it
+       was, the same preservation rotation already had: capture it,
+       change the size, then compensate the scroll by the drift. */
+    var aEl = null, aTop = 0;
+    var anchorY = Math.round(window.innerHeight * 0.35);
+    var ln = contentEl.querySelectorAll(".line");
+    for(var li2 = 0; li2 < ln.length; li2++){ var rr = ln[li2].getBoundingClientRect(); if(rr.bottom >= anchorY){ aEl = ln[li2]; aTop = rr.top; break; } }
     document.documentElement.style.setProperty("--reader-fs", FS[fsIdx] + "px");
+    if(aEl){ var drift = aEl.getBoundingClientRect().top - aTop; if(drift) compensateScroll(drift); }
     $("fontDown").disabled = fsIdx <= 0;
     $("fontUp").disabled = fsIdx >= FS.length - 1;
     var qfd = $("qcFontDown"), qfu = $("qcFontUp");
