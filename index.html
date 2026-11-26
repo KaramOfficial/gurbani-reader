@@ -687,6 +687,8 @@
      while pressed, with the deep-gold icon — no ring, no
      one-off size */
   .auto-btn.active{background:var(--accent-soft);color:var(--accent-strong)}
+  /* the island's jump buttons match its icon buttons */
+  #floatPair .jump-ico svg{width:20px;height:20px}
   /* shabad skip: roomier layouts only — the small portrait
      player never carries them */
   .sec-btn{display:none}
@@ -945,7 +947,7 @@
 
 
 <div class="ang-unit" id="angUnit"><button class="ang-pill-btn" id="angPrevPill" aria-label="Previous Ang"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button><button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button><button class="ang-pill-btn" id="angNextPill" aria-label="Next Ang"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button></div>
-<div class="float-pair" id="floatPair"><button class="recenter fp-ico" id="paathBtn" title="Sehaj Paaths — switch Paath, or go back to Default reading" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" title="Set a Sehaj Paath to this pankti" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button></div>
+<div class="float-pair" id="floatPair"><button class="recenter fp-ico jump-ico" id="jumpUndo" aria-label="Undo jump \u2014 go back to where you were listening" title="Undo jump"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/></svg></button><button class="recenter fp-ico" id="paathBtn" title="Sehaj Paaths — switch Paath, or go back to Default reading" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" title="Set a Sehaj Paath to this pankti" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button><button class="recenter fp-ico jump-ico" id="jumpRedo" aria-label="Redo jump" title="Redo jump"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h3"/></svg></button></div>
 <div class="pv-toast" id="pvToast" role="status">Normal speed preview · 1×</div>
 <div class="book-view" id="bookView" hidden>
   <div class="book-bar">
@@ -1209,8 +1211,6 @@
       <button class="skip-btn" id="fwd5" aria-label="Forward 5 seconds">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 6l6 6-6 6"/><path d="M7.5 6l6 6-6 6"/><text x="3.4" y="17.2" text-anchor="middle" font-size="10.5" fill="currentColor" stroke="none" font-weight="700">5</text></svg>
       </button>
-      <button class="skip-btn" id="jumpUndo" aria-label="Undo jump \u2014 go back to where you were listening" title="Undo jump" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/></svg></button>
-      <button class="skip-btn" id="jumpRedo" aria-label="Redo jump" title="Redo jump" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h3"/></svg></button>
       <button class="skip-btn sec-btn" id="nextSec" aria-label="Next shabad" title="Next shabad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5v14"/><path d="M5.5 6l8 6-8 6"/></svg></button>
       <button class="skip-btn auto-btn active" id="autoScrollBtn" aria-label="Auto-scroll with audio" aria-pressed="true" title="Auto-scroll — follow the audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 10h13"/><path d="m8.5 15.5 3.5 3.5 3.5-3.5"/></svg></button>
       <div class="now-playing" id="nowPlaying"><span class="np-title">ਜਪੁਜੀ ਸਾਹਿਬ</span><small>Double-tap a word to listen from there</small></div>
@@ -1722,6 +1722,7 @@
     var fbShow = (show || !fg) && !autoScrolling && !audioSwitching &&
       (state.mode === "ang" || state.mode === "bani") &&
       !sheet.classList.contains("open") && $("angPop").hidden && $("paathPop").hidden;
+    paintJumpBtns();
     var pb = $("paathBtn"); if(pb) pb.classList.toggle("show", fbShow);
     var sb2 = $("saveBtn"); if(sb2) sb2.classList.toggle("show", fbShow);
     if(show) hideOrb(); /* the two floating affordances never share the screen */
@@ -3713,11 +3714,20 @@
     if(item2 == null) return null;
     return { mode: state.mode, item: item2, t: audio.currentTime || 0, playing: !audio.paused };
   }
+  /* the jump buttons live on the Recenter island now (owner,
+     Nov 26): they flank the trio in the island's own style and
+     exist only while their stack does — an empty stack hides
+     the button entirely. They share the island's calm guards:
+     never mid-glide, mid-switch, over a sheet, or while the
+     follow tracker is driving. */
   function paintJumpBtns(){
     var st = jumpStack();
+    var calm = (state.mode === "ang" || state.mode === "bani") &&
+      !sheet.classList.contains("open") && $("angPop").hidden && $("paathPop").hidden &&
+      !(!audio.paused && autoScrollOn && !manualHold);
     var u = $("jumpUndo"), r = $("jumpRedo");
-    if(u) u.disabled = !st.u.length;
-    if(r) r.disabled = !st.r.length;
+    if(u) u.classList.toggle("show", calm && !!st.u.length);
+    if(r) r.classList.toggle("show", calm && !!st.r.length);
   }
   function noteJump(){
     if(jumpRestoring) return;
