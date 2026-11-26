@@ -1138,6 +1138,7 @@
           <option value="1" selected>1×</option>
           <option value="1.25">1.25×</option>
           <option value="1.5">1.5×</option>
+          <option value="1.75">1.75×</option>
           <option value="2">2×</option>
         </select>
       </div>
@@ -3676,7 +3677,7 @@
      ladder doesn't offer falls back to the fastest it does (2×). */
   var advancedMode = false;
   try{ advancedMode = localStorage.getItem("gurbani-reader:advanced-v1") === "1"; }catch(e){}
-  var SPEED_BASE = ["0.75", "1", "1.25", "1.5", "2"], SPEED_ADV = ["2.25", "2.5", "2.75", "3", "3.25", "3.5", "3.75", "4"];
+  var SPEED_BASE = ["0.75", "1", "1.25", "1.5", "1.75", "2"], SPEED_ADV = ["2.25", "2.5", "2.75", "3", "3.25", "3.5", "3.75", "4"];
   function buildSpeedOptions(){
     var s = $("speed"); if(!s) return;
     var cur = s.value || "1";

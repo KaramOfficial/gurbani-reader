@@ -149,7 +149,7 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   therefore held in one JS variable (the single source of truth) and
   **re-applied on `loadedmetadata` and on every `play` event**. Any
   rebuild must do the equivalent on its platform.
-- Speeds offered: 0.75×, 1×, 1.25×, 1.5×, 2× — plus, only when
+- Speeds offered: 0.75×, 1×, 1.25×, 1.5×, 1.75×, 2× — plus, only when
   **Advanced mode** is on (Menu → Reading, an Off/On seg, persisted
   as advanced-v1): 2.25×, 2.5×, 2.75×, 3×, 3.25×, 3.5×, 3.75×, 4×.
   Turning it off above 2×
