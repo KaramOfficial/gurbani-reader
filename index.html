@@ -325,6 +325,14 @@
     max-width:82vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .ang-island.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  /* the Ang pill travels as a unit: on desktop its own prev/next
+     switchers flank it, and the unit shows on an Ang switch, once
+     on landing, and whenever a tap calls the floating UI up */
+  .ang-unit{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;z-index:45;display:flex;align-items:center;gap:8px;transform:translate(-50%,-20px);opacity:0;pointer-events:none;transition:opacity .3s,transform .34s cubic-bezier(.32,.72,.24,1)}
+  .ang-unit.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .ang-unit .ang-island{position:static;transform:none;opacity:1;pointer-events:auto}
+  .ang-pill-btn{display:none;width:38px;height:38px;border-radius:50%;background:var(--paper);border:1px solid var(--hairline);box-shadow:var(--shadow);place-items:center;color:var(--ink-soft);cursor:pointer;flex:none}
+  .ang-pill-btn:disabled{opacity:.35}
   /* ---------- recenter pill: appears when the audio's pankti is scrolled away ---------- */
   /* the light-touch orb: during immersive playback (audio playing,
      auto-scroll on, bars hidden) a tap anywhere raises only this one
@@ -730,7 +738,6 @@
 
   .rail-x{display:none}
   .rail-sep{display:none}
-  .ang-side{display:none}
   /* the sync button IS a Google button — Google's own design:
      white, hairline border, the four-colour G, pill shape */
   #syncBtn{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23FFC107' d='M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z'/%3E%3Cpath fill='%23FF3D00' d='m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z'/%3E%3Cpath fill='%234CAF50' d='M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z'/%3E%3Cpath fill='%231976D2' d='M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z'/%3E%3C/svg%3E") no-repeat 12px center/18px 18px;color:#3c4043;border:1px solid #dadce0;border-radius:999px;padding:10px 18px 10px 40px;font:500 14px/1 "Inter",sans-serif;box-shadow:0 1px 2px rgba(60,64,67,.12)}
@@ -738,23 +745,23 @@
 
   /* ============ LANDSCAPE: CONTROLS ON THE SIDES (owner, Nov 25) ============
      Portrait keeps the top/bottom chrome at every size. In landscape
-     the reader stays centred and untouched \u2014 the Bani column never
-     moves or resizes for any panel \u2014 and the chrome lives in the
-     empty side space instead \u2014 ALL of it on the RIGHT, so the
-     left side stays free for whatever comes next (meanings, notes).
-     The language is the phone landscape's, the one the owner
-     picked as the best of the set: a slim icon rail down the right
-     edge, the Menu growing out of it as one compact unit, the
-     audio bar one compact flat bar along the bottom, the quick
-     cluster and the Recenter trio standing beside the rail on the
-     phone's own show/hide cycle. Functional and minimal. Same
-     controls, same behaviour; only the arrangement is designed
-     for the shape. */
+     the reader and the audio bar stay CENTRED on the window, the
+     Recenter trio sits at the bottom centre where it always was,
+     and the chrome that belongs on a side lives in the empty RIGHT
+     side space \u2014 so the left side stays free for whatever comes
+     next (meanings, notes). The language is the phone landscape's,
+     the one the owner picked as the best of the set: a slim icon
+     rail down the right edge carrying navigation and reading
+     controls only, the Menu growing out of it as one compact unit,
+     the Ang pill travelling top centre with its own switchers.
+     Functional and minimal. Same controls, same behaviour; only
+     the arrangement is designed for the shape. */
   @media (orientation:landscape) and (min-width:1024px){
     /* the desktop speaks the phone landscape's language: a slim
-       ICON RAIL down the right edge \u2014 \u0a74, Search, fullscreen,
-       Appearance, Menu, the pager at its foot \u2014 functional and
-       minimal, and it slides away with the bars like the phone's */
+       ICON RAIL down the right edge \u2014 \u0a74, Search, Library,
+       Menu, text size, Appearance, fullscreen, the current Ang at
+       its foot \u2014 functional and minimal, and it slides away
+       with the bars like the phone's */
     .topbar{left:auto;right:0;top:0;bottom:0;width:60px;border-bottom:0;border-left:1px solid var(--hairline);padding-top:0;display:flex;flex-direction:column;background:var(--bg)}
     body.bars-hidden .topbar{transform:translateX(110%)}
     .topbar-in{flex:none;flex-direction:column;gap:8px;padding:12px 0 4px;align-items:center;max-width:none;width:60px;overflow:hidden}
@@ -762,8 +769,8 @@
     .brand > div:not(.ik){display:none}
     .pager{flex:none;flex-direction:column;border-top:0;gap:2px;padding:6px 0 12px;margin-top:auto;align-items:center;max-width:none;align-self:auto}
     .pager-cur{font-size:11px;text-align:center;min-height:0}
-    /* the strip carries what you reach for while reading, in
-       reading order: find, listen, adjust */
+    /* the strip carries navigation and reading controls only \u2014
+       everything already in the audio bar stays in the audio bar */
     .rail-x{display:grid}
     .rail-sep{display:block;width:26px;height:1px;background:var(--hairline);margin:3px 0;flex:none}
     .brand{order:0}
@@ -771,45 +778,30 @@
     #railLibrary{order:2}
     #libraryBtn{order:3}
     .rail-sep.s1{order:4}
-    #railPlay{order:5;background:var(--accent);color:#fff;border-color:transparent}
-    #railUndo{order:6}
-    #railRedo{order:7}
-    #railFollow{order:8}
-    #railFollow.active{color:var(--accent-strong);box-shadow:inset 0 0 0 1.5px var(--accent)}
-    .rail-sep.s2{order:9}
-    #railFontDown{order:10}
-    #railFontUp{order:11}
+    #railFontDown{order:5}
+    #railFontUp{order:6}
     .rail-font{font:600 13px/1 "Inter",sans-serif}
-    #appBtn{order:12}
-    #fsBtn{order:13}
-    .rail-x:disabled{opacity:.38}
-    /* the Ang switchers flank the audio bar \u2014 big buttons joined
-       to its sides, in the bar's own surface language, sinking
-       with it when the bars hide; the rail keeps only the current
-       Ang, which still opens the switcher */
+    #appBtn{order:7}
+    #fsBtn{order:8}
+    /* the pager's chevrons live with the Ang pill now, top centre;
+       the rail keeps only the current Ang */
     #prevBtn,#nextBtn{display:none}
-    .ang-side{display:grid;place-items:center;position:fixed;bottom:10px;width:56px;height:88px;z-index:38;background:var(--bar-bg);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);border:1px solid var(--hairline);border-radius:18px;box-shadow:var(--shadow);color:var(--ink-soft);cursor:pointer;transition:transform .3s,opacity .3s}
-    #angPrevSide{left:calc((100vw - 384px)/2 - 464px)}
-    #angNextSide{left:calc((100vw - 384px)/2 + 408px)}
-    .ang-island{left:calc(50% - 192px)}
-    body.bars-hidden .ang-side{transform:translateY(16px);opacity:0;pointer-events:none}
-    .ang-side:disabled{opacity:.35}
-    main{padding-top:14px;margin-right:384px;margin-left:calc((100vw - 384px - 800px)/2)}
-    /* the audio bar stays what it is on the phone \u2014 one compact
-       flat bar along the bottom \u2014 and hides/shows with the bars */
-    .player{left:0;right:0;top:auto;bottom:0;width:auto;padding:0 384px calc(10px + env(safe-area-inset-bottom)) 12px;transform:none}
+    .ang-pill-btn{display:grid}
+    /* the reader and the audio bar stay CENTRED on the window;
+       the panel floats in the right margin, over the margin \u2014
+       and the Recenter trio is back at the bottom centre, where
+       it always was (its landscape override is simply gone) */
+    main{padding-top:14px}
+    .player{left:0;right:0;top:auto;bottom:0;width:auto;padding:0 12px calc(10px + env(safe-area-inset-bottom));transform:none}
     .player-in{max-width:800px}
     /* the quick cluster stands just left of the rail, on the
        phone's own show/hide cycle */
     .quick{right:76px;bottom:118px}
-    /* Recenter and its companions stand vertically beside the
-       rail, and come and go exactly as they do on the phone */
-    .float-pair{left:auto;right:76px;top:50%;bottom:auto;transform:translateY(-50%);flex-direction:column;align-items:flex-end}
     /* the Menu/Search panel grows OUT of the rail \u2014 one unit
        with it \u2014 and inside it is the compact cut of the menu:
        small headings, tight rows, controls full-width under their
        labels, nothing oversized */
-    .sheet{left:auto;right:68px;top:12px;bottom:auto;width:300px;height:auto;max-height:calc(100dvh - 24px);padding:0;transform:translateX(12px);opacity:0;pointer-events:none;border:1px solid var(--hairline);border-radius:18px;box-shadow:var(--shadow);transition:transform .3s cubic-bezier(.32,.72,.24,1),opacity .26s}
+    .sheet{left:auto;right:68px;top:12px;bottom:auto;width:280px;height:auto;max-height:calc(100dvh - 24px);padding:0;transform:translateX(12px);opacity:0;pointer-events:none;border:1px solid var(--hairline);border-radius:18px;box-shadow:var(--shadow);transition:transform .3s cubic-bezier(.32,.72,.24,1),opacity .26s}
     .sheet.open{transform:none;opacity:1;pointer-events:auto}
     .sheet-in{max-width:none;padding:16px 16px 12px}
     .sheet-head{margin-bottom:0}
@@ -826,35 +818,22 @@
     .menu-navrow{margin-top:10px;padding:9px 11px;border-radius:12px}
     .scrim.open{opacity:0;pointer-events:none}
   }
-  /* tablet landscape / small laptops: slimmer left card, a narrower
-     measure, and the player floats as a card at the bottom right */
   @media (orientation:landscape) and (min-width:1024px) and (max-width:1399px){
-    main{max-width:592px;margin-right:364px;margin-left:calc((100vw - 364px - 592px)/2)}
-    .player{padding-right:364px}
-    .ang-island{left:calc(50% - 182px)}
-    #angPrevSide{left:calc((100vw - 364px)/2 - 464px)}
-    #angNextSide{left:calc((100vw - 364px)/2 + 408px)}
-    .sheet{width:280px}
+    main{max-width:592px}
   }
   @media (orientation:landscape) and (min-width:1200px) and (max-width:1399px){
-    main{max-width:648px;margin-left:calc((100vw - 364px - 648px)/2)}
+    main{max-width:648px}
   }
   @media (orientation:landscape) and (min-width:1600px){
     .player-in{max-width:840px}
-    main{margin-right:412px;margin-left:calc((100vw - 412px - 840px)/2)}
-    .player{padding-right:412px}
-    .ang-island{left:calc(50% - 206px)}
-    #angPrevSide{left:calc((100vw - 412px)/2 - 484px)}
-    #angNextSide{left:calc((100vw - 412px)/2 + 428px)}
     .topbar{width:68px}
     .topbar-in{width:68px}
     .topbar .fbtn{width:42px;height:42px}
     .sheet{width:320px;right:76px}
     .quick{right:84px}
-    .float-pair{right:84px}
   }
-  /* short landscape windows: the whole side system scales down —
-     smaller rail, smaller buttons, tighter panel — so it always
+  /* short landscape windows: the whole side system scales down \u2014
+     smaller rail, smaller buttons, tighter panel \u2014 so it always
      fits the height it is given */
   @media (orientation:landscape) and (min-width:1024px) and (max-height:760px){
     .topbar{width:52px}
@@ -864,7 +843,6 @@
     .pager{padding-bottom:8px}
     .sheet{top:8px}
     .sheet-in{padding:12px 14px 10px}
-    .ang-side{height:72px}
   }
   /* phone landscape: the top bar compacts into a slim icon rail on
      the left; the one-row player stays at the bottom, clear of it */
@@ -878,7 +856,7 @@
     main{padding-left:60px;padding-top:10px}
     .player{left:60px}
     .float-pair{left:calc(50% + 30px)}
-    .ang-island{left:calc(50% + 30px)}
+    .ang-unit{left:calc(50% + 30px)}
   }
 </style>
 </head>
@@ -901,11 +879,6 @@
     </button>
     <button class="fbtn rail-x" id="railLibrary" aria-label="Library" title="Library"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></button>
     <span class="rail-sep s1" aria-hidden="true"></span>
-    <button class="fbtn rail-x" id="railPlay" aria-label="Play or pause" title="Play / pause"><svg id="railPlayIcon" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="railPauseIcon" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true" style="display:none"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
-    <button class="fbtn rail-x" id="railUndo" aria-label="Undo jump" title="Undo jump" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/></svg></button>
-    <button class="fbtn rail-x" id="railRedo" aria-label="Redo jump" title="Redo jump" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h3"/></svg></button>
-    <button class="fbtn rail-x" id="railFollow" aria-label="Auto-scroll with audio" title="Auto-scroll — follow the audio" aria-pressed="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 10h13"/><path d="m8.5 15.5 3.5 3.5 3.5-3.5"/></svg></button>
-    <span class="rail-sep s2" aria-hidden="true"></span>
     <button class="fbtn rail-x rail-font" id="railFontDown" aria-label="Smaller text" title="Smaller text">A−</button>
     <button class="fbtn rail-x rail-font" id="railFontUp" aria-label="Larger text" title="Larger text">A+</button>
   </div>
@@ -918,10 +891,8 @@
 
 
 
-<button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button>
+<div class="ang-unit" id="angUnit"><button class="ang-pill-btn" id="angPrevPill" aria-label="Previous Ang"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button><button class="ang-island" id="angIsland" aria-label="Current position — open the switcher"></button><button class="ang-pill-btn" id="angNextPill" aria-label="Next Ang"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button></div>
 <div class="float-pair" id="floatPair"><button class="recenter fp-ico" id="paathBtn" title="Sehaj Paaths — switch Paath, or go back to Default reading" aria-label="Sehaj Paaths — switch Paath, or go back to Default reading"><span class="pg-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5.5C10.5 4 8.2 3.2 4.5 3.2c-.6 0-1 .4-1 1v13.6c0 .6.4 1 1 1 3.7 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3.6 0 1-.4 1-1V4.2c0-.6-.4-1-1-1-3.7 0-6 .8-7.5 2.3z"/><path d="M12 5.5v13.3"/></svg></span></button><button class="recenter" id="recenterBtn" aria-label="Recenter on the pankti being read"><span class="rc-arrow" id="rcArrow">↓</span><span>Recenter</span></button><button class="recenter fp-ico" id="saveBtn" title="Set a Sehaj Paath to this pankti" aria-label="Set a Sehaj Paath to this pankti"><span class="pg-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.8h11V20.2L12 16.4l-5.5 3.8z"/></svg></span></button></div>
-<button class="ang-side" id="angPrevSide" aria-label="Previous Ang"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg></button>
-<button class="ang-side" id="angNextSide" aria-label="Next Ang"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></button>
 <div class="pv-toast" id="pvToast" role="status">Normal speed preview · 1×</div>
 <div class="book-view" id="bookView" hidden>
   <div class="book-bar">
@@ -1529,10 +1500,19 @@
       }
     }
     isl.classList.add("show");
+    var un = $("angUnit"); if(un) un.classList.add("show");
     clearTimeout(islandTimer);
     islandTimer = setTimeout(islandHide, 1600);
   }
-  function islandHide(){ var isl = $("angIsland"); if(isl) isl.classList.remove("show"); clearTimeout(islandTimer); }
+  function islandHide(){ var isl = $("angIsland"); if(isl) isl.classList.remove("show"); var un = $("angUnit"); if(un) un.classList.remove("show"); clearTimeout(islandTimer); }
+  /* raise the Ang unit for the current item — used on landing and
+     whenever a tap calls the floating UI up */
+  function islandPing(){
+    var label = null;
+    if(state.mode === "ang" && state.ang) label = "\u0a05\u0a70\u0a17 " + paNum(viewAng || state.ang);
+    else if(state.mode === "bani" && state.id){ var b = baniById(viewBaniId || state.id); if(b) label = b.pa; }
+    if(label) islandShow(label);
+  }
   $("angIsland").addEventListener("click", function(){ islandHide(); openAngPop(); });
   var viewTick = false;
   window.addEventListener("scroll", function(){
@@ -1935,10 +1915,13 @@
   $("pagerCur").addEventListener("click", function(){ openAngPop(); });
   /* the big side switchers mirror the pager's state (updatePager
      calls this after it sets the pager itself) */
+  var islandLanded = false;
   function paintAngSides(){
-    var prev = $("prevBtn"), next = $("nextBtn"), ps = $("angPrevSide"), ns = $("angNextSide");
+    var prev = $("prevBtn"), next = $("nextBtn"), ps = $("angPrevPill"), ns = $("angNextPill");
     if(ps && prev){ ps.disabled = prev.disabled; ps.setAttribute("aria-label", prev.getAttribute("aria-label") || "Previous"); }
     if(ns && next){ ns.disabled = next.disabled; ns.setAttribute("aria-label", next.getAttribute("aria-label") || "Next"); }
+    /* the pill shows once on landing */
+    if(!islandLanded && (state.ang || state.id)){ islandLanded = true; islandPing(); }
   }
   function markActiveBani(){
     var btns = document.querySelectorAll(".bani-btn");
@@ -1959,22 +1942,14 @@
   /* the desktop rail's own buttons: each drives the real control */
   var railLibrary = $("railLibrary");
   if(railLibrary) railLibrary.addEventListener("click", function(){ openSheet(); showMenuPanel("library"); });
-  var railPlay = $("railPlay");
-  if(railPlay) railPlay.addEventListener("click", function(){ var b = $("playBtn"); if(b) b.click(); });
-  var railUndoB = $("railUndo");
-  if(railUndoB) railUndoB.addEventListener("click", function(){ var b = $("jumpUndo"); if(b) b.click(); });
-  var railRedoB = $("railRedo");
-  if(railRedoB) railRedoB.addEventListener("click", function(){ var b = $("jumpRedo"); if(b) b.click(); });
-  var railFollowB = $("railFollow");
-  if(railFollowB) railFollowB.addEventListener("click", function(){ var b = $("autoScrollBtn"); if(b) b.click(); });
   var railFontDownB = $("railFontDown");
   if(railFontDownB) railFontDownB.addEventListener("click", function(){ var b = $("fontDown"); if(b) b.click(); });
   var railFontUpB = $("railFontUp");
   if(railFontUpB) railFontUpB.addEventListener("click", function(){ var b = $("fontUp"); if(b) b.click(); });
-  var angPrevSideB = $("angPrevSide");
-  if(angPrevSideB) angPrevSideB.addEventListener("click", function(){ var b = $("prevBtn"); if(b) b.click(); });
-  var angNextSideB = $("angNextSide");
-  if(angNextSideB) angNextSideB.addEventListener("click", function(){ var b = $("nextBtn"); if(b) b.click(); });
+  var angPrevPillB = $("angPrevPill");
+  if(angPrevPillB) angPrevPillB.addEventListener("click", function(){ var b = $("prevBtn"); if(b) b.click(); });
+  var angNextPillB = $("angNextPill");
+  if(angNextPillB) angNextPillB.addEventListener("click", function(){ var b = $("nextBtn"); if(b) b.click(); });
   var libBack = $("libraryBack"); if(libBack) libBack.addEventListener("click", function(){ showMenuPanel("main"); });
   $("sheetClose").addEventListener("click", closeSheet);
   scrim.addEventListener("click", closeSheet);
@@ -2369,7 +2344,7 @@
      Recenter's own press is exempt: its click is about to re-mark */
   window.addEventListener("pointerdown", function(e){ if(e.target.closest && e.target.closest("#recenterBtn")) return; clearFocusMark(); }, {passive:true});
   document.addEventListener("click", function(e){
-    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#paathBtn") || e.target.closest("#saveBtn") || e.target.closest("#angPop") || e.target.closest("#paathPop") || e.target.closest(".ang-island")) return;
+    if(e.target.closest(".player") || e.target.closest(".topbar") || e.target.closest(".sheet") || e.target.closest("#quickCtl") || e.target.closest("#recenterBtn") || e.target.closest("#paathBtn") || e.target.closest("#saveBtn") || e.target.closest("#angPop") || e.target.closest("#paathPop") || e.target.closest(".ang-unit")) return;
     /* the third tap of a preview triple-tap belongs to the preview */
     if(pvClickMark && e.timeStamp === pvClickMark){ pvClickMark = 0; return; }
     /* immersive playback (audio playing, auto-scroll on, bars hidden):
@@ -2377,7 +2352,7 @@
        the small floating button, never the whole chrome; a second tap
        dismisses it. Outside that state, a tap calls the bars as before. */
     if(!audio.paused && autoScrollOn && document.body.classList.contains("bars-hidden")){
-      if($("quickCtl").classList.contains("show")) hideOrb(); else showOrb();
+      if($("quickCtl").classList.contains("show")) hideOrb(); else { showOrb(); islandPing(); }
       return;
     }
     /* bars up + a tap ANYWHERE outside the UI itself — on a pankti,
@@ -2388,7 +2363,7 @@
     if(!document.body.classList.contains("bars-hidden")){
       hideBars(); return;
     }
-    showBars();
+    showBars(); islandPing();
   });
 
   /* ---------- helpers ---------- */
@@ -3454,9 +3429,6 @@
     var u = $("jumpUndo"), r = $("jumpRedo");
     if(u) u.disabled = !jumpUndoStack.length;
     if(r) r.disabled = !jumpRedoStack.length;
-    var ru = $("railUndo"), rr = $("railRedo");
-    if(ru) ru.disabled = !jumpUndoStack.length;
-    if(rr) rr.disabled = !jumpRedoStack.length;
   }
   function noteJump(){
     if(jumpRestoring) return;
@@ -3533,9 +3505,6 @@
   function setPlayIcon(playing){
     playIcon.style.display = playing ? "none" : "";
     pauseIcon.style.display = playing ? "" : "none";
-    var rpi = $("railPlayIcon"), rpa = $("railPauseIcon");
-    if(rpi) rpi.style.display = playing ? "none" : "";
-    if(rpa) rpa.style.display = playing ? "" : "none";
     playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
     var qp = $("qcPlayIcon"), qz = $("qcPauseIcon"), qb = $("qcPlay");
     if(qp) qp.style.display = playing ? "none" : "";
@@ -3643,7 +3612,7 @@
     /* a pause from the quick cluster is not a call for the UI — the
        cluster simply becomes the play button and stays */
     if(Date.now() - qcToggleAt < 600) return;
-    showBars();
+    showBars(); islandPing();
   });
   audio.addEventListener("ended", function(){
     audioSwitching = true; audioSwitchAt = Date.now();
@@ -3728,8 +3697,6 @@
   function paintAutoScrollBtn(){
     if(!autoScrollBtn) return;
     autoScrollBtn.classList.toggle("active", autoScrollOn);
-    var railF = $("railFollow");
-    if(railF){ railF.classList.toggle("active", autoScrollOn); railF.setAttribute("aria-pressed", String(autoScrollOn)); }
     autoScrollBtn.setAttribute("aria-pressed", String(autoScrollOn));
   }
   if(autoScrollBtn) autoScrollBtn.addEventListener("click", function(){
