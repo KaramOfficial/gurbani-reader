@@ -5,7 +5,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<link rel="icon" href="data:," />
+<link rel="icon" type="image/png" href="art-192.png" />
 <title>Gurbani Reader</title>
 <script>try{ var ap = localStorage.getItem("gurbani-reader:appearance-v1"); if(ap === "night" || ap === "day") document.documentElement.classList.add(ap); }catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1401,10 +1401,11 @@
     var prevF = detour ? detourGlf : glf;
     var sameF = !!(prevF && prevF.mode === state.mode && prevF.item === item && prevF.idx === idx);
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
-    if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); syncDirty(); return; }
+    if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); syncDirty(); paintMedia(); return; }
     glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
     syncDirty();
+    paintMedia();
   }
   function saveFocus(force){
     var found = currentLineEl(); if(!found) return;
@@ -1524,6 +1525,56 @@
     });
     return best;
   }
+  /* ---------- the phone's media notification (Media Session) ----------
+     The shade / lock-screen card is painted from the same facts as
+     everything else: the world the audio is in — a Sehaj Paath's
+     name, a Bani's name, or the Ang — as the title, the focus
+     pankti as the artist line, "Gurbani Reader" as the album, and
+     the ੴ brand mark as the artwork, instead of the browser's
+     generated letter tile. mediaLine is previewText's cleaning
+     with a longer budget: vishraam marks dropped, the dandi kept. */
+  var mediaLastKey = "";
+  function mediaLine(item, idx){
+    var text = lineTextAt(item, idx); if(!text) return null;
+    var toks = String(text).split(/\s+/), out = [], words = 0;
+    for(var i=0;i<toks.length;i++){
+      var w = toks[i]; if(!w) continue;
+      if(/^॥([੦-੯]+॥)?$/.test(w)){ if(words) out.push(w); continue; }
+      if(!/[\u0A01-\u0A5E\u0A70-\u0A76]/.test(w)) continue;
+      out.push(w.replace(/[;,.]+$/, "")); words++;
+      if(words >= 14) break;
+    }
+    if(!words) return null;
+    var s = out.join(" ");
+    return s.length > 96 ? s.slice(0, 96).replace(/\s+\S*$/, "") + " …" : s;
+  }
+  function paintMedia(){
+    try{
+      if(!("mediaSession" in navigator)) return;
+      var f = detour ? detourGlf : glf; if(!f || f.item == null) return;
+      var title, artist = mediaLine(f.item, f.idx);
+      if(f.mode === "bani"){
+        var b = baniById(f.item); title = b ? b.pa : "Gurbani Reader";
+      } else {
+        var angLabel = "\u0a05\u0a70\u0a17 " + paNum(f.item);
+        var pt = !detour ? paathById(paathData.current) : null;
+        if(pt && pt.name){ title = pt.name; if(artist) artist = angLabel + " · " + artist; }
+        else title = angLabel;
+      }
+      var key = title + "|" + (artist || "");
+      if(key === mediaLastKey) return;
+      mediaLastKey = key;
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: title,
+        artist: artist || "",
+        album: "Gurbani Reader",
+        artwork: [
+          { src: "art-192.png", sizes: "192x192", type: "image/png" },
+          { src: "art-512.png", sizes: "512x512", type: "image/png" }
+        ]
+      });
+    }catch(e){}
+  }
   function islandShow(label){
     var isl = $("angIsland"); if(!isl) return;
     if(isl.textContent !== label){
@@ -1549,6 +1600,7 @@
     if(state.mode === "ang" && state.ang) label = "\u0a05\u0a70\u0a17 " + paNum(viewAng || state.ang);
     else if(state.mode === "bani" && state.id){ var b = baniById(viewBaniId || state.id); if(b) label = b.pa; }
     if(label) islandShow(label);
+    paintMedia();
   }
   $("angIsland").addEventListener("click", function(){ islandHide(); openAngPop(); });
   var viewTick = false;
@@ -3775,8 +3827,10 @@
     seekEl.addEventListener(ev, function(){ if(state.seeking && !seekEl.matches(":active")) state.seeking = false; });
   });
 
-  audio.addEventListener("play", function(){ setPlayIcon(true); audioSwitching = false; scheduleAutoHide(); trackKick(); });
+  audio.addEventListener("play", function(){ setPlayIcon(true); audioSwitching = false; scheduleAutoHide(); trackKick(); paintMedia(); try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing"; }catch(e){} });
   audio.addEventListener("pause", function(){
+    try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused"; }catch(e){}
+    paintMedia();
     setPlayIcon(false);
     /* a pause the browser fires because the audio is switching (natural end,
        rollover, a tap into another Ang) is not the reader pausing — the bars
@@ -3821,7 +3875,9 @@
     tDur.textContent = fmt(audio.duration || state.duration || 0);
     if(pendingSeek > 0){ var ps = pendingSeek; try{ audio.currentTime = ps; }catch(e){} pendingSeek = 0; armSeekFix(ps); }
   });
-  audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight(); });
+  audio.addEventListener("timeupdate", function(){ syncProgress(); clearExpiredHighlight();
+    try{ var md = audio.duration; if(("mediaSession" in navigator) && navigator.mediaSession.setPositionState && isFinite(md) && md > 0) navigator.mediaSession.setPositionState({ duration: md, position: Math.min(audio.currentTime || 0, md), playbackRate: audio.playbackRate || 1 }); }catch(e){}
+  });
   /* Cache what comes next while there is still time: when playback gets within
      ~45 seconds of the end, the next Ang's audio and text chunk (or the next
      Bani's audio) start loading, so the switch plays like one connected stream

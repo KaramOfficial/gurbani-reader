@@ -156,6 +156,15 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   falls back to 2×; the cluster's speed pill cycles whatever ladder
   is currently offered. Skip ±5s buttons flank the
   transport. A seek bar reflects and controls position.
+- **The phone's media notification** (Media Session) is painted
+  from the same facts: title = the world the audio is in (a
+  Sehaj Paath's name, a Bani's name, or ਅੰਗ N), artist = the
+  focus pankti (vishraam-cleaned, ~14 words; prefixed with the
+  Ang when the title is a Paath's name), album = "Gurbani
+  Reader", artwork = the ੴ brand mark (`art-512.png` /
+  `art-192.png`, which is also the favicon). It repaints on
+  every head move and transport change; playback and position
+  state follow the audio, so the shade's seek bar is real.
 - **Jump history — Undo / Redo** (owner, Nov 25): the player carries
   Undo and Redo buttons (and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). The
   model is the classic two-stack editor undo, and its entries are
