@@ -160,7 +160,7 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   Undo and Redo buttons (and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). The
   model is the classic two-stack editor undo, and its entries are
   **lines**: a deliberate jump — double-tap a word or line to play
-  from there, a seek-bar jump, or landing on an Ang in Default mode
+  from there, a seek-bar jump, or landing on an Ang (in any mode)
   — first pushes the line being left (item, line index, its start
   second, playing or paused) onto the undo stack and clears the
   redo stack; Undo and Redo walk the stacks, restoring through the
@@ -294,18 +294,22 @@ enters a Paath record). There is exactly one head per Paath, and
 the complete list of what can move it is short by design: audio
 follow-along (bounded by speech — 3× at the fastest), a seek on the
 audio bar, a double-tap on a line or word, and assign-to-Paath.
-Hand scrolling, browsing and the Ang steppers never move a Paath's
-head; pressing Play resumes at the head (playing from where you are
-*looking* is what double-tap is for). Because the fastest mover is
-a voice, head changes can never burst — sync traffic is a trickle
-by construction, not by throttling heroics. **Default-mode
-landing:** a deliberate navigation to an Ang while free reading
-(steppers, the Ang switcher) lands there — the free head resets to
-that Ang's first line, no exceptions, and the head being left goes
-onto the jump history's undo stack (§5), so Undo always brings it
-back. A *targeted* arrival is not a landing: a search result or a
-voice-search link sets the head to its own line (the detour seed)
-and is never reset to line 1.
+Hand scrolling and browsing never move a Paath's head; pressing
+Play resumes at the head (playing from where you are *looking* is
+what double-tap is for). Because the fastest mover is a voice,
+head changes can never burst — sync traffic is a trickle by
+construction, not by throttling heroics. **Landing:** a deliberate
+navigation to an Ang — the steppers, the pill chevrons, the Ang
+switcher, the in-stream end-of-Ang buttons — lands there, **in
+every mode**: the head resets to that Ang's first line at once,
+the head being left goes onto the jump history's undo stack (§5)
+so Undo always brings it back, and the view is placed so the
+first line already sits in the focus zone — pressing Play starts
+exactly there, with no settling scroll. The one exception:
+landing back on the Ang that already holds the head changes
+nothing. A *targeted* arrival is not a landing: a search result
+or a voice-search link sets the head to its own line (the detour
+seed) and is never reset to line 1.
 
 ## 8. Persistence (device-local storage)
 
