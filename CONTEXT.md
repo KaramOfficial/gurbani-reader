@@ -545,8 +545,11 @@ with auto-scroll on and the bars hidden, a tap ANYWHERE — on a word,
 on a line, on empty space — raises only a small floating cluster
 (a vertical column along the right edge, stacked up from the
 bottom-right corner — top to bottom: play/pause, the speed pill,
-the A− / A+ font pair, and the settings orb at the corner; the
-owner's layout calls Nov 24) instead of the whole chrome; a second tap dismisses it, and
+the A− / A+ font pair, search, appearance, and the settings orb
+at the corner; the owner's layout calls Nov 24, appearance added
+Nov 26 — the portrait strip no longer carries a theme button,
+so the cluster does; it cycles Day/Auto/Night exactly like the
+strip button and paints the same icon) instead of the whole chrome; a second tap dismisses it, and
 it fades on its own after ~5s. The Ang unit rises with the
 cluster on that tap and shares its lifetime — it stays while
 the cluster stays and leaves when the cluster leaves, instead
