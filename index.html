@@ -687,6 +687,11 @@
      while pressed, with the deep-gold icon — no ring, no
      one-off size */
   .auto-btn.active{background:var(--accent-soft);color:var(--accent-strong)}
+  /* shabad skip: roomier layouts only — the small portrait
+     player never carries them */
+  .sec-btn{display:none}
+  @media (min-width:761px){ .sec-btn{display:grid} }
+  @media (orientation:landscape) and (max-height:500px){ .sec-btn{display:grid} }
   .skip-btn svg{width:23px;height:23px}
   .play-btn{
     width:47px;height:47px;flex:none;border-radius:50%;
@@ -1193,6 +1198,7 @@
           <option value="2">2×</option>
         </select>
       </div>
+      <button class="skip-btn sec-btn" id="prevSec" aria-label="Previous shabad" title="Previous shabad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5v14"/><path d="M18.5 6 10.5 12l8 6"/></svg></button>
       <button class="skip-btn" id="back5" aria-label="Back 5 seconds">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6 4.5 12l6 6"/><path d="M16.5 6l-6 6 6 6"/><text x="20.6" y="17.2" text-anchor="middle" font-size="10.5" fill="currentColor" stroke="none" font-weight="700">5</text></svg>
       </button>
@@ -1205,6 +1211,7 @@
       </button>
       <button class="skip-btn" id="jumpUndo" aria-label="Undo jump \u2014 go back to where you were listening" title="Undo jump" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/></svg></button>
       <button class="skip-btn" id="jumpRedo" aria-label="Redo jump" title="Redo jump" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h3"/></svg></button>
+      <button class="skip-btn sec-btn" id="nextSec" aria-label="Next shabad" title="Next shabad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5v14"/><path d="M5.5 6l8 6-8 6"/></svg></button>
       <button class="skip-btn auto-btn active" id="autoScrollBtn" aria-label="Auto-scroll with audio" aria-pressed="true" title="Auto-scroll — follow the audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 10h13"/><path d="m8.5 15.5 3.5 3.5 3.5-3.5"/></svg></button>
       <div class="now-playing" id="nowPlaying"><span class="np-title">ਜਪੁਜੀ ਸਾਹਿਬ</span><small>Double-tap a word to listen from there</small></div>
     </div>
@@ -1258,6 +1265,7 @@
   /* Bani chain stream (Nitnem 5, then Sukhmani Sahib) — mirrors the Ang stream */
   var BANI_CHAIN = ["japji","jaap","tav","chaupai","anand","sukhmani"];
   state.streamBanis = []; state.baniGroups = {}; state.baniFirstLine = {}; state.baniFirstWord = {};
+  state.sectionStarts = [];   /* flat-line indices where a titled section / shabad begins (shabad skip) */
   state.baniLineCount = {}; state.baniDur = {}; state.baniHeight = {}; state.appendingBani = false; state.prependingBani = false;
   function baniById(id){ return BANIS.find(function(b){ return b.id === id; }) || null; }
   function chainNext(id){ var i = BANI_CHAIN.indexOf(id); return (i >= 0 && i < BANI_CHAIN.length - 1) ? BANI_CHAIN[i + 1] : null; }
@@ -2577,7 +2585,7 @@
 
   /* ---------- render ---------- */
   function render(groups, opts){
-    state.flatLines = []; state.flatWords = [];
+    state.flatLines = []; state.flatWords = []; state.sectionStarts = [];
     state.curLine = -1; state.curWord = -1;
     var html = "";
     html += '<div class="book-head"><div class="ornament" aria-hidden="true">· · ·</div>' +
@@ -2593,6 +2601,7 @@
       var deco = paraOn ? paraDeco(g.lines) : null;
       g.lines.forEach(function(line, lidx){
         var li = state.flatLines.length;
+        if(lidx === 0 || isHeaderLine(line.text)) noteSectionStart(li);
         state.flatLines.push({start:line.start, end:line.end});
         html += '<p class="line' + (isMoolLine(line) ? ' mool' : '') + (deco && deco.hdr[lidx] ? ' hdr' : '') + '" data-li="' + li + '">';
         if(line.words && line.words.length && line.text){
@@ -3023,6 +3032,7 @@
     var deco = paraOn ? paraDeco(lines) : null;
     lines.forEach(function(line, lidx){
       var li = state.flatLines.length;
+      if(lidx === 0 || isHeaderLine(line.text)) noteSectionStart(li);
       state.flatLines.push({start:line.start, end:line.end});
       state.lineAng[li] = ang;
       html += '<p class="line' + (isMoolLine(line) ? ' mool' : '') + (deco && deco.hdr[lidx] ? ' hdr' : '') + '" data-li="' + li + '">';
@@ -3601,6 +3611,56 @@
     try{ audio.currentTime = Math.max(0, t); }catch(e){}
     armSeekFix(Math.max(0, t));
   }
+
+  /* ---------- shabad skip: previous / next titled section ---------- */
+  function noteSectionStart(li){
+    var s = state.sectionStarts;
+    if(s[s.length - 1] !== li) s.push(li);
+  }
+  /* a transport jump to a line: the jump-history records it,
+     the audio seeks (switching item when the line lives in
+     another stream item), the head lands on it, the view
+     follows — and the play state is whatever it was. */
+  function gotoLineIdx(li){
+    var rec = state.flatLines[li];
+    if(!rec || typeof rec.start !== "number") return;
+    var wasPaused = audio.paused;
+    noteJump();
+    var la = state.lineAng[li];
+    if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = rec.start; switchAudioToAng(la, false); if(!wasPaused) playAudio(); }
+    else if(state.mode === "bani" && la && la !== state.id){ pendingSeek = rec.start; switchAudioToBani(la, false); if(!wasPaused) playAudio(); }
+    else seekTo(rec.start);
+    saveFocusLine(li); markFocus(li); updateRecenter();
+    viewToLine(li);
+  }
+  /* sections are the app's own titled groups (a Bani's Paudis,
+     an Ang's shabad headers) within the current item only.
+     Previous goes to the current section's start when we are
+     into it (>3s or past its first line), else the one before. */
+  function skipShabad(dir){
+    var fg = effFocus(); if(!fg) return;
+    var base = fg.mode === "ang" ? state.angFirstLine[fg.item] : state.baniFirstLine[fg.item];
+    if(typeof base !== "number") return;
+    var count = fg.mode === "ang" ? (state.angLines[fg.item] || []).length : (state.baniLineCount[fg.item] || 0);
+    if(!count) return;
+    var li = base + fg.idx, starts = [], i;
+    (state.sectionStarts || []).forEach(function(s){ if(s >= base && s < base + count) starts.push(s); });
+    if(!starts.length) return;
+    var target = null;
+    if(dir > 0){
+      for(i = 0; i < starts.length; i++){ if(starts[i] > li){ target = starts[i]; break; } }
+    } else {
+      var cur = -1;
+      for(i = 0; i < starts.length; i++){ if(starts[i] <= li) cur = starts[i]; }
+      if(cur < 0) return;
+      if(li > cur || (audio.currentTime - (state.flatLines[cur] ? state.flatLines[cur].start : 0)) > 3) target = cur;
+      else { var pi = starts.indexOf(cur); if(pi > 0) target = starts[pi - 1]; }
+    }
+    if(target === null || target === li) return;
+    gotoLineIdx(target);
+  }
+  if($("prevSec")) $("prevSec").addEventListener("click", function(){ skipShabad(-1); });
+  if($("nextSec")) $("nextSec").addEventListener("click", function(){ skipShabad(1); });
 
   /* ---------- jump history: undo / redo for listening jumps ----------
      The classic two-stack undo (the model every text editor uses):
