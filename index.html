@@ -328,8 +328,8 @@
   /* the Ang pill travels as a unit: on desktop its own prev/next
      switchers flank it, and the unit shows on an Ang switch, once
      on landing, and whenever a tap calls the floating UI up */
-  .ang-unit{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;z-index:45;display:flex;align-items:center;gap:8px;transform:translate(-50%,-20px);opacity:0;pointer-events:none;transition:opacity .3s,transform .34s cubic-bezier(.32,.72,.24,1),top .34s cubic-bezier(.32,.72,.24,1)}
-  .ang-unit.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+  .ang-unit{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;z-index:45;display:flex;align-items:center;gap:8px;transform:translate(-50%,-26px) scale(.94);opacity:0;pointer-events:none;transition:opacity .25s,transform .38s cubic-bezier(.32,.72,.24,1),top .34s cubic-bezier(.32,.72,.24,1)}
+  .ang-unit.show{transform:translate(-50%,0) scale(1);opacity:1;pointer-events:auto}
   .ang-unit .ang-island{position:static;transform:none;opacity:1;pointer-events:auto}
   .ang-pill-btn{display:none;width:38px;height:38px;border-radius:50%;background:var(--paper);border:1px solid var(--hairline);box-shadow:var(--shadow);place-items:center;color:var(--ink-soft);cursor:pointer;flex:none}
   .ang-pill-btn:disabled{opacity:.35}
@@ -411,8 +411,8 @@
   .qc-font{font-family:"Noto Serif Gurmukhi",serif;font-size:15px;font-weight:600;color:var(--ink-soft)}
   .quick .orb:disabled{opacity:.38}
   .recenter .rc-arrow{color:var(--accent);font-weight:700;font-family:inherit}
-  .ang-island.bump{animation:islandBump .18s ease}
-  @keyframes islandBump{50%{transform:translate(-50%,0) scale(1.07)}}
+  .ang-island.bump{animation:islandBump .34s cubic-bezier(.32,.72,.24,1)}
+  @keyframes islandBump{0%{transform:translateY(-6px) scale(1.05)}55%{transform:translateY(1px) scale(1.01)}100%{transform:translateY(0) scale(1)}}
   .sheet-close{width:38px;height:38px;border-radius:50%;border:1px solid var(--hairline);display:grid;place-items:center;background:var(--paper)}
   .sheet-close svg{width:16px;height:16px}
 
