@@ -158,15 +158,21 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   transport. A seek bar reflects and controls position.
 - **Jump history — Undo / Redo** (owner, Nov 25): the player carries
   Undo and Redo buttons (and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y). The
-  model is the classic two-stack editor undo: a deliberate jump —
-  double-tap a word or line to play from there, or a seek-bar jump —
-  first pushes the position being left (item, second, playing or
-  paused) onto the undo stack and clears the redo stack; Undo and
-  Redo walk the stacks, restoring through the ordinary switch/seek
-  machinery so focus, highlight and auto-scroll follow. Three jumps
-  are kept. It tracks the *listening* position, so it behaves the
-  same in free reading and inside a Sehaj Paath; the ±5s nudges and
-  continuous playback never enter it.
+  model is the classic two-stack editor undo, and its entries are
+  **lines**: a deliberate jump — double-tap a word or line to play
+  from there, a seek-bar jump, or landing on an Ang in Default mode
+  — first pushes the line being left (item, line index, its start
+  second, playing or paused) onto the undo stack and clears the
+  redo stack; Undo and Redo walk the stacks, restoring through the
+  ordinary switch/seek machinery, so the audio re-seeks to that
+  line and the head lands on it (a restore writes the focus record
+  for the restored line explicitly — a paused seek saves nothing on
+  its own). Three jumps are kept **per reading context** (one stack
+  pair per Paath, one for Default, one per Bani), on-device and in
+  memory only — never synced — so Undo inside a Paath can never
+  drag in a position from free reading or a Bani. Follow-along
+  (continuous playback) never enters it and never clears the redo
+  stack; the ±5s nudges never enter it either.
 - Wake Lock is held while playing so the screen stays awake.
 - Fullscreen: attempted once playback is flowing and auto-scroll is
   carrying the reading (not on the bare play tap); exiting is manual.
@@ -280,6 +286,27 @@ this derivation.
 > `focusedLine()` read `curLine`, so with highlighting off every save
 > fell back to the anchor line and refreshes landed behind the audio.
 
+**The head (owner, Nov 25).** What a Paath remembers is its last
+**focus line** — the head — and nothing else: scroll position is
+never part of a Paath's stored or synced state (the device-local
+session place in §8 is a separate, per-device convenience and never
+enters a Paath record). There is exactly one head per Paath, and
+the complete list of what can move it is short by design: audio
+follow-along (bounded by speech — 3× at the fastest), a seek on the
+audio bar, a double-tap on a line or word, and assign-to-Paath.
+Hand scrolling, browsing and the Ang steppers never move a Paath's
+head; pressing Play resumes at the head (playing from where you are
+*looking* is what double-tap is for). Because the fastest mover is
+a voice, head changes can never burst — sync traffic is a trickle
+by construction, not by throttling heroics. **Default-mode
+landing:** a deliberate navigation to an Ang while free reading
+(steppers, the Ang switcher) lands there — the free head resets to
+that Ang's first line, no exceptions, and the head being left goes
+onto the jump history's undo stack (§5), so Undo always brings it
+back. A *targeted* arrival is not a landing: a search result or a
+voice-search link sets the head to its own line (the detour seed)
+and is never reset to line 1.
+
 ## 8. Persistence (device-local storage)
 
 | Key | Holds |
@@ -293,7 +320,7 @@ this derivation.
 | `gurbani-reader:autoscroll-v1` | Auto-scroll on/off |
 | `gurbani-reader:nitnem-open` | Nitnem section expanded in switcher/Library |
 | `gurbani-reader:paaths-v1` | Sehaj Paath trackers: the list + the current one's id (always a real tracker — there is no "Default" Paath) |
-| `gurbani-reader:ctx-<id>` | One tracker's snapshot world: `{ place, glf }` — Ang state only, never a Bani's |
+| `gurbani-reader:ctx-<id>` | One tracker's snapshot: `{ glf }` — the Paath's head (its last focus line) and nothing else; Ang state only, never a Bani's. A Paath never stores a scroll place (owner, Nov 25) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
 | `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world |
@@ -641,19 +668,19 @@ one) and addable without limit via "+ New Sehaj Paath". There is no
 "Default" tracker: older builds kept a nameless one (id null, snapshot
 at `ctx-default`, display name in `defName`) — a one-time migration
 folds its journey into Sehaj Paath ੧ (or a new tracker if ੧ already has
-one), drops `defName`, and scrubs any Bani place/focus out of every
-snapshot. The fold never renames a Paath: a renamed ੧ keeps its name
+one), drops `defName`, and scrubs any Bani focus (and any stored
+place) out of every snapshot. The fold never renames a Paath: a renamed ੧ keeps its name
 whether or not it has started (with a stored `defName` to honour and
-a renamed ੧, the journey goes to a new tracker carrying that name). Each journey is a complete snapshot world —
-its own saved place + its own global focus (`ctx-<id>`): switching
-stashes the live records under the old context, installs the target's,
-and lands through the ordinary restore machinery, so "continue" opens
-the journey's Ang on its pankti, marked, audio parked. A journey with
-no snapshot starts at ਅੰਗ ੧. Row sub-labels say the action: "Resume at
-ਅੰਗ ੧੬੫ · 12% complete" for a journey in progress ("ਅੰਗ … · % complete"
-for the current one), "Not started" otherwise (a snapshot whose
-place is a Bani's renders "Not started" too — a Paath label only ever
-names an Ang). Every journey row carries a pencil to rename it inline;
+a renamed ੧, the journey goes to a new tracker carrying that name). Each journey's whole stored world is its
+**head** — its last focus line (`ctx-<id>` = `{ glf }`): switching
+snapshots the old context's head, installs the target's, and derives
+the landing place from that head (`placeFromFocus`), so "continue"
+opens the journey's Ang exactly on its pankti, marked, audio parked.
+A journey with no snapshot starts at ਅੰਗ ੧. Row sub-labels read the
+head and nothing else: "Resume at ਅੰਗ ੧੬੫ · 12% complete" for a journey
+in progress ("ਅੰਗ … · % complete" for the current one), "Not started"
+otherwise (a snapshot whose head is a Bani's renders "Not started"
+too — a Paath label only ever names an Ang). Every journey row carries a pencil to rename it inline;
 renames are validated — "Default" (the mode's name), a duplicate of
 another Paath's name, an empty name, and names over 40 characters are
 refused with a toast. Duplicates are judged on the name as it will
@@ -813,15 +840,17 @@ durable progress: `rec_paaths` (the Sehaj Paath list — ids and names
 only; which Paath is current is this device's own business and is
 not synced), `rec_settings` (font size, speed, follow-along mode,
 appearance, advanced mode, auto-scroll, paragraph headers), and one
-`rec_ctx_<id>` per Sehaj Paath (its Ang-only snapshot). What is
+`rec_ctx_<id>` per Sehaj Paath carrying **its head alone** (`{ glf }`
+— the last focus line; no place, no scroll position, ever). What is
 **never** shared is presence: free (Default) reading's place and
 focus (`detour-v1`), the world this device is in (`mode-v1`), the
 live records (`last-v1`, `focus-v1`), and the per-size-class layout
 keys. Free reading is per-device, full stop. The current Paath's
-shared record is *derived* from the live records while this device
-is in the Paath world (Ang-scrubbed, exactly like a switch-time
-snapshot); in free reading the record is the parked snapshot,
-unchanged — free reading can never dirty a Paath record.
+shared record is *derived* from the live focus while this device
+is in the Paath world (a Bani focus never enters it — the parked
+Ang head stands, exactly like a switch-time snapshot); in free
+reading the record is the parked snapshot, unchanged — free
+reading can never dirty a Paath record.
 
 Each record carries its own server timestamp (`<field>_at`, a
 Firestore `serverTimestamp`) and its writer's device id
@@ -836,12 +865,14 @@ reintroduce it). **One snapshot listener**, attached at sign-in,
 is the only reader: its first delivery IS the sign-in merge (there
 is no separate pull and no read polling), and every later remote
 write arrives the same way. **Pushes fire on the save itself**:
-place, focus and Paath-list saves announce a `reader-dirty` event
-and the sync layer pushes within ~300 ms (bursts coalesced into
-one merge write); a 2.5 s reconcile interval plus visible / focus /
-pagehide flushes catch anything else, and every push path is
-guarded by a per-record "last sent" string, so an unchanged record
-is never rewritten and a quiet app writes nothing. Per record the
+focus, snapshot and Paath-list saves announce a `reader-dirty`
+event and the sync layer pushes on a gentle ~1.5 s throttle
+(records change at reading pace at the fastest — §7 — so that is
+all the coalescing they need), with immediate flushes on pause,
+tab-hide and pagehide; a 2.5 s reconcile interval catches anything
+else, and every push path is guarded by a per-record "last sent"
+string, so an unchanged record is never rewritten and a quiet app
+writes nothing. Per record the
 device remembers only two things in `sync-v1`: the exact JSON last
 sent or applied, and the newest server stamp applied. That state
 is scoped to the account — a different uid signing in resets it
@@ -849,36 +880,43 @@ is scoped to the account — a different uid signing in resets it
 is republished by the reconcile. Removing a Paath from the list
 deletes its `rec_ctx_*` fields in the same merge write.
 
-Ordering is the server stamp's — with **one content rule for Paath
-records, decided by position before clock** (the Readest receiver
-rule): a record whose position (Ang, then line) is ahead of the
-local record always applies, however old its reading stamp; at the
-same position the newer stamp applies; a record behind applies
-only when its stamp is newer by a wide margin (2 minutes — beyond
-clock skew or a casual scroll on a stale device), which is what a
-genuine intentional move backward looks like. Otherwise the local
-record stands and is republished, and the cloud stamp is
-deliberately not marked seen, so a failed republication never
-blacklists the cloud record. A position's `ts` is when that
-position was SET, never when it was re-saved: opening the app,
-landing, resizing or settling re-saves a place without minting a
-new reading time (same rule for the focus record). Client clocks
-never veto a further-along reading. The list gets the same
-protection at first contact only (a customised local list is never
-replaced by a factory-default cloud list); settings take the
-cloud's word.
+Ordering is **plain last-writer-wins on the server stamp** — the
+standard rule, with no position heuristics and no client-clock
+comparisons (a position-first + 2-minute-margin rule shipped on
+2026-11-25 and was removed the same night: it classified a
+deliberate undo — a behind head with a seconds-newer stamp — as a
+stale packet, vetoed it, and republished the wrong line back over
+it; and its veto-republish could keep two devices' writes pending
+indefinitely, which is what the Account note's "Still syncing"
+watchdog was seen doing in the field). The head is one line and
+the newest write IS the reader's latest intent, ahead or behind.
+Two guards only: a record for a Paath this device's list does not
+carry is left unseen (a later list that names it evaluates it
+fresh), and at first contact a customised local list is never
+replaced by a factory-default cloud list; settings take the
+cloud's word. A focus record's `ts` is when that line was SET,
+never when it was re-saved (re-saving an unchanged focus keeps its
+`ts`). Pending-write echoes carry a null stamp and are skipped
+record by record.
 
 Pushes are **gated on server hydration**: until the listener's
 first non-cache snapshot has been handled, no push fires — a
 booting device merges before it ever writes, so its stale boot
 state cannot overwrite fresher cloud records (cache-only snapshot
-deliveries settle and apply nothing). Every Paath snapshot write
-(the `writeCtx` funnel, switch-time snapshots, assign-to-Paath)
-announces `reader-dirty` like every other save. The listener is
-attached with `includeMetadataChanges`, because the Account note
-is driven by `hasPendingWrites` — a metadata-only transition; a
-pending state older than ~12 s reads "Still syncing — will keep
-trying." instead of an eternal "Syncing…".
+deliveries settle and apply nothing). The gate **re-arms on
+reactivation** (the Readest pull-on-open rule): when the tab
+becomes visible again or the device comes back online, pushes
+lock until a one-shot server `get()` has been pulled through the
+same handler — a woken device applies the cloud's latest state
+before it can write anything — with an 8 s watchdog that lifts
+the gate if no server answer ever comes, so it can never wedge
+shut. Every Paath snapshot write (the `writeCtx` funnel,
+switch-time snapshots, assign-to-Paath) announces `reader-dirty`
+like every other save. The listener is attached with
+`includeMetadataChanges`, because the Account note is driven by
+`hasPendingWrites` — a metadata-only transition; a pending state
+older than ~12 s reads "Still syncing — will keep trying." instead
+of an eternal "Syncing…".
 
 **Build freshness.** The build carries a token (`reader-build:` in
 an HTML comment at the top of `index.html`). On boot and on focus
