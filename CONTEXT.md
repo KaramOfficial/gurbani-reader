@@ -155,7 +155,16 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   Turning it off above 2×
   falls back to 2×; the cluster's speed pill cycles whatever ladder
   is currently offered. Skip ±5s buttons flank the
-  transport. A seek bar reflects and controls position.
+  transport. A seek bar reflects and controls position. The
+  speed control is a borderless text select — no pill, no
+  expander arrow — with a full 40px tap height. On small
+  portrait screens the player runs slim (the Cook V1 layout,
+  owner Nov 26): a tighter seek row (10.5px times, a 20px
+  slider), 40px transport buttons (44px play) on 4px gaps —
+  2px on the smallest phones so the row never wraps — and the
+  double-tap hint held to a single line — the card gives its
+  height back to the text; larger layouts keep the roomier
+  geometry.
 - **The phone's media notification** (Media Session) is painted
   from the same facts: title = the world the audio is in (a
   Sehaj Paath's name, a Bani's name, or ਅੰਗ N), artist = the

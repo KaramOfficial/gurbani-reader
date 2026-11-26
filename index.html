@@ -657,7 +657,6 @@
   .ctrl-row{display:flex;align-items:center;gap:2px;margin-top:2px}
   @media (max-width:560px){
     .now-playing{text-align:left;padding-left:12px}
-    .speed-wrap select{max-width:60px}
   }
   .now-playing{
     flex:1;min-width:0;text-align:center;
@@ -693,10 +692,33 @@
   .play-btn:active{transform:scale(.95)}
   .play-btn svg{width:21px;height:21px}
   @media (prefers-color-scheme: dark){.play-btn{color:#1c1406}}
-  .speed-wrap{flex:none;display:flex;align-items:center;margin-right:auto;height:38px;border:1px solid var(--hairline);border-radius:999px;padding:0 6px 0 8px}
+  .speed-wrap{flex:none;display:flex;align-items:center;margin-right:auto}
   .speed-wrap select{
-    border:0;background:transparent;border-radius:999px;
-    padding:6px 2px;font-size:13.5px;font-weight:600;min-height:38px;max-width:66px;color:var(--ink-soft);
+    -webkit-appearance:none;appearance:none;
+    border:0;background:transparent;
+    padding:10px 4px;font-size:13.5px;font-weight:700;min-height:40px;color:var(--ink-soft);
+    text-align:center;cursor:pointer;
+  }
+  /* the slim player on small portrait (Cook V1, owner Nov 26):
+     tighter seek row, 40px buttons with airier gaps, the hint
+     held to one line — the card gives its height back to the
+     text. Placed after the base player rules so it wins. */
+  @media (max-width:560px){
+    .player-in{padding:6px 12px 6px}
+    .seek-row{gap:8px}
+    .time{font-size:10.5px;min-width:32px}
+    input[type="range"]{height:20px}
+    .ctrl-row{gap:4px}
+    .play-btn{width:44px;height:44px}
+    .skip-btn{width:40px;height:40px}
+    .skip-btn.auto-btn{width:40px;height:40px}
+    .now-playing small{white-space:nowrap;font-size:10px}
+  }
+  /* very small phones: tighten the gaps so the whole transport
+     still holds one row (the follow toggle must not wrap) */
+  @media (max-width:380px){
+    .player-in{padding:6px 10px}
+    .ctrl-row{gap:2px}
   }
   /* ---------- landscape phones: chrome collapses to two slim rows ----------
      A landscape phone is only ~360-410px tall; the portrait chrome (a
