@@ -720,23 +720,26 @@ whatever comes next (meanings, notes):
   Appearance, Menu; the pager stacked at its foot), the stream gains
   a matching left inset, and the player stays one compact row along
   the bottom, clear of the rail. The rail slides away with the bars.
-- **Landscape ≥1024px**: the top bar is a floating card in the
-  **top-right** margin (brand, context line, buttons, pager), and
-  the Menu/Library/Search sheets **expand below it, out of the same
-  corner** — a drop-down growth of that card, never a panel from
-  another side; non-modal, no scrim dim, closing from their own
-  button, their toggle, or Esc. The **audio bar stays the phone's
-  bar** — one compact flat bar along the bottom, centred on the
-  reading measure, hiding and showing with the bars. The **quick
-  cluster** stands in the right margin above the bar on the phone's
-  own tap-to-show cycle, and the **Recenter trio stands vertically**
-  in the right margin, coming and going exactly as on the phone.
-  At 1024–1399px the card is slimmer (224px), the measure narrows
-  (592px, 648px from 1200px) and the column centres in the space
-  left of the control side, the audio bar centred on the same axis;
-  at ≥1400px everything is window-centred with the card at 264px.
-  There is no separate theme button — Appearance lives in the top
-  bar's card, where it always was.
+- **Landscape ≥1024px** speaks the phone landscape's language —
+  the arrangement the owner picked as the best of the set. A slim
+  **60px icon rail down the right edge**: ੴ mark, Search,
+  fullscreen, Appearance, Menu, with the pager stacked at its foot;
+  it slides away with the bars, exactly like the phone's rail. The
+  **Menu/Library/Search panel grows out of the rail** — parked
+  immediately left of it, top-aligned, one visual unit — and inside
+  it is the compact cut of the menu: small section headings, tight
+  rows, each control full-width under its label, nothing oversized.
+  The **audio bar stays the phone's bar** — one compact flat bar
+  along the bottom, centred on the reading measure, hiding and
+  showing with the bars. The **quick cluster** stands just left of
+  the rail above the bar on the phone's own tap-to-show cycle, and
+  the **Recenter trio stands vertically** beside the rail, coming
+  and going exactly as on the phone. At 1024–1399px the measure
+  narrows (592px, 648px from 1200px) and the column centres in the
+  space left of the rail, the audio bar centred on the same axis;
+  at ≥1400px the column is window-centred and the rail never
+  reaches it. There is no separate theme button and no brand text
+  in the rail — just the ੴ mark, like the phone.
 
 **Book mode.** Menu → Display carries a Book row, shown only where a
 book fits: landscape and ≥1024px wide (desktops and tablets; never on
