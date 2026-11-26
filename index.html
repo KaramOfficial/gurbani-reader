@@ -4736,6 +4736,10 @@
       try{ if(audio) audio.pause(); }catch(e){}
       parkDataset(meta().ownerUid);
       restoreDataset(slot);
+      /* an account whose world this device already established
+         (its parked dataset carries a mode of its own) is never
+         re-claimed by the cloud pick */
+      try{ var stash0 = JSON.parse(lsGet(stashKey(slot)) || "null"); if(stash0 && stash0["gurbani-reader:mode-v1"]) setMeta({ worldFor: slot || null }); }catch(e){}
       setMeta({ ownerUid: slot || null });
       reenterWorld();
       applying = false;
@@ -5083,6 +5087,29 @@
       syncedNote();
       applying = false;
     }
+    /* First contact with an account on THIS device (owner,
+       Nov 26): the device has no world of its own for the account
+       yet, so it lands on the Paath the cloud heard from most
+       recently — records carry server stamps, and the newest
+       ctx stamp names it — and the Library then shows that Paath
+       as the current one, because it IS this device's current
+       one now. The claim is made once per account per device
+       (kept in the device meta, outside the datasets): from then
+       on the current mode is this device's own business and no
+       snapshot ever moves it — two phones signed into one account
+       read different Paaths without disturbing each other. */
+    function maybeClaimWorld(d){
+      if(!user) return;
+      if(meta().worldFor === user.uid) return;
+      setMeta({ worldFor: user.uid });
+      var bestId = null, bestAt = -1;
+      Object.keys(d).forEach(function(f){
+        if(f.indexOf("rec_ctx_") !== 0 || /_(at|by)$/.test(f)) return;
+        var at = atOf(d[f + "_at"]); if(at == null) return;
+        if(at > bestAt){ bestAt = at; bestId = f.slice(8); }
+      });
+      if(bestId && paathById(bestId) && (detour || paathData.current !== bestId)) switchPaath(bestId);
+    }
     function atOf(v){
       if(v == null) return null;
       if(typeof v === "number") return v;
@@ -5152,6 +5179,7 @@
         }
         applyRecord(recId, data, at);
       });
+      maybeClaimWorld(d);
       if(user){
         if(doc.metadata && doc.metadata.hasPendingWrites){
           if(!pendingSince) pendingSince = Date.now();

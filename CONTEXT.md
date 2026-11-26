@@ -863,7 +863,16 @@ on sync3 (11 checks) while passing on sync4.
 Sync is **per record**, never a whole-state blob. What is shared is
 durable progress: `rec_paaths` (the Sehaj Paath list — ids and names
 only; which Paath is current is this device's own business and is
-not synced), `rec_settings` (font size, speed, follow-along mode,
+not synced — with one first-contact exception: a device that has
+no established world of its own for an account **claims the
+cloud's most recently updated Paath once**, at its first hydrated
+snapshot (the newest `rec_ctx_<id>` server stamp names it;
+`switchPaath` lands it, and the Library shows it as current,
+because it is this device's current Paath now). The claim is
+recorded per account in the device meta, outside the datasets;
+an account whose parked dataset carries a mode of its own is
+never re-claimed, and no later snapshot ever moves a device's
+world), `rec_settings` (font size, speed, follow-along mode,
 appearance, advanced mode, auto-scroll, paragraph headers), and one
 `rec_ctx_<id>` per Sehaj Paath carrying **its head alone** (`{ glf }`
 — the last focus line; no place, no scroll position, ever). What is
