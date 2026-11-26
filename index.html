@@ -264,7 +264,7 @@
   }
   .pop-scrim.open{opacity:1;pointer-events:auto}
   .ang-pop{
-    position:fixed;inset:0;z-index:56;display:grid;place-items:start center;
+    position:fixed;inset:0;z-index:56;display:grid;place-items:center;
     padding:calc(64px + env(safe-area-inset-top)) 14px 14px;pointer-events:none;
   }
   .ang-pop[hidden]{display:none}
@@ -759,16 +759,17 @@
   @media (orientation:landscape) and (min-width:1024px){
     /* the desktop speaks the phone landscape's language: a slim
        ICON RAIL down the right edge \u2014 \u0a74, Search, Library,
-       Menu, text size, Appearance, fullscreen, the current Ang at
-       its foot \u2014 functional and minimal, and it slides away
+       Menu, text size, Appearance, fullscreen \u2014 functional and
+       minimal, and it slides away
        with the bars like the phone's */
     .topbar{left:auto;right:0;top:0;bottom:0;width:60px;border-bottom:0;border-left:1px solid var(--hairline);padding-top:0;display:flex;flex-direction:column;background:var(--bg)}
     body.bars-hidden .topbar{transform:translateX(110%)}
     .topbar-in{flex:none;flex-direction:column;gap:8px;padding:12px 0 4px;align-items:center;max-width:none;width:60px;overflow:hidden}
     .brand{flex:none}
     .brand > div:not(.ik){display:none}
-    .pager{flex:none;flex-direction:column;border-top:0;gap:2px;padding:6px 0 12px;margin-top:auto;align-items:center;max-width:none;align-self:auto}
-    .pager-cur{font-size:11px;text-align:center;min-height:0}
+    /* no Ang number in the strip — the Ang lives in the pill,
+       top centre, and nowhere else */
+    .pager{display:none}
     /* the strip carries navigation and reading controls only \u2014
        everything already in the audio bar stays in the audio bar */
     .rail-x{display:grid}
@@ -783,8 +784,7 @@
     .rail-font{font:600 13px/1 "Inter",sans-serif}
     #appBtn{order:7}
     #fsBtn{order:8}
-    /* the pager's chevrons live with the Ang pill now, top centre;
-       the rail keeps only the current Ang */
+    /* the pager's chevrons live with the Ang pill now, top centre */
     #prevBtn,#nextBtn{display:none}
     .ang-pill-btn{display:grid}
     /* the reader and the audio bar stay CENTRED on the window;
@@ -840,7 +840,6 @@
     .topbar-in{width:52px;gap:5px;padding-top:8px}
     .topbar .fbtn{width:32px;height:32px}
     .rail-sep{margin:1px 0;width:22px}
-    .pager{padding-bottom:8px}
     .sheet{top:8px}
     .sheet-in{padding:12px 14px 10px}
   }

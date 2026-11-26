@@ -726,8 +726,7 @@ whatever comes next (meanings, notes):
   and the Recenter trio sits at the bottom centre where it always
   was. On the right edge, a slim **icon rail** carries navigation
   and reading controls only — ੴ mark, Search, Library, Menu, text
-  A−/A+, Appearance, fullscreen, with the current-Ang button at
-  its foot — because everything already in the audio bar (play,
+  A−/A+, Appearance, fullscreen — because everything already in the audio bar (play,
   jump undo/redo, follow-along) stays in the audio bar: one home
   per control. The rail slides away with the bars, like the
   phone's. The **Menu/Library/Search panel grows out of the
@@ -739,7 +738,10 @@ whatever comes next (meanings, notes):
   sync button is Google's own button (white, the four-colour G).
   The **Ang pill travels as a unit, top centre**: its own ‹ ›
   switchers flank it (the pager's chevrons live here now, their
-  disabled state mirrored from the pager), and the unit shows on
+  disabled state mirrored from the pager); the Ang number lives
+  in the pill and nowhere else — the rail carries no Ang readout.
+  Clicking the pill opens the Ang switcher as a centred floating
+  popup. The unit shows on
   an Ang switch, **once on landing**, and **whenever a tap calls
   the floating UI up** — alongside the quick cluster and the bars.
   The **quick cluster** stands just left of the rail above the
