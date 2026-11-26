@@ -320,7 +320,8 @@ every mode**: the head resets to that Ang's first line at once,
 the head being left goes onto the jump history's undo stack (§5)
 so Undo always brings it back, and the view is placed so the
 first line already sits in the focus zone — pressing Play starts
-exactly there, with no settling scroll. The one exception:
+exactly there, with no settling scroll — and the Ang pill
+  (§10) flashes once, as on every arrival. The one exception:
 landing back on the Ang that already holds the head changes
 nothing. A *targeted* arrival is not a landing: a search result
 or a voice-search link sets the head to its own line (the detour
