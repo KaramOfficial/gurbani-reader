@@ -150,12 +150,31 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   decode; the file is longer than ~25 min (Japji, Jaap, Anand,
   Rehraas, Sukhmani — decoding one whole would pin 200MB+ on a
   phone); or a fetch/decode fails (Angs then try the gursevak origin
-  stream). Trade-off, same as the Checker: at non-1× speeds the
-  buffer engine shifts pitch (varispeed); the element's
-  pitch-preserving path survives only on the long-file fallback.
-  Prefetch warms the next item's bytes into a small (≤3) buffer
-  cache instead of a second streaming element; files over ~8MB are
-  not pre-warmed (they belong to the element anyway).
+  stream). Prefetch warms the next item's bytes into a small (≤3)
+  buffer cache instead of a second streaming element; files over
+  ~8MB are not pre-warmed (they belong to the element anyway).
+- **Pitch at off-1× speeds (2026-11-27):** the buffer engine's raw
+  playbackRate is varispeed (pitch shifts with speed), so at any
+  speed ≠ 1× the source is routed through a SoundTouch WSOLA
+  time-stretcher running in an AudioWorklet (SoundTouchJS 2.1.1,
+  MPL-2.0, vendored beside the page as `soundtouch-processor.js` —
+  no build step, no CDN). The source plays at the chosen rate and
+  the stretcher corrects pitch back to the original (verified
+  numerically: a 440Hz tone stays 440Hz at 0.75×/1.5×/2×, where
+  varispeed alone gives 880Hz at 2×). Design rules: 1× never
+  touches the stretcher (plain buffer, zero extra CPU); the
+  worklet loads lazily on the first off-speed use; the facade's
+  position stays source-true (NO delay compensation in `pos()` —
+  the stretcher's ~0.1s output lag is accepted, because
+  compensating would fight the seek auto-correct's 0.09s
+  threshold); and every failure (no AudioWorklet, module load
+  blocked, node creation throws) falls back to plain varispeed —
+  the stretcher can never break playback. Long files on the
+  element keep the element's own native pitch preservation.
+  Related fix in the same change: the speed setter now captures
+  the position at the OLD rate before assigning the new one —
+  previously a mid-play speed change teleported the position
+  (e.g. ~+11s jumping to 2× after 11s at 1×).
 - Rollover at track end is seamless: the next item's audio is already
   loaded; the switch must not flash the bars, restart the scroll, or lose
   any setting (see the speed lesson below). If the next item is still
