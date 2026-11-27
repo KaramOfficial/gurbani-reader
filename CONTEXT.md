@@ -189,7 +189,12 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   from there, a seek-bar jump, or landing on an Ang (in any mode)
   — first pushes the line being left (item, line index, its start
   second, playing or paused) onto the undo stack and clears the
-  redo stack; a head that arrives by SYNC is a landing too
+  redo stack. A jump whose destination IS the current line records nothing
+  (owner, Nov 26): double-tapping the landing pankti to start
+  the Paath had recorded the start line itself, so Undo later
+  took him back to the start of the auto-scroll — callers pass
+  their destination to `noteJump(dest)` and a proven same-line
+  match skips the record. A head that arrives by SYNC is a landing too
   (owner, Nov 26): when a remote apply replaces the live head,
   the head it replaces is pushed onto this device's undo
   stack — the stacks themselves still never sync, but a sync

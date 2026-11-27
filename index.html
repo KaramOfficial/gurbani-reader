@@ -2819,7 +2819,7 @@
   function playFromLine(ln){
     var recL = state.flatLines[Number(ln.getAttribute("data-li"))];
     if(recL && typeof recL.start === "number"){
-      noteJump();
+      noteJump(posOfLine(Number(ln.getAttribute("data-li"))));
       clearHighlight();
       var la = state.lineAng[Number(ln.getAttribute("data-li"))];
       if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = recL.start; switchAudioToAng(la, false); }
@@ -2835,7 +2835,7 @@
   function playFromWord(w){
     var rec = state.flatWords[Number(w.getAttribute("data-wi"))];
     if(rec && typeof rec.start === "number"){
-      noteJump();
+      noteJump(posOfLine(rec.line));
       clearHighlight();
       var wa = state.lineAng[rec.line];
       if(state.mode === "ang" && wa && wa !== state.ang){ pendingSeek = rec.start; switchAudioToAng(wa, false); }
@@ -3646,7 +3646,7 @@
     var rec = state.flatLines[li];
     if(!rec || typeof rec.start !== "number") return;
     var wasPaused = audio.paused;
-    noteJump();
+    noteJump(posOfLine(li));
     var la = state.lineAng[li];
     if(state.mode === "ang" && la && la !== state.ang){ pendingSeek = rec.start; switchAudioToAng(la, false); if(!wasPaused) playAudio(); }
     else if(state.mode === "bani" && la && la !== state.id){ pendingSeek = rec.start; switchAudioToBani(la, false); if(!wasPaused) playAudio(); }
@@ -3766,9 +3766,23 @@
     st.r.length = 0;
     paintJumpBtns();
   }
-  function noteJump(){
+  /* the {mode, item, idx} a flat line is the head OF — the same
+     math jumpPos uses, for a caller that knows its destination */
+  function posOfLine(li){
+    var item = state.lineAng[li]; if(item == null) return null;
+    var first = state.mode === "ang" ? state.angFirstLine[item] : state.baniFirstLine[item];
+    if(typeof first !== "number") return null;
+    return { mode: state.mode, item: item, idx: li - first };
+  }
+  function noteJump(dest){
     if(jumpRestoring) return;
     var p = jumpPos(); if(!p) return;
+    /* a jump whose destination IS the current line records
+       nothing: nothing was left, so there is nothing to come
+       back to (owner, Nov 26). Only a proven same-line match
+       skips — an unknown destination records as before. */
+    if(dest && p.mode === dest.mode && p.item === dest.item &&
+       typeof p.idx === "number" && p.idx === dest.idx) return;
     var st = jumpStack();
     st.u.push(p);
     while(st.u.length > JUMP_CAP) st.u.shift();
@@ -3973,8 +3987,19 @@
   });
   seekEl.addEventListener("change", function(){
     var dur = audio.duration || state.duration || 0;
-    noteJump();
-    seekTo(dur * (Number(seekEl.value) / 100));
+    var tT = dur * (Number(seekEl.value) / 100);
+    /* the line the release lands in, within the current item —
+       a release inside the head's own line records no jump */
+    var dest = null;
+    var curItem = state.mode === "bani" ? state.id : state.ang;
+    for(var li2 = 0; li2 < state.flatLines.length; li2++){
+      if(state.lineAng[li2] !== curItem) continue;
+      var s2 = state.flatLines[li2].start;
+      if(typeof s2 === "number" && s2 <= tT) dest = posOfLine(li2);
+      else if(typeof s2 === "number" && s2 > tT && dest) break;
+    }
+    noteJump(dest);
+    seekTo(tT);
     state.seeking = false;
   });
   /* a drag released off the control (or a cancelled gesture) can end
