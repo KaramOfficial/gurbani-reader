@@ -167,10 +167,19 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   position stays source-true (NO delay compensation in `pos()` —
   the stretcher's ~0.1s output lag is accepted, because
   compensating would fight the seek auto-correct's 0.09s
-  threshold); and every failure (no AudioWorklet, module load
-  blocked, node creation throws) falls back to plain varispeed —
-  the stretcher can never break playback. Long files on the
-  element keep the element's own native pitch preservation.
+  threshold). FALLBACK LADDER (owner-ruled 2026-11-27: wrong
+  pitch is worse than a wrong seek — varispeed is never a
+  landing spot, and a plain buffer source only ever runs at
+  1×): while the worklet loads, playback holds at 1× (the speed
+  lands a beat late, never wrong); if the stretcher cannot run
+  at all (no AudioWorklet, module load fails, node creation
+  throws, processor errors), the file is handed to the native
+  element at the chosen speed — pitch right, seeks approximate —
+  keeping its decoded buffer/chunk state, and returning to 1×
+  hands it straight back to the buffer engine. A file loaded
+  while already at an off-speed with a dead stretcher goes to
+  the element from the start. Long files on the element keep
+  the element's own native pitch preservation throughout.
   Related fix in the same change: the speed setter now captures
   the position at the OLD rate before assigning the new one —
   previously a mid-play speed change teleported the position

@@ -1301,49 +1301,63 @@
     var mode = "wa", pendingSrc = "", gen = 0, wantPlay = false;
     var ticker = null, endedFlag = false, seekToken = 0;
     var stNode = null, stState = "off", stLinked = false;   /* pitch stretcher: off | loading | ready | dead */
+    var srcRate = 1, useEl = false;   /* srcRate: rate the running source was started at; useEl: wa-loaded file handed to the element (off-speed, stretcher dead) */
     var cache = {}, cacheOrder = [];   /* prefetch cache: url -> {ab}, at most 3 */
     var chunkReg = {};   /* srcUrl -> chunk-manifest URL (chunked long tracks) */
     var trk = null;      /* active chunked track: {src, chunks:[{url,dur,start}], total, idx, bufs, busy, pendingAdvance, wantSeek, adopting} */
     var vbase = 0;       /* global start time of the current chunk within the track */
     var holdPos = false; /* a cross-chunk seek is decoding: freeze the clock at the seek origin instead of free-running on the stopped source's stale start time */
     function emit(ev){ var l = listeners[ev]; if(l) l.slice().forEach(function(f){ try{ f(); }catch(e){} }); }
-    function lpos(){ if(!buf || holdPos) return base; if(!playing) return base; return Math.min(base + (wa.currentTime - t0) * rate, buf.duration); }
-    function pos(){ if(mode !== "wa") return el.currentTime || 0; var p = lpos(); return trk ? Math.min(vbase + p, trk.total) : p; }
+    function lpos(){ if(!buf || holdPos) return base; if(!playing) return base; return Math.min(base + (wa.currentTime - t0) * srcRate, buf.duration); }
+    function pos(){ if(useEl) return el.currentTime || 0; if(mode !== "wa") return el.currentTime || 0; var p = lpos(); return trk ? Math.min(vbase + p, trk.total) : p; }
     function startTicker(){ if(ticker) return; ticker = setInterval(function(){ emit("timeupdate"); if(trk && playing && buf && trk.idx + 1 < trk.chunks.length && buf.duration - lpos() < 45) ensureChunk(trk.idx + 1); }, 250); }
     function stopTicker(){ if(ticker){ clearInterval(ticker); ticker = null; } }
     function stopSrc(){ if(srcNode){ var n = srcNode; srcNode = null; n.onended = null; try{ n.stop(); }catch(e){} try{ n.disconnect(); }catch(e){} } linkStretch(false); }
     /* Pitch preservation at off-1x speeds: SoundTouch (WSOLA) in an
        AudioWorklet, vendored beside this page (soundtouch-processor.js,
-       SoundTouchJS 2.1.1, MPL-2.0). Loaded lazily on the first off-speed
-       use; 1x never touches it (plain buffer = zero extra CPU), and any
-       failure leaves the plain varispeed path running — playback itself
-       can never break because of the stretcher. */
+       SoundTouchJS 2.1.1, MPL-2.0), loaded lazily on first off-speed use.
+       The fallback ladder is owner-ruled (2026-11-27): wrong pitch is
+       worse than a wrong seek, so varispeed is NEVER a landing spot —
+       a plain source only ever runs at 1x. While the stretcher loads,
+       playback holds at 1x (the speed lands a beat late, never wrong);
+       if the stretcher cannot run at all, the file is handed to the
+       native element (pitch right, seeks approximate) and handed back
+       to the buffer engine when the speed returns to 1x. */
     function linkStretch(on){
       if(!stNode) return;
       if(on && !stLinked){ try{ stNode.connect(gain); stLinked = true; }catch(e){} }
       if(!on && stLinked){ try{ stNode.disconnect(); }catch(e){} stLinked = false; }
     }
+    function stretchDead(){
+      stState = "dead"; stNode = null; linkStretch(false);
+      if(mode === "wa" && !useEl && (buf || trk) && rate !== 1) handToEl();
+    }
     function ensureStretch(){
-      if(stState !== "off" || !wa || !wa.audioWorklet || typeof AudioWorkletNode === "undefined") return;
+      if(stState !== "off" || !wa) return;
+      if(!wa.audioWorklet || typeof AudioWorkletNode === "undefined"){ stretchDead(); return; }
       stState = "loading";
       var url; try{ url = new URL("soundtouch-processor.js", document.baseURI).href; }catch(e){ url = "soundtouch-processor.js"; }
       wa.audioWorklet.addModule(url).then(function(){
         try{ stNode = new AudioWorkletNode(wa, "soundtouch-processor", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] }); }
-        catch(e){ stState = "dead"; stNode = null; return; }
+        catch(e){ stretchDead(); return; }
+        stNode.onprocessorerror = function(){ stretchDead(); };
         stState = "ready";
-        if(mode === "wa" && playing && rate !== 1 && buf) startSrc();
-      }, function(){ stState = "dead"; });
+        if(mode === "wa" && !useEl && playing && rate !== 1 && buf) startSrc();
+      }, function(){ stretchDead(); });
     }
     function startSrc(){
       holdPos = false;
       stopSrc();
-      srcNode = wa.createBufferSource(); srcNode.buffer = buf; srcNode.playbackRate.value = rate;
-      if(rate !== 1 && stState === "ready" && stNode){
+      var useStretch = rate !== 1 && stState === "ready" && stNode;
+      var r = useStretch ? rate : 1;
+      srcRate = r;
+      srcNode = wa.createBufferSource(); srcNode.buffer = buf; srcNode.playbackRate.value = r;
+      if(useStretch){
         try{ stNode.parameters.get("playbackRate").value = rate; }catch(e){}
         linkStretch(true); srcNode.connect(stNode);
       } else {
         srcNode.connect(gain);
-        if(rate !== 1) ensureStretch();
+        if(rate !== 1 && stState !== "dead") ensureStretch();
       }
       var off = Math.max(0, Math.min(base, buf.duration - 0.03));
       srcNode.onended = function(){
@@ -1392,11 +1406,40 @@
       return "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + pd + ".mp3";
     }
     function toEl(url){
-      mode = "el"; buf = null; trk = null; vbase = 0; holdPos = false; stopSrc(); stopTicker(); playing = false;
+      mode = "el"; buf = null; trk = null; vbase = 0; holdPos = false; useEl = false; stopSrc(); stopTicker(); playing = false;
       el.src = url;
       try{ el.playbackRate = rate; }catch(e){}
       try{ el.load(); }catch(e){}
       if(wantPlay){ wantPlay = false; var pr = el.play(); if(pr && pr.catch) pr.catch(function(){}); }
+    }
+    /* Off-speed with a dead stretcher: hand the file to the native
+       element (pitch right, seeks approximate — the accepted trade).
+       The decoded buffer / chunk state is kept, so returning to 1x
+       hands straight back to the buffer engine. */
+    function handToEl(){
+      if(mode !== "wa" || useEl) return;
+      var p = pos(), wp = playing || wantPlay; wantPlay = false;
+      if(playing){ base = lpos(); playing = false; stopSrc(); }
+      stopTicker();
+      useEl = true;
+      el.src = trk ? trk.src : pendingSrc;
+      try{ el.playbackRate = rate; }catch(e){}
+      try{ el.load(); }catch(e){}
+      var onMeta = function(){
+        el.removeEventListener("loadedmetadata", onMeta);
+        try{ el.currentTime = p; }catch(e){}
+        if(wp){ var pr = el.play(); if(pr && pr.catch) pr.catch(function(){}); }
+      };
+      el.addEventListener("loadedmetadata", onMeta);
+    }
+    function handToWa(){
+      if(!useEl) return;
+      var p = el.currentTime || 0, wasPlaying = !el.paused && !el.ended;
+      try{ el.pause(); }catch(e){}
+      useEl = false; endedFlag = false;
+      if(wasPlaying) playing = true;
+      api.currentTime = p;
+      if(wasPlaying){ startTicker(); emit("play"); emit("timeupdate"); }
     }
     function adoptBuffer(b, myGen){
       if(myGen !== gen) return;
@@ -1499,7 +1542,7 @@
       decodeAB(ab.slice(0)).then(function(b){ adoptBuffer(b, myGen); }, function(){ if(myGen === gen) toEl(fallbackFor(url)); });
     }
     ["play", "pause", "ended", "timeupdate", "seeked", "seeking", "loadedmetadata", "error", "canplay"].forEach(function(ev){
-      el.addEventListener(ev, function(){ if(mode === "el") emit(ev); });
+      el.addEventListener(ev, function(){ if(mode === "el" || useEl) emit(ev); });
     });
     var api = {
       addEventListener: function(ev, f){ (listeners[ev] = listeners[ev] || []).push(f); },
@@ -1509,16 +1552,18 @@
       load: function(){
         var url = pendingSrc; if(!url) return;
         var myGen = ++gen;
-        wantPlay = false; endedFlag = false; base = 0; buf = null; trk = null; vbase = 0; holdPos = false;
+        wantPlay = false; endedFlag = false; base = 0; buf = null; trk = null; vbase = 0; holdPos = false; srcRate = 1; useEl = false;
         if(playing){ playing = false; stopSrc(); }
         stopTicker();
-        if(mode === "el"){ try{ el.pause(); }catch(e){} mode = "wa"; }
+        if(mode === "el" || useEl){ try{ el.pause(); }catch(e){} mode = "wa"; useEl = false; }
         if(!window.fetch || !ensureCtx()){ toEl(url); return; }
+        if(rate !== 1 && stState === "dead"){ toEl(url); return; }   /* off-speed + dead stretcher: element from the start, no wasted decode */
         if(chunkReg[url]){ loadTrack(url, myGen); return; }
         loadWhole(url, myGen);
       },
       play: function(){
-        if(mode !== "wa") return el.play();
+        if(mode !== "wa" || useEl) return el.play();
+        if(rate !== 1 && stState === "dead" && (buf || trk)){ wantPlay = true; handToEl(); return Promise.resolve(); }
         if(trk && pos() >= trk.total - 0.02){
           if(trk.bufs[0]){ trk.wantSeek = null; landSeek(0, 0); }
           else { trk.wantSeek = { idx: 0, local: 0 }; wantPlay = true; ensureChunk(0); return Promise.resolve(); }
@@ -1533,7 +1578,7 @@
       },
       pause: function(){
         wantPlay = false;
-        if(mode !== "wa"){ el.pause(); return; }
+        if(mode !== "wa" || useEl){ el.pause(); return; }
         if(!playing) return;
         base = lpos(); playing = false; stopSrc(); stopTicker(); emit("pause"); emit("timeupdate");
       },
@@ -1549,13 +1594,13 @@
       }
     };
     Object.defineProperties(api, {
-      paused: { get: function(){ return mode === "wa" ? !playing : el.paused; } },
-      ended: { get: function(){ return mode === "wa" ? endedFlag : el.ended; } },
-      seeking: { get: function(){ return mode === "wa" ? false : el.seeking; } },
+      paused: { get: function(){ return (mode !== "wa" || useEl) ? el.paused : !playing; } },
+      ended: { get: function(){ return (mode !== "wa" || useEl) ? el.ended : endedFlag; } },
+      seeking: { get: function(){ return (mode !== "wa" || useEl) ? el.seeking : false; } },
       currentTime: {
         get: function(){ return mode === "wa" ? pos() : (el.currentTime || 0); },
         set: function(v){
-          if(mode !== "wa"){ try{ el.currentTime = v; }catch(e){} return; }
+          if(mode !== "wa" || useEl){ try{ el.currentTime = v; }catch(e){} return; }
           if(trk){
             v = Math.max(0, Math.min(v, trk.total)); endedFlag = false;
             var ci = chunkIndexAt(v), cl = v - trk.chunks[ci].start;
@@ -1576,20 +1621,25 @@
           setTimeout(function(){ if(tk === seekToken){ emit("seeking"); emit("seeked"); emit("timeupdate"); } }, 0);
         }
       },
-      duration: { get: function(){ return mode === "wa" ? (trk ? trk.total : (buf ? buf.duration : NaN)) : el.duration; } },
-      readyState: { get: function(){ return mode === "wa" ? (buf ? 4 : 0) : el.readyState; } },
+      duration: { get: function(){ return (mode !== "wa" || useEl) ? el.duration : (trk ? trk.total : (buf ? buf.duration : NaN)); } },
+      readyState: { get: function(){ return (mode !== "wa" || useEl) ? el.readyState : (buf ? 4 : 0); } },
       playbackRate: {
-        get: function(){ return mode === "wa" ? rate : el.playbackRate; },
-        set: function(v){ v = Number(v) || 1; if(mode !== "wa"){ rate = v; try{ el.playbackRate = v; }catch(e){} return; } var p = playing ? lpos() : null; rate = v; if(v !== 1) ensureStretch(); if(playing){ base = p; startSrc(); } }
+        get: function(){ return (mode !== "wa" || useEl) ? el.playbackRate : rate; },
+        set: function(v){ v = Number(v) || 1; if(mode !== "wa"){ rate = v; try{ el.playbackRate = v; }catch(e){} return; }
+          if(useEl){ rate = v; if(v === 1) handToWa(); else { try{ el.playbackRate = v; }catch(e){} } return; }
+          var p = playing ? lpos() : null; rate = v;
+          if(v !== 1 && stState === "dead"){ if(buf || trk) handToEl(); return; }
+          if(v !== 1) ensureStretch();
+          if(playing){ base = p; startSrc(); } }
       },
       volume: {
-        get: function(){ return mode === "wa" ? vol : el.volume; },
-        set: function(v){ vol = v; if(mode === "wa"){ if(gain) gain.gain.value = v; } else { try{ el.volume = v; }catch(e){} } }
+        get: function(){ return (mode !== "wa" || useEl) ? el.volume : vol; },
+        set: function(v){ vol = v; if(mode === "wa" && !useEl){ if(gain) gain.gain.value = v; } else { try{ el.volume = v; }catch(e){} } }
       },
       src: { get: function(){ return pendingSrc || ""; }, set: function(v){ pendingSrc = v || ""; } },
       currentSrc: { get: function(){ return pendingSrc || ""; } },
       preload: { get: function(){ return "auto"; }, set: function(){} },
-      error: { get: function(){ return mode === "el" ? el.error : null; } }
+      error: { get: function(){ return (mode === "el" || useEl) ? el.error : null; } }
     });
     return api;
   }
