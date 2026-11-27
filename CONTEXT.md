@@ -54,7 +54,13 @@ Base: `https://karamofficial.github.io/gurbani-checker/`
 - **Ang text+timings:** `chunks/chunk-<range>.json` (note: **no** `/data/`
   segment), ranges of 100 Angs, shaped `{ angs: { "<ang>": { lines,
   duration } } }`.
-- **Ang audio:** `https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/<ang zero-padded to 4>.mp3`.
+- **Ang audio:** mirrored on GitHub Pages shards (that host sends CORS
+  `*`; the origin `media.gursevak.com` sends no CORS headers, which is
+  why the files had to be mirrored before they could be fetched for
+  decoding): `https://karamofficial.github.io/gurbani-audio-<shard>/ang<ang>.mp3`
+  with shard 1 = Angs 1–500, 2 = 501–1000, 3 = 1001–1430. The origin
+  URL (`media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/<ang zero-padded to 4>.mp3`)
+  remains the engine's per-file fallback when a mirror fetch fails.
 - **Line shape:** `{ start, end, text, words: [{ word, start, end }] }` —
   seconds into that item's audio. `text` is the full line including
   punctuation; `words` carries the per-word timings used for taps, the
@@ -130,8 +136,26 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
 
 ## 5. Playback
 
-- One shared `<audio>` element for everything; a second hidden element
-  only preloads the next track.
+- **Playback engine (2026-11-27, the Checker engine ported):** one
+  WebAudio buffer engine behind a facade that speaks the `<audio>`
+  interface the whole app already used — nothing else in the app
+  changed. The current file is fetched whole and decoded once to a
+  mono 22.05kHz buffer (~30MB for a 6-minute Ang, one file held at a
+  time), so every seek starts at the exact sample on every browser:
+  the native element's byte-estimated MP3 seek (0.1–0.3s landing
+  error, worst in Firefox) and its wake-up first-syllable clip are
+  gone, and the old seek auto-correct simply never fires (its error
+  threshold is never crossed). Per-file guards keep the native
+  element as the transport when: the browser has no WebAudio/fetch
+  decode; the file is longer than ~25 min (Japji, Jaap, Anand,
+  Rehraas, Sukhmani — decoding one whole would pin 200MB+ on a
+  phone); or a fetch/decode fails (Angs then try the gursevak origin
+  stream). Trade-off, same as the Checker: at non-1× speeds the
+  buffer engine shifts pitch (varispeed); the element's
+  pitch-preserving path survives only on the long-file fallback.
+  Prefetch warms the next item's bytes into a small (≤3) buffer
+  cache instead of a second streaming element; files over ~8MB are
+  not pre-warmed (they belong to the element anyway).
 - Rollover at track end is seamless: the next item's audio is already
   loaded; the switch must not flash the bars, restart the scroll, or lose
   any setting (see the speed lesson below). If the next item is still

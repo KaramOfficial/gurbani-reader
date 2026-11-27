@@ -1263,6 +1263,227 @@
       playIcon = $("playIcon"), pauseIcon = $("pauseIcon"),
       nowPlaying = $("nowPlaying"), brandSub = $("brandSub"),
       sheet = $("sheet"), scrim = $("scrim");
+  /* ---------- playback engine: WebAudio buffer playback (the Checker
+     engine, ported) — ONE sample-exact playback path on every browser.
+     The file is fetched whole and decoded once to a mono 22.05kHz buffer
+     (speech needs no stereo/48k: ~30MB for a 6-minute Ang, one file held
+     at a time), so a seek starts at the exact sample on Firefox, Chrome,
+     Safari, phone or desktop — the native element's byte-estimated MP3
+     seek (0.1-0.3s landing error in Firefox) and its wake-up
+     first-syllable clip are gone. Guards, per file, with the native
+     element kept as the fallback transport:
+       - no WebAudio / fetch / decode support (very old browsers)
+       - files longer than ~25 min (Japji, Jaap, Anand, Rehraas,
+         Sukhmani): decoding one whole would pin 200MB+ of buffer on a
+         phone, so they keep the streaming element, exactly as in the
+         Checker — no regression, no memory blow-up
+       - a fetch/decode failure: the element plays the file instead,
+         and for Angs it tries the original gursevak stream when the
+         mirror itself was the failure
+     The facade speaks the exact interface the rest of the app already
+     uses on the <audio> element (src / load / play / pause,
+     currentTime, duration, playbackRate, paused / ended / seeking /
+     readyState, getAttribute("src"), and the play / pause / ended /
+     timeupdate / seeked / seeking / loadedmetadata / error events —
+     seeked stays asynchronous, as on the native element, because the
+     seek auto-correct arms itself after setting currentTime). Nothing
+     else in the app changes: sync, follow-along, previews and the
+     media session all keep reading this one clock. */
+  function makeAudioEngine(el){
+    var listeners = {};
+    var wa = null, gain = null, buf = null, srcNode = null;
+    var playing = false, base = 0, t0 = 0, rate = 1, vol = 1;
+    var mode = "wa", pendingSrc = "", gen = 0, wantPlay = false;
+    var ticker = null, endedFlag = false, seekToken = 0;
+    var cache = {}, cacheOrder = [];   /* prefetch cache: url -> {ab}, at most 3 */
+    function emit(ev){ var l = listeners[ev]; if(l) l.slice().forEach(function(f){ try{ f(); }catch(e){} }); }
+    function pos(){ if(mode !== "wa") return el.currentTime || 0; if(!buf) return base; if(!playing) return base; return Math.min(base + (wa.currentTime - t0) * rate, buf.duration); }
+    function startTicker(){ if(ticker) return; ticker = setInterval(function(){ emit("timeupdate"); }, 250); }
+    function stopTicker(){ if(ticker){ clearInterval(ticker); ticker = null; } }
+    function stopSrc(){ if(srcNode){ var n = srcNode; srcNode = null; n.onended = null; try{ n.stop(); }catch(e){} } }
+    function startSrc(){
+      stopSrc();
+      srcNode = wa.createBufferSource(); srcNode.buffer = buf; srcNode.playbackRate.value = rate; srcNode.connect(gain);
+      var off = Math.max(0, Math.min(base, buf.duration - 0.03));
+      srcNode.onended = function(){
+        if(playing && pos() >= buf.duration - 0.05){ playing = false; base = buf.duration; endedFlag = true; stopTicker(); emit("pause"); emit("ended"); emit("timeupdate"); }
+      };
+      srcNode.start(0, off); t0 = wa.currentTime; base = off;
+    }
+    function ensureCtx(){
+      if(wa) return true;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return false;
+      try{ wa = new AC(); }catch(e){ return false; }
+      gain = wa.createGain(); gain.gain.value = vol; gain.connect(wa.destination);
+      return true;
+    }
+    function decodeAB(ab){
+      /* decode through an offline mono 22.05kHz context when the browser
+         has one (small buffer, off the playback clock); otherwise the
+         playback context's own decoder (device rate, still exact) */
+      var Off = window.OfflineAudioContext || window.webkitOfflineAudioContext, ctx = null;
+      if(Off){ try{ ctx = new Off(1, 1, 22050); }catch(e){ ctx = null; } }
+      if(!ctx) ctx = wa;
+      return new Promise(function(res, rej){
+        var dp;
+        try{ dp = ctx.decodeAudioData(ab, function(b){ res(b); }, function(e){ rej(e); }); }
+        catch(e){ rej(e); return; }
+        if(dp && dp.catch) dp.catch(rej);
+      });
+    }
+    function probeDuration(url){
+      return new Promise(function(res){
+        try{
+          var p = new Audio(); p.preload = "metadata";
+          p.onloadedmetadata = function(){ var d = p.duration; try{ p.src = ""; }catch(e){} res(isFinite(d) ? d : 0); };
+          p.onerror = function(){ res(0); };
+          p.src = url;
+        }catch(e){ res(0); }
+      });
+    }
+    function fallbackFor(url){
+      var m = /gurbani-audio-[123]\/ang(\d+)\.mp3/.exec(url || "");
+      if(!m) return url;
+      var pd = m[1]; while(pd.length < 4) pd = "0" + pd;
+      return "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + pd + ".mp3";
+    }
+    function toEl(url){
+      mode = "el"; buf = null; stopSrc(); stopTicker(); playing = false;
+      el.src = url;
+      try{ el.playbackRate = rate; }catch(e){}
+      try{ el.load(); }catch(e){}
+      if(wantPlay){ wantPlay = false; var pr = el.play(); if(pr && pr.catch) pr.catch(function(){}); }
+    }
+    function adoptBuffer(b, myGen){
+      if(myGen !== gen) return;
+      buf = b; mode = "wa"; endedFlag = false;
+      emit("loadedmetadata"); emit("timeupdate");
+      if(wantPlay){ wantPlay = false; api.play(); }
+    }
+    function cachePut(url, ab){
+      if(!cache[url]) cacheOrder.push(url);
+      cache[url] = { ab: ab };
+      while(cacheOrder.length > 3){
+        var idx = -1;
+        for(var i = 0; i < cacheOrder.length; i++){ if(cacheOrder[i] !== pendingSrc && cacheOrder[i] !== url){ idx = i; break; } }
+        if(idx < 0) break;
+        delete cache[cacheOrder.splice(idx, 1)[0]];
+      }
+    }
+    function fetchAB(url){
+      var c = cache[url];
+      if(c && c.ab) return Promise.resolve(c.ab);
+      return fetch(url).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
+        .then(function(ab){ cachePut(url, ab); return ab; });
+    }
+    function decodeGate(ab, url, myGen){
+      if(ab.byteLength > 3000000){
+        probeDuration(url).then(function(d){
+          if(myGen !== gen) return;
+          if(d > 1500){ toEl(url); return; }
+          decodeAB(ab.slice(0)).then(function(b){ adoptBuffer(b, myGen); }, function(){ if(myGen === gen) toEl(fallbackFor(url)); });
+        });
+        return;
+      }
+      decodeAB(ab.slice(0)).then(function(b){ adoptBuffer(b, myGen); }, function(){ if(myGen === gen) toEl(fallbackFor(url)); });
+    }
+    ["play", "pause", "ended", "timeupdate", "seeked", "seeking", "loadedmetadata", "error", "canplay"].forEach(function(ev){
+      el.addEventListener(ev, function(){ if(mode === "el") emit(ev); });
+    });
+    var api = {
+      addEventListener: function(ev, f){ (listeners[ev] = listeners[ev] || []).push(f); },
+      removeEventListener: function(ev, f){ var l = listeners[ev]; if(l){ var i = l.indexOf(f); if(i >= 0) l.splice(i, 1); } },
+      getAttribute: function(n){ return n === "src" ? (pendingSrc || null) : null; },
+      setAttribute: function(n, v){ if(n === "src") api.src = v; },
+      load: function(){
+        var url = pendingSrc; if(!url) return;
+        var myGen = ++gen;
+        wantPlay = false; endedFlag = false; base = 0; buf = null;
+        if(playing){ playing = false; stopSrc(); }
+        stopTicker();
+        if(mode === "el"){ try{ el.pause(); }catch(e){} mode = "wa"; }
+        if(!window.fetch || !ensureCtx()){ toEl(url); return; }
+        var cached = cache[url] && cache[url].ab;
+        if(cached){ decodeGate(cached, url, myGen); return; }
+        /* a big file gets its duration probed from metadata BEFORE the
+           whole body is downloaded, so a long Bani never pins memory
+           or bandwidth just to discover it belongs on the element */
+        fetch(url, { method: "HEAD" }).then(function(r){ return r && r.ok ? Number(r.headers.get("content-length") || 0) : 0; })
+          .catch(function(){ return 0; })
+          .then(function(len){
+            if(myGen !== gen) return;
+            if(len > 3000000){
+              probeDuration(url).then(function(d){
+                if(myGen !== gen) return;
+                if(d > 1500){ toEl(url); return; }
+                fetchAB(url).then(function(ab){ if(myGen === gen) decodeGate(ab, url, myGen); }, function(){ if(myGen === gen) toEl(fallbackFor(url)); });
+              });
+              return;
+            }
+            fetchAB(url).then(function(ab){ if(myGen === gen) decodeGate(ab, url, myGen); }, function(){ if(myGen === gen) toEl(fallbackFor(url)); });
+          });
+      },
+      play: function(){
+        if(mode !== "wa") return el.play();
+        if(!buf){ wantPlay = true; return Promise.resolve(); }
+        if(wa.state === "suspended"){ var rp = wa.resume(); if(rp && rp.catch) rp.catch(function(){}); }
+        if(playing) return Promise.resolve();
+        if(base >= buf.duration - 0.02) base = 0;
+        endedFlag = false; playing = true;
+        startSrc(); startTicker(); emit("play"); emit("timeupdate");
+        return Promise.resolve();
+      },
+      pause: function(){
+        wantPlay = false;
+        if(mode !== "wa"){ el.pause(); return; }
+        if(!playing) return;
+        base = pos(); playing = false; stopSrc(); stopTicker(); emit("pause"); emit("timeupdate");
+      },
+      prefetch: function(url){
+        if(!url || cache[url] || url === pendingSrc || !window.fetch) return;
+        fetch(url).then(function(r){
+          if(!r.ok) return null;
+          var len = Number(r.headers.get("content-length") || 0);
+          if(len > 8000000) return null;   /* long file: the element streams it — don't pin memory warming it */
+          return r.arrayBuffer();
+        }).then(function(ab){ if(ab) cachePut(url, ab); }).catch(function(){});
+      }
+    };
+    Object.defineProperties(api, {
+      paused: { get: function(){ return mode === "wa" ? !playing : el.paused; } },
+      ended: { get: function(){ return mode === "wa" ? endedFlag : el.ended; } },
+      seeking: { get: function(){ return mode === "wa" ? false : el.seeking; } },
+      currentTime: {
+        get: function(){ return mode === "wa" ? pos() : (el.currentTime || 0); },
+        set: function(v){
+          if(mode !== "wa"){ try{ el.currentTime = v; }catch(e){} return; }
+          if(!buf){ base = Math.max(0, v); return; }
+          base = Math.max(0, Math.min(v, buf.duration)); endedFlag = false;
+          if(playing) startSrc();
+          var tk = ++seekToken;
+          setTimeout(function(){ if(tk === seekToken){ emit("seeking"); emit("seeked"); emit("timeupdate"); } }, 0);
+        }
+      },
+      duration: { get: function(){ return mode === "wa" ? (buf ? buf.duration : NaN) : el.duration; } },
+      readyState: { get: function(){ return mode === "wa" ? (buf ? 4 : 0) : el.readyState; } },
+      playbackRate: {
+        get: function(){ return mode === "wa" ? rate : el.playbackRate; },
+        set: function(v){ v = Number(v) || 1; rate = v; if(mode !== "wa"){ try{ el.playbackRate = v; }catch(e){} return; } if(playing){ base = pos(); startSrc(); } }
+      },
+      volume: {
+        get: function(){ return mode === "wa" ? vol : el.volume; },
+        set: function(v){ vol = v; if(mode === "wa"){ if(gain) gain.gain.value = v; } else { try{ el.volume = v; }catch(e){} } }
+      },
+      src: { get: function(){ return pendingSrc || ""; }, set: function(v){ pendingSrc = v || ""; } },
+      currentSrc: { get: function(){ return pendingSrc || ""; } },
+      preload: { get: function(){ return "auto"; }, set: function(){} },
+      error: { get: function(){ return mode === "el" ? el.error : null; } }
+    });
+    return api;
+  }
+  audio = makeAudioEngine(audio);
+
 
   var state = {
     mode:"bani", id:"japji", ang:null,
@@ -1289,7 +1510,7 @@
   function chainPrev(id){ var i = BANI_CHAIN.indexOf(id); return i > 0 ? BANI_CHAIN[i - 1] : null; }
   function baniAudioUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".mp3"; }
   function baniDataUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".json"; }
-  function preloadBaniAudio(id){ if(!id) return; var b = baniById(id); if(!b) return; var u = baniAudioUrl(b); if(preAudio.getAttribute("src") !== u){ preAudio.src = u; try{ preAudio.load(); }catch(e){} } }
+  function preloadBaniAudio(id){ if(!id) return; var b = baniById(id); if(!b) return; if(audio.prefetch) audio.prefetch(baniAudioUrl(b)); }
 
   /* the sentence in focus: the follow-along line when one is active,
      otherwise the line sitting at the reading anchor right now */
@@ -3280,7 +3501,7 @@
     paintBrandSub(); resetView(); updatePager();
     nowPlaying.innerHTML = "<span class=\"np-title\">" + esc(state.titlePa) + "</span><small>Double-tap a word to listen from there</small>";
     var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
-    audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
+    audio.src = angAudioUrl(ang);
     applySpeed();
     audio.load(); resetProgress(); clearHighlight();
     savePlace(); preloadAngAudio(ang + 1);
@@ -3393,8 +3614,9 @@
      rootMargin overscan trigger prefetch + rehydration. One fetch in flight,
      deduped by Ang number; dropped sections rebuild from retained line data. */
   var preAudio = new Audio(); preAudio.preload = "auto";
-  function angAudioUrl(ang){ var pd = String(ang); while(pd.length < 4) pd = "0" + pd; return "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + pd + ".mp3"; }
-  function preloadAngAudio(ang){ if(ang >= 1 && ang <= 1430 && preAudio.getAttribute("src") !== angAudioUrl(ang)){ preAudio.src = angAudioUrl(ang); try{ preAudio.load(); }catch(e){} } }
+  function angAudioUrl(ang){ var shard = ang <= 500 ? 1 : (ang <= 1000 ? 2 : 3); return "https://karamofficial.github.io/gurbani-audio-" + shard + "/ang" + ang + ".mp3"; }
+  function angAudioOriginUrl(ang){ var pd = String(ang); while(pd.length < 4) pd = "0" + pd; return "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + pd + ".mp3"; }
+  function preloadAngAudio(ang){ if(ang >= 1 && ang <= 1430 && audio.prefetch) audio.prefetch(angAudioUrl(ang)); }
   function buildLinesInnerAt(lines, ang){
     var html = "", wi = state.angFirstWord[ang] || 0, baseLi = state.angFirstLine[ang] || 0;
     var deco = paraOn ? paraDeco(lines) : null;
@@ -3738,7 +3960,7 @@
       observeTail(); preloadAngAudio(ang + 1);
       state.flatLines.forEach(function(_, li){ state.lineAng[li] = ang; });
       var padded = String(ang); while(padded.length < 4) padded = "0" + padded;
-      audio.src = "https://media.gursevak.com/media/Sehaj_Paath_Pagewise/Sehaj_Paath_16kbps/" + padded + ".mp3";
+      audio.src = angAudioUrl(ang);
       applySpeed();
       audio.load(); resetProgress();
       if(pendingFreeLand === ang){
