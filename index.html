@@ -3911,23 +3911,13 @@
     if(u) u.classList.toggle("show", calm && withRc && !!st.u.length);
     if(r) r.classList.toggle("show", calm && withRc && !!st.r.length);
   }
-  /* a head that arrives by SYNC is a landing this device lived
-     through (owner, Nov 26): when a remote apply replaces the
-     live head, the head it replaces goes onto this device's own
-     undo stack — the stacks themselves still never sync, but a
-     sync landing is history too, so the pankti the reader was
-     on before the other device moved is one Undo away instead
-     of gone. */
-  function noteRemoteHead(prev, next){
-    if(!prev || !next) return;
-    if(prev.mode === next.mode && prev.item === next.item && prev.idx === next.idx) return;
-    var st = jumpStack();
-    st.u.push({ mode: prev.mode, item: prev.item, idx: prev.idx,
-      t: (typeof prev.start === "number" ? prev.start : (prev.t || 0)), playing: false });
-    while(st.u.length > JUMP_CAP) st.u.shift();
-    st.r.length = 0;
-    paintJumpBtns();
-  }
+  /* jump history belongs to THIS device's own explicit jumps
+     alone (owner, Nov 26): a head that arrives by SYNC replaces
+     the live head — that is sync doing its job — but it never
+     enters the undo stack, never clears the redo stack and
+     never evicts a local entry; follow-along never records
+     either. The stacks are written only by noteJump (a local
+     jump) and by the undo/redo walk itself. */
   /* the {mode, item, idx} a flat line is the head OF — the same
      math jumpPos uses, for a caller that knows its destination */
   function posOfLine(li){
@@ -5542,7 +5532,6 @@
       try{ playing = !!(audio && !audio.paused && !audio.ended); }catch(e){}
       if(id === paathData.current && !detour && !playing){
         if(data.glf){
-          try{ noteRemoteHead(glf, data.glf); }catch(e){}
           try{ rlog("info", "sync.apply.live", { id: id, item: data.glf.item, idx: data.glf.idx }); }catch(e){}
           glf = data.glf; lsSet(FOCUS_KEY, JSON.stringify(data.glf));
           /* the live place is re-derived from the head: on this

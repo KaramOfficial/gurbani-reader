@@ -238,12 +238,15 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   the Paath had recorded the start line itself, so Undo later
   took him back to the start of the auto-scroll — callers pass
   their destination to `noteJump(dest)` and a proven same-line
-  match skips the record. A head that arrives by SYNC is a landing too
-  (owner, Nov 26): when a remote apply replaces the live head,
-  the head it replaces is pushed onto this device's undo
-  stack — the stacks themselves still never sync, but a sync
-  landing is history, so the pankti the reader was on before
-  another device moved is one Undo away instead of gone.
+  match skips the record. A head that arrives by SYNC is NOT a
+  landing in this history (owner, Nov 26): a remote apply
+  replaces the live head — sync doing its job — but it never
+  enters the undo stack, never clears the redo stack and never
+  evicts a local entry; the stacks are written only by the
+  reader's own explicit jumps on this device and by the
+  undo/redo walk itself. (A flood of remote applies once pushed
+  the reader's own entries out of the 3-deep stack within
+  seconds — the stacks are local property, not a sync mirror.)
   Undo and Redo walk the stacks, restoring through the
   ordinary switch/seek machinery, so the audio re-seeks to that
   line and the head lands on it (a restore writes the focus record
