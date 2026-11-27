@@ -1720,6 +1720,22 @@
   var DETOUR_KEY = "gurbani-reader:detour-v1";
   function readDetourStore(){ try{ var v = JSON.parse(localStorage.getItem(DETOUR_KEY) || "null"); return v && typeof v === "object" ? v : null; }catch(e){ return null; } }
   function writeDetourStore(s){ try{ if(s) localStorage.setItem(DETOUR_KEY, JSON.stringify(s)); else localStorage.removeItem(DETOUR_KEY); }catch(e){} }
+  /* each Nitnem Bani keeps its OWN place + head in its own slot of
+     the free store (owner, Nov 27) — the store's top-level place/glf
+     belong to free ANG reading (Default) alone, so a Bani can never
+     borrow Default's pankti, nor Default a Bani's */
+  function baniSlot(id){ var ds = readDetourStore(); var s = ds && ds.banis ? ds.banis[id] : null; return s && typeof s === "object" ? s : null; }
+  function writeBaniSlot(id, slot){ var ds = readDetourStore() || {}; if(!ds.banis) ds.banis = {}; ds.banis[id] = slot; writeDetourStore(ds); }
+  /* one-time adoption: a legacy shared place/head that names a Bani
+     moves into that Bani's own slot, so existing progress survives */
+  function adoptLegacyBaniPlace(){
+    var ds = readDetourStore(); if(!ds || !ds.place || ds.place.mode !== "bani") return;
+    var bid = (ds.place.fl && ds.place.fl.item) || ds.place.id; if(!bid) return;
+    if(ds.banis && ds.banis[bid]) return;
+    var slot = { place: ds.place, glf: (ds.glf && ds.glf.mode === "bani" && ds.glf.item === bid) ? ds.glf : null };
+    if(!ds.banis) ds.banis = {};
+    ds.banis[bid] = slot; writeDetourStore(ds);
+  }
   function exitDetour(){ detour = null; detourGlf = null; }   /* the slot itself stays: it is free reading's home, resumed when the reader comes back to it */
   /* The reader is always in one of two worlds: inside a Sehaj Paath
      (its place + focus ARE the app's place + focus), or in FREE reading
@@ -1770,7 +1786,8 @@
          own session record only; Paath records store the focus
          line alone and sync never sees this.) */
       var flNow = focusedLine();
-      var prevPlace = detour ? (readDetourStore() || {}).place : readPlace();
+      var inBani = !!(detour && state.mode === "bani" && state.id);
+      var prevPlace = detour ? (inBani ? (baniSlot(state.id) || {}).place : (readDetourStore() || {}).place) : readPlace();
       var samePos = !!(prevPlace && prevPlace.mode === state.mode && prevPlace.id === state.id && prevPlace.ang === state.ang
         && ((prevPlace.fl == null && flNow == null) || (prevPlace.fl && flNow && prevPlace.fl.item === flNow.item && prevPlace.fl.idx === flNow.idx)));
       var placeRec = {
@@ -1778,7 +1795,10 @@
         y: window.scrollY || 0, t: (audio && audio.currentTime) || 0, ts: (samePos && prevPlace.ts) ? prevPlace.ts : Date.now(),
         fl: flNow
       };
-      if(detour){ var dsp = readDetourStore() || {}; dsp.place = placeRec; writeDetourStore(dsp); }
+      if(detour){
+        if(inBani){ var dspB = baniSlot(state.id) || {}; dspB.place = placeRec; writeBaniSlot(state.id, dspB); }
+        else { var dsp = readDetourStore() || {}; dsp.place = placeRec; writeDetourStore(dsp); }
+      }
       else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
       if(audio && !audio.paused) saveFocus();
       syncDirty();
@@ -1840,7 +1860,10 @@
     var prevF = detour ? detourGlf : glf;
     var sameF = !!(prevF && prevF.mode === state.mode && prevF.item === item && prevF.idx === idx);
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
-    if(detour){ detourGlf = frec; var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); syncDirty(); paintMedia(); return; }
+    if(detour){ detourGlf = frec;
+      if(frec.mode === "bani" && frec.item){ var dsfB = baniSlot(frec.item) || {}; dsfB.glf = frec; writeBaniSlot(frec.item, dsfB); }
+      else { var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); }
+      syncDirty(); paintMedia(); return; }
     glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
     syncDirty();
@@ -3450,14 +3473,42 @@
       try{ savePlace(); }catch(e){}
       snapshotCurrentPaath();
       detour = { resumed: true };
-      var dsx = readDetourStore();
-      detourGlf = dsx && dsx.glf ? dsx.glf : (dsx && dsx.place && dsx.place.fl ? { mode: dsx.place.mode, item: dsx.place.fl.item, idx: dsx.place.fl.idx, start: dsx.place.fl.start, t: dsx.place.t || 0, ts: Date.now(), pv: null } : null);
       setMode("free");
-      if(dsx && dsx.place && dsx.place.mode === "bani" && ((dsx.place.fl && dsx.place.fl.item === b.id) || dsx.place.id === b.id)) pendingRestore = dsx.place;
+    }
+    /* leaving one Bani for another: the outgoing Bani's place is
+       saved into its own slot first (the scroll saver may not have
+       fired since the last move) */
+    if(detour && state.mode === "bani" && state.id && state.id !== b.id && state.flatLines && state.flatLines.length){ try{ savePlace(true); }catch(e){} }
+    /* the Bani's OWN head + place (owner, Nov 27): seeded from its
+       slot, never from the shared free-Ang head — Recenter inside
+       this Bani answers to this Bani's pankti. A Bani with a saved
+       place resumes there; a Bani with only a head lands on that
+       pankti; a Bani with neither opens ON its first line — the
+       first line becomes its head and the landing puts it in the
+       focus zone, so no Recenter is needed or offered */
+    adoptLegacyBaniPlace();
+    var bSlot = baniSlot(b.id);
+    detourGlf = bSlot && bSlot.glf ? bSlot.glf : null;
+    if(!pendingRestore){
+      if(bSlot && bSlot.place) pendingRestore = bSlot.place;
+      else if(detourGlf){
+        pendingRestore = { mode: "bani", ang: null, id: b.id, y: 0, t: detourGlf.t || 0, fl: { item: b.id, idx: detourGlf.idx, start: detourGlf.start, src: "audio" } };
+        pendingRecenterLine = { mode: "bani", item: b.id, idx: detourGlf.idx };
+      } else {
+        detourGlf = { mode: "bani", item: b.id, idx: 0, start: 0, t: 0, ts: Date.now(), pv: null };
+        var bFresh = baniSlot(b.id) || {}; bFresh.glf = detourGlf; writeBaniSlot(b.id, bFresh);
+        pendingRestore = { mode: "bani", ang: null, id: b.id, y: 0, t: 0, fl: { item: b.id, idx: 0, start: 0, src: "audio" } };
+        pendingRecenterLine = { mode: "bani", item: b.id, idx: 0 };
+      }
+    }
+    if(!detourGlf){
+      var rp0 = pendingRestore || (bSlot && bSlot.place);
+      if(rp0 && rp0.fl && rp0.fl.item === b.id) detourGlf = { mode: "bani", item: b.id, idx: rp0.fl.idx, start: rp0.fl.start, t: rp0.t || 0, ts: Date.now(), pv: null };
     }
     navSettleUntil = Date.now() + 2000;
     var token = ++state.loadToken;
     state.mode = "bani"; state.id = b.id; state.ang = null;
+    try{ paintJumpBtns(); }catch(e){}   /* now keyed to this Bani's own jump stack */
     state.titlePa = b.pa; state.titleEn = b.en;
     pauseAudio(); setLoading(b.pa); window.scrollTo(0,0); showBars();
     var url = BASE + "/data/" + b.folder + "/" + b.file + ".json";
@@ -4253,8 +4304,8 @@
      from free reading or a Bani (and the reverse). On-device only,
      in memory, never synced. */
   function jumpCtxKey(){
+    if(state.mode === "bani" && state.id) return "bani:" + state.id;
     if(detour) return "free";
-    if(state.mode === "bani") return "bani:" + state.id;
     return "paath:" + (paathData.current || "none");
   }
   function jumpStack(){

@@ -487,7 +487,7 @@ seed) and is never reset to line 1.
 | `gurbani-reader:ctx-<id>` | One tracker's snapshot: `{ glf }` — the Paath's head (its last focus line) and nothing else; Ang state only, never a Bani's. A Paath never stores a scroll place (owner, Nov 25) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
-| `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world |
+| `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world; inside it, a `banis` map holds each Nitnem Bani's OWN place + focus slot |
 | `gurbani-reader:mode-v1` | Which world the reader left in: `free` (Default reading) or `paath` |
 | `gurbani-reader:sync-v1` | Cloud-sync meta (never itself synced): this device's writer id (`cid`), the account the sync state belongs to (`uid`), and per record only the exact JSON last sent or applied (`sent`) + the newest server stamp applied (`seen`) |
 
@@ -807,7 +807,18 @@ and the Reader's chunks enumerate an Ang's lines identically,
 verified line-for-line) lands there on that exact pankti as the
 focus, centred at the anchor, lite-marked, audio parked at its
 start, the link stripped from the address bar; and the **Paath
-popup's Default row** (below). A plain ?ang=N link (no line) keeps
+popup's Default row** (below). Within the free world, each Bani is
+its own context (owner, Nov 27): it keeps its OWN head and place in
+its own slot of detour-v1 (the `banis` map), exactly as each Paath
+keeps its own — the store's top-level place + focus belong to free
+ANG reading alone. Recenter inside a Bani answers to that Bani's
+head, never to Default's; a Bani with a saved place resumes there,
+and a Bani with no saved head opens ON its first line — the first
+line becomes its head and the landing places it in the focus zone,
+no Recenter needed — the Ang landing rule (\u00a77) applied to Banis.
+Jump history is likewise keyed per Bani (\u00a75). A legacy shared
+place/head that names a Bani is adopted into that Bani's slot on
+first open. A plain ?ang=N link (no line) keeps
 the older in-world behaviour. In Default reading, Recenter behaves
 NORMALLY — it answers to the free world's own focus (seeded from
 the link pankti when there is one, afterwards moved only by the
