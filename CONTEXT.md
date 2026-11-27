@@ -180,9 +180,12 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   Nov 26): Undo and Redo live on the Recenter island, flanking
   the trio in the island's own round icon-button style — Undo
   left of the book button, Redo right of the bookmark — and
-  each exists only while its stack is non-empty and the island
+  each exists only while its stack is non-empty, the island
   is calm (no sheet or popup open, the follow tracker not
-  driving); the keyboard keeps Ctrl/⌘+Z, Ctrl/⌘+Shift+Z,
+  driving), AND Recenter itself is showing (owner, Nov 26):
+  they ride with Recenter and never show alone in the centre —
+  alone they take too much focus. The keyboard keeps
+  Ctrl/⌘+Z, Ctrl/⌘+Shift+Z,
   Ctrl+Y. The
   model is the classic two-stack editor undo, and its entries are
   **lines**: a deliberate jump — double-tap a word or line to play

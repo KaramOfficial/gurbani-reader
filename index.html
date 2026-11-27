@@ -3745,9 +3745,16 @@
     var calm = (state.mode === "ang" || state.mode === "bani") &&
       !sheet.classList.contains("open") && $("angPop").hidden && $("paathPop").hidden &&
       !(!audio.paused && autoScrollOn && !manualHold);
+    /* Undo/Redo exist only WITH the Recenter island's centre
+       (owner, Nov 26): when Recenter itself is hidden they never
+       show alone — alone in the centre they take too much focus.
+       updateRecenter toggles Recenter's class before calling
+       this, so the verdict read here is fresh. */
+    var rc = $("recenterBtn");
+    var withRc = !!(rc && rc.classList.contains("show"));
     var u = $("jumpUndo"), r = $("jumpRedo");
-    if(u) u.classList.toggle("show", calm && !!st.u.length);
-    if(r) r.classList.toggle("show", calm && !!st.r.length);
+    if(u) u.classList.toggle("show", calm && withRc && !!st.u.length);
+    if(r) r.classList.toggle("show", calm && withRc && !!st.r.length);
   }
   /* a head that arrives by SYNC is a landing this device lived
      through (owner, Nov 26): when a remote apply replaces the
