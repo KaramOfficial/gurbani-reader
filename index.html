@@ -1784,6 +1784,7 @@
   var assignRec = null;   /* the pankti captured when the assign popup opens — once the popup covers the anchor, the view can no longer be sampled */
   function openPaathPop(mode){
     paathPopMode = mode;
+    assignWarnedFor = null;
     if(mode === "assign") assignRec = currentFocusRec();
     if(sheet.classList.contains("open")) closeSheet();
     closeAngPop();
@@ -1794,6 +1795,7 @@
     requestAnimationFrame(function(){ pp.classList.add("open"); });
   }
   function closePaathPop(){
+    assignWarnedFor = null;
     var pp = $("paathPop");
     if(!pp || pp.hidden) return;
     pp.classList.remove("open");
@@ -1849,6 +1851,20 @@
     try{ paintJumpBtns(); }catch(e){}
   }
   var toastTimer = null;
+  /* which Paaths are playing on OTHER devices right now, learned
+     from their records as they land (see notePresence): recId ->
+     {by, at} with at = the record's server stamp; a marker older
+     than the window is a device that stopped without a last
+     save (closed mid-play) and no longer counts as live */
+  var presenceMap = {};
+  function notePresence(recId, live, by, at){
+    if(live && by) presenceMap[recId] = { by: by, at: at };
+    else delete presenceMap[recId];
+  }
+  function liveElsewhere(id){
+    var p = presenceMap["ctx:" + id];
+    return !!(p && p.at && (Date.now() - p.at) < 30000);
+  }
   function toastMsg(msg){
     var t = $("msgToast"); if(!t) return;
     t.textContent = msg; t.classList.add("show");
@@ -1883,11 +1899,11 @@
   /* make the current pankti the chosen Paath's place + focus, in place:
      its snapshot is rewritten so the next time it opens, it resumes
      right here. The reader never moves. */
+  var assignWarnedFor = null;   /* the Paath whose live-elsewhere warning is already up — a second tap sets it anyway */
   function assignFocusToPaath(id){
     var f = assignRec || currentFocusRec();
-    assignRec = null;
-    if(!f){ toastMsg("Open a pankti first, then set it"); return; }
-    if(f.mode === "bani"){ closePaathPop(); toastMsg("Sehaj Paath tracks Ang reading — this is Nitnem"); return; }
+    if(!f){ assignRec = null; toastMsg("Open a pankti first, then set it"); return; }
+    if(f.mode === "bani"){ assignRec = null; closePaathPop(); toastMsg("Sehaj Paath tracks Ang reading — this is Nitnem"); return; }
     var pv = null;
     try{ pv = previewText(lineTextAt(f.item, f.idx)); }catch(e){}
     var frec = { mode: f.mode, item: f.item, idx: f.idx, start: f.start, t: f.t, ts: Date.now(), pv: pv };
@@ -1895,6 +1911,20 @@
       y: 0, t: f.t, ts: Date.now(), fl: { item: f.item, idx: f.idx, start: f.start, src: "view" } };
     var rec = paathById(id);
     var name = rec ? rec.name : "";
+    /* a Paath playing on another device keeps overwriting its
+       head with its live position — a pankti set here would be
+       replaced within seconds, silently (owner, Nov 26). Warn
+       in the popup first; a second tap on the same Paath is the
+       reader saying "set it anyway" and goes through. */
+    if(liveElsewhere(id) && assignWarnedFor !== id){
+      assignWarnedFor = id;
+      var curEl = $("paathPopCur");
+      if(curEl) curEl.textContent = "\u26A0 This Paath is playing on another device right now.\nWhile it plays there, its position will overwrite the pankti you set.\nTap " + (name || "the Paath") + " again to set it anyway.";
+      toastMsg("Playing on another device — tap again to set anyway");
+      return;
+    }
+    assignWarnedFor = null;
+    assignRec = null;
     if(!detour && paathData.current === id){
       glf = frec; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
       try{ localStorage.setItem(LAST_KEY, JSON.stringify(place)); }catch(e){}
@@ -5153,6 +5183,13 @@
       var out = null;
       try{ out = JSON.parse(JSON.stringify(data)); }catch(e){ return data; }
       if(recId.indexOf("ctx:") === 0 && out.glf && typeof out.glf === "object") delete out.glf.t;
+      /* the live marker is presence, not position: it rides the
+         wire but never takes part in the sent-baseline comparison,
+         or a receiver would push its marker-less copy over the
+         playing device's record and the player would re-push it
+         back — the exact ping-pong the canonical form exists to
+         prevent (same reasoning as glf.t above) */
+      if(recId.indexOf("ctx:") === 0) delete out.live;
       return out;
     }
 
@@ -5181,7 +5218,21 @@
     function localRecord(recId){
       if(recId === "paaths") return { list: paathData.list.map(function(p){ return { id: p.id, name: p.name }; }) };
       if(recId === "settings"){ var o = {}; SETTINGS_KEYS.forEach(function(k){ var v = lsGet(k); if(v !== null) o[k] = v; }); return o; }
-      return canonRec(recId, deriveCtx(recId.slice(4)));
+      var rec = canonRec(recId, deriveCtx(recId.slice(4)));
+      /* presence rides the record (owner, Nov 26): while THIS
+         device is playing this Paath, the record carries a live
+         marker — playback pushes keep the record's server stamp
+         fresh, so other devices can see the Paath is mid-reading
+         elsewhere and warn before a set-pankti it would
+         overwrite. No extra writes: the marker hitches on the
+         pushes playback already makes, and the pause save (which
+         pushes anyway) clears it. */
+      try{
+        if(rec && rec.glf && recId.slice(4) === paathData.current && !detour &&
+           state.mode === "ang" && audio && !audio.paused && !audio.ended)
+          rec.live = { by: CID };
+      }catch(e){}
+      return rec;
     }
     function recIdsLocal(){
       var ids = ["paaths", "settings"];
@@ -5266,12 +5317,12 @@
         var data = localRecord(recId); if(!data) return;
         if(recId.indexOf("ctx:") === 0 && !data.glf) return;
         var json = JSON.stringify(data);
-        if(sentMap()[recId] === json) return;
+        if(sentMap()[recId] === JSON.stringify(canonRec(recId, data))) return;
         var f = fieldOf(recId);
         upd[f] = json;
         upd[f + "_at"] = firebase.firestore.FieldValue.serverTimestamp();
         upd[f + "_by"] = CID;
-        sentJson[recId] = json;
+        sentJson[recId] = JSON.stringify(canonRec(recId, data));   /* baseline is canonical; the wire (upd) keeps the full record, live marker included */
       });
       /* Paaths deleted from the list lose their cloud record too */
       var cur = {}; paathData.list.forEach(function(p){ cur[p.id] = 1; });
@@ -5491,6 +5542,7 @@
         if(first && recId === "paaths" && listCustomised(localRecord("paaths")) && !listCustomised(data)){
           forgetSent(recId); schedulePush(); return;
         }
+        if(recId.indexOf("ctx:") === 0){ try{ notePresence(recId, data.live, d[f + "_by"], at); }catch(e){} }
         applyRecord(recId, data, at);
       });
       maybeClaimWorld(d);

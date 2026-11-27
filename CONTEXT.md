@@ -176,6 +176,18 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   it survives small sizes; Cook I2, Nov 26). It repaints on
   every head move and transport change; playback and position
   state follow the audio, so the shade's seek bar is real.
+- **Presence + the assign warning** (owner, Nov 26): while a
+  device is PLAYING a Paath, that Paath's record carries a
+  `live` marker (it rides the pushes playback already makes;
+  the pause save clears it; the canonical comparison ignores
+  it, like `glf.t`, so it can never ping-pong). A device that
+  receives a foreign record notes the marker with the record's
+  server stamp; a marker fresher than ~30 s means the Paath is
+  mid-reading elsewhere. **Set-to-pankti on a live-elsewhere
+  Paath warns first** — the popup explains that the playing
+  device's position will overwrite the set pankti, and a second
+  tap on the same Paath sets it anyway. Without the warning the
+  overwrite was silent and looked exactly like broken sync.
 - **Jump history — Undo / Redo** (owner, Nov 25; buttons moved
   Nov 26): Undo and Redo live on the Recenter island, flanking
   the trio in the island's own round icon-button style — Undo
