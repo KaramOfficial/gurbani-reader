@@ -308,6 +308,19 @@
   .paath-name{font-size:14.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .paath-sub{font-size:12px;color:var(--muted);margin-top:1px;font-family:"Noto Sans Gurmukhi",sans-serif}
   .paath-pv{font-family:"Noto Serif Gurmukhi",serif;font-size:13.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .paath-live{display:inline-flex;align-items:center;gap:6px;margin-left:8px;vertical-align:middle}
+  .paath-live-n{font-size:11px;font-weight:700;line-height:1;color:var(--accent-strong);background:var(--accent-soft);border-radius:999px;padding:3px 7px;white-space:nowrap}
+  .paath-live-n.idle{color:var(--ink-soft);background:var(--hairline)}
+  .paath-stop{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;border:1px solid var(--hairline);background:var(--bg);color:var(--ink);cursor:pointer;padding:0;flex:none}
+  .paath-stop svg{width:11px;height:11px}
+  #stopFloat{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translate(-50%,-18px);opacity:0;pointer-events:none;transition:transform .28s ease,opacity .28s ease;z-index:120;background:var(--bg);color:var(--ink);border:1px solid var(--hairline);border-radius:999px;padding:9px 16px;font-size:13.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:92vw;text-align:center}
+  #stopFloat.show{transform:translate(-50%,0);opacity:1}
+  #logOverlay{position:fixed;inset:0;z-index:130;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px}
+  #logOverlay[hidden]{display:none}
+  .log-card{background:var(--bg);color:var(--ink);border-radius:16px;max-width:640px;width:100%;max-height:82vh;display:flex;flex-direction:column;padding:12px;border:1px solid var(--hairline)}
+  .log-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700;margin-bottom:8px}
+  .log-head button{margin-left:6px}
+  #logText{overflow:auto;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
   .paath-edit{flex:none;display:grid;place-items:center;width:40px;height:40px;min-height:40px;border-radius:50%;color:var(--muted)}
   .paath-edit:active{background:var(--accent-soft)}
   .paath-edit svg{width:15px;height:15px}
@@ -975,6 +988,8 @@
   </div>
 </div>
 <div class="pv-toast msg-toast" id="msgToast" role="status"></div>
+<div id="stopFloat" role="status"></div>
+<div id="logOverlay" hidden><div class="log-card"><div class="log-head"><span>App logs</span><span><button class="ang-go" id="logCopy" type="button">Copy</button><button class="ang-go" id="logClear" type="button">Clear</button><button class="ang-go" id="logClose" type="button">Close</button></span></div><pre id="logText"></pre></div></div>
 <div class="quick" id="quickCtl">
   <button class="orb" id="qcPlay" aria-label="Pause"><svg id="qcPlayIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg><svg id="qcPauseIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
   <button class="qc-speed" id="qcSpeed" aria-label="Playback speed">1×</button>
@@ -1055,6 +1070,7 @@
       <div>
         <span class="menu-label">Sync</span>
         <p class="menu-note" id="syncNote">Optional — sync your place, Sehaj Paaths &amp; settings across devices.</p>
+        <p class="menu-note"><button class="ang-go" id="logBtn" type="button" style="flex:none">View app logs</button></p>
       </div>
       <span class="menu-spacer"></span>
       <button class="ang-go" id="syncBtn" style="flex:none">Sign in with Google</button>
@@ -1783,6 +1799,7 @@
   var paathPopMode = "go";
   var assignRec = null;   /* the pankti captured when the assign popup opens — once the popup covers the anchor, the view can no longer be sampled */
   function openPaathPop(mode){
+    presPing();
     paathPopMode = mode;
     assignWarnedFor = null;
     if(mode === "assign") assignRec = currentFocusRec();
@@ -1819,7 +1836,7 @@
       html += '<span class="paath-dot" aria-hidden="true"></span>';
       html += '<span class="paath-text"><span class="paath-name">' + esc(name) + '</span>' +
         (sub ? '<span class="paath-sub">' + esc(sub) + '</span>' : '') +
-        (pv ? '<span class="paath-pv">' + esc(pv) + '</span>' : '') + '</span>';
+        (pv ? '<span class="paath-pv">' + esc(pv) + '</span>' : '') + paathLiveHTML(key) + '</span>';
       html += '</div>';
     };
     if(!assign){
@@ -1851,6 +1868,53 @@
     try{ paintJumpBtns(); }catch(e){}
   }
   var toastTimer = null;
+  /* ---------- app log (owner, Nov 26) ----------
+     GitHub Pages is static hosting: there is no server and no
+     server log to read. The battle-tested pattern for a static
+     app is one structured client logger: level + event + fields,
+     mirrored to the console and kept in a bounded on-device ring
+     buffer (newest 300) that the reader can open and copy from
+     the Menu (Account -> View app logs), so a phone with no
+     DevTools still carries its own debug trail. */
+  var RLOG_KEY = "gurbani-reader:log-v1", RLOG_CAP = 300;
+  var rlogBuf = null, rlogDirty = false, rlogTimer = null;
+  function rlogLoad(){ if(rlogBuf) return rlogBuf; try{ rlogBuf = JSON.parse(localStorage.getItem(RLOG_KEY) || "[]"); if(!Array.isArray(rlogBuf)) rlogBuf = []; }catch(e){ rlogBuf = []; } return rlogBuf; }
+  function rlogSave(){ if(!rlogDirty) return; rlogDirty = false; try{ localStorage.setItem(RLOG_KEY, JSON.stringify(rlogBuf.slice(-RLOG_CAP))); }catch(e){} }
+  function rlog(lv, ev, d){
+    try{
+      var buf = rlogLoad();
+      var clean = null;
+      if(d != null){ try{ clean = JSON.parse(JSON.stringify(d, function(k, v){ return (typeof v === "string" && v.length > 140) ? v.slice(0, 140) : v; })); }catch(e){ clean = null; } }
+      buf.push({ t: Date.now(), lv: lv, ev: ev, d: clean });
+      while(buf.length > RLOG_CAP) buf.shift();
+      rlogDirty = true;
+      if(!rlogTimer) rlogTimer = setTimeout(function(){ rlogTimer = null; rlogSave(); }, 1500);
+      var msg = "[reader] " + ev;
+      if(lv === "error") console.error(msg, clean || "");
+      else if(lv === "warn") console.warn(msg, clean || "");
+      else console.log(msg, clean || "");
+    }catch(e){}
+  }
+  window.addEventListener("error", function(e){ rlog("error", "window.error", { msg: String(e && e.message || "").slice(0, 140) }); });
+  window.addEventListener("unhandledrejection", function(e){ rlog("error", "window.unhandledrejection", { msg: String(e && e.reason && e.reason.message || e && e.reason || "").slice(0, 140) }); });
+  window.addEventListener("pagehide", rlogSave);
+  function logText(){
+    return rlogLoad().map(function(e){
+      var dt = new Date(e.t);
+      var p2 = function(x){ return String(x).padStart(2, "0"); };
+      return p2(dt.getHours()) + ":" + p2(dt.getMinutes()) + ":" + p2(dt.getSeconds()) + " " + String(e.lv).toUpperCase() + " " + e.ev + (e.d ? " " + JSON.stringify(e.d) : "");
+    }).join("\n");
+  }
+  function openLogs(){ var o = $("logOverlay"), t = $("logText"); if(!o || !t) return; rlogSave(); t.textContent = logText() || "(no logs yet)"; o.hidden = false; }
+  function closeLogs(){ var o = $("logOverlay"); if(o) o.hidden = true; }
+  (function(){
+    var b = $("logBtn"); if(b) b.addEventListener("click", openLogs);
+    var c = $("logClose"); if(c) c.addEventListener("click", closeLogs);
+    var cp = $("logCopy"); if(cp) cp.addEventListener("click", function(){ var t = logText(); if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ toastMsg("Logs copied"); }, function(){ toastMsg("Copy failed"); }); });
+    var cl = $("logClear"); if(cl) cl.addEventListener("click", function(){ rlogBuf = []; rlogDirty = true; rlogSave(); var t = $("logText"); if(t) t.textContent = "(no logs yet)"; });
+    var o = $("logOverlay"); if(o) o.addEventListener("click", function(e){ if(e.target === o) closeLogs(); });
+  })();
+  rlog("info", "app.boot", { name: (typeof sessionName === "function" ? sessionName() : ""), ua: String(navigator.userAgent || "").slice(0, 80) });
   /* which Paaths are playing on OTHER devices right now, learned
      from their records as they land (see notePresence): recId ->
      {by, at} with at = the record's server stamp; a marker older
@@ -1863,8 +1927,64 @@
   }
   function liveElsewhere(id){
     var p = presenceMap["ctx:" + id];
-    return !!(p && p.at && (Date.now() - p.at) < 30000);
+    if(p && p.at && (Date.now() - p.at) < 30000) return true;
+    return screensOn(id).playing;
   }
+  /* ---------- screens on a Paath + remote stop (owner, Nov 26) ----------
+     Every open app keeps a small presence entry for the Paath it
+     has open (pres_<id> in the sync doc, one entry per device,
+     refreshed on play/pause, popup opens, visibility returns and a
+     slow interval). The Library rows show how many OTHER screens
+     are on each Paath, with a stop button beside the preview: the
+     stop writes a command (stop_<id>) and every other screen that
+     is playing that Paath pauses, keeps its place, and floats a
+     note at the top naming the device that stopped it. */
+  var presMap = {};   /* paath id -> { cid: {name, playing, at} }, foreign entries only */
+  function sessionName(){
+    var ua = navigator.userAgent || "";
+    var br = /Edg\//.test(ua) ? "Edge" : /OPR\/|Opera/.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Browser";
+    var os = /Android/.test(ua) ? "Android" : /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Macintosh|Mac OS/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
+    return os ? br + " \u00B7 " + os : br;
+  }
+  function notePres(id, map){
+    presMap[id] = map || {};
+    if(!paathEditing){ try{ buildPaathLists(); }catch(e){} }
+    var pp = $("paathPop"); if(pp && !pp.hidden){ try{ buildPaathPop(); }catch(e){} }
+  }
+  function screensOn(id){
+    var m = presMap[id] || {}, now = Date.now(), n = 0, playing = false, names = [];
+    Object.keys(m).forEach(function(k){
+      var e = m[k]; if(!e || typeof e.at !== "number" || now - e.at > 150000) return;
+      n++; if(e.playing && now - e.at < 60000) playing = true;
+      if(e.name) names.push(e.name);
+    });
+    return { n: n, playing: playing, names: names };
+  }
+  function paathLiveHTML(id){
+    var s = screensOn(id);
+    if(!s.n) return "";
+    var label = s.names.length ? s.names.join(", ") : "another device";
+    return '<span class="paath-live"><span class="paath-live-n' + (s.playing ? "" : " idle") + '" title="' + esc(label) + '">' + (s.playing ? "\u25CF " : "\u25CB ") + s.n + '</span>' +
+      '<button class="paath-stop" data-paath-stop="' + esc(id) + '" aria-label="Stop this Paath on other devices" title="Stop on other devices"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button></span>';
+  }
+  function stopPaathEverywhere(id){
+    try{ if(window.__readerSync && window.__readerSync.stopPaath) window.__readerSync.stopPaath(id); }catch(e){}
+    toastMsg("Stop sent \u2014 screens playing this Paath will pause");
+  }
+  function presPing(){ try{ if(window.__readerSync && window.__readerSync.presPing) window.__readerSync.presPing(); }catch(e){} }
+  var stopFloatTimer = null;
+  function onRemoteStop(id, name){
+    if(id !== paathData.current || detour) return;
+    if(!audio || audio.paused) return;
+    try{ rlog("warn", "stop.received", { id: id, from: name || "" }); }catch(e){}
+    try{ audio.pause(); }catch(e){}
+    var t = $("stopFloat");
+    if(t){ t.textContent = "\u23F8 Paused here \u2014 stopped from " + (name || "another device"); t.classList.add("show");
+      if(stopFloatTimer) clearTimeout(stopFloatTimer);
+      stopFloatTimer = setTimeout(function(){ t.classList.remove("show"); }, 6500); }
+  }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") presPing(); });
+  window.addEventListener("pagehide", function(){ try{ if(window.__readerSync && window.__readerSync.presLeave) window.__readerSync.presLeave(); }catch(e){} });
   function toastMsg(msg){
     var t = $("msgToast"); if(!t) return;
     t.textContent = msg; t.classList.add("show");
@@ -1925,6 +2045,7 @@
     }
     assignWarnedFor = null;
     assignRec = null;
+    rlog("info", "paath.assign", { id: id, item: f.item, idx: f.idx });
     if(!detour && paathData.current === id){
       glf = frec; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
       try{ localStorage.setItem(LAST_KEY, JSON.stringify(place)); }catch(e){}
@@ -1942,6 +2063,7 @@
   $("saveBtn").addEventListener("click", function(){ openPaathPop("assign"); });
   $("paathPopClose").addEventListener("click", closePaathPop);
   $("paathPopList").addEventListener("click", function(e){
+    var sbp = e.target.closest("[data-paath-stop]"); if(sbp){ stopPaathEverywhere(sbp.getAttribute("data-paath-stop")); return; }
     var r = e.target.closest("[data-pop-row]"); if(!r) return;
     var key = r.getAttribute("data-pop-row");
     if(paathPopMode === "assign"){ assignFocusToPaath(key); return; }
@@ -2318,7 +2440,7 @@
           html += '<button class="paath-edit" data-paath-save aria-label="Save name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></button>';
         } else {
           var pv2 = paathPreview(id);
-          html += '<span class="paath-text"><span class="paath-name" title="' + esc(name) + '">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span>' + (pv2 ? '<span class="paath-pv">' + esc(pv2) + '</span>' : '') + '</span>';
+          html += '<span class="paath-text"><span class="paath-name" title="' + esc(name) + '">' + esc(name) + '</span><span class="paath-sub">' + esc(paathPlaceLabel(id)) + '</span>' + (pv2 ? '<span class="paath-pv">' + esc(pv2) + '</span>' : '') + paathLiveHTML(id) + '</span>';
           html += '<button class="paath-edit" data-paath-edit aria-label="Rename ' + esc(name) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4.2 1.2L5 16Z"/></svg></button>';
         }
         html += '</div>';
@@ -2349,6 +2471,7 @@
     else loadAng(1);
   }
   function switchPaath(id){
+    rlog("info", "paath.switch", { to: id });
     closeSheet(); closeAngPop(); closePaathPop();
     if(id === paathData.current){
       /* already the current Paath — but if a detour is live, picking it
@@ -2421,6 +2544,8 @@
   var paathLists = document.querySelectorAll("[data-paath-list]");
   for(var pl2=0;pl2<paathLists.length;pl2++){
     paathLists[pl2].addEventListener("click", function(e){
+      var sbl = e.target.closest("[data-paath-stop]");
+      if(sbl){ stopPaathEverywhere(sbl.getAttribute("data-paath-stop")); return; }
       var saveBtn = e.target.closest("[data-paath-save]");
       if(saveBtn){ commitPaathRename(saveBtn.closest("[data-paath-list]")); return; }
       var editBtn = e.target.closest("[data-paath-edit]");
@@ -3853,6 +3978,7 @@
      the stored focus would stay on the line that was left. Waits
      out an async load (a cross-Ang restore) before writing. */
   function landJumpFocus(p){
+    rlog("info", "jump.land", { mode: p.mode, item: p.item, idx: p.idx });
     if(!p || typeof p.idx !== "number") return;
     var tries = 0;
     var iv = setInterval(function(){
@@ -4046,8 +4172,9 @@
     seekEl.addEventListener(ev, function(){ if(state.seeking && !seekEl.matches(":active")) state.seeking = false; });
   });
 
-  audio.addEventListener("play", function(){ setPlayIcon(true); audioSwitching = false; scheduleAutoHide(); trackKick(); paintMedia(); try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing"; }catch(e){} });
+  audio.addEventListener("play", function(){ setPlayIcon(true); audioSwitching = false; scheduleAutoHide(); trackKick(); paintMedia(); presPing(); rlog("info", "play", { mode: state.mode, item: state.mode === "ang" ? state.ang : state.id, at: Math.round(audio.currentTime || 0) }); try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing"; }catch(e){} });
   audio.addEventListener("pause", function(){
+    presPing(); rlog("info", "pause", { mode: state.mode, item: state.mode === "ang" ? state.ang : state.id, at: Math.round(audio.currentTime || 0) });
     try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused"; }catch(e){}
     paintMedia();
     setPlayIcon(false);
@@ -5141,7 +5268,7 @@
     /* decision helpers + sync4 state, exposed for the test harness
        (the live sync paths need a real account and cannot run in a
        sandbox) */
-    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich, canonKeys: canonKeys, canonRec: canonRec,
+    window.__readerSync = { placeTsOf: placeTsOf, keysPristine: keysPristine, keysRich: keysRich, canonKeys: canonKeys, canonRec: canonRec, presPing: presPingSync, presLeave: presLeaveSync, stopPaath: stopPaathSync,
       state: function(){ return { inFlight: pushInFlight, recovering: recovering, owner: meta().ownerUid || null, everAccount: !!meta().everAccount }; } };
     function setNote(s){ if(note) note.textContent = s; }
     /* bug zero was silence: every sync failure used to swallow its
@@ -5152,6 +5279,7 @@
     function syncErr(tag, e){
       var code = (e && (e.code || e.message)) || "unknown";
       try{ console.error("[reader-sync] " + tag + ":", e); }catch(_){}
+      try{ rlog("error", "sync.error", { tag: tag, code: String(code).slice(0, 60) }); }catch(_){}
       code = String(code).replace(/^.*\//, "").replace(/[^a-z0-9-]/gi, "").slice(0, 40);
       return code || "unknown";
     }
@@ -5295,6 +5423,7 @@
        recovering flag itself can never wedge. After recovery the
        listener re-fires and any owed push goes out again. */
     function recoverConnection(why){
+      try{ rlog("warn", "sync.recover", { why: String(why || "") }); }catch(e){}
       if(!db || !user) return;
       var now = Date.now();
       if(recovering || now - lastRecoverAt < 30000){ schedulePush(); return; }
@@ -5349,6 +5478,7 @@
       db.collection("progress").doc(user.uid).set(upd, { merge: true }).then(function(){
         if(flight !== flightSeq) return;   /* abandoned flight: its echo reconciles */
         flightDone();
+        try{ rlog("info", "sync.push", { recs: Object.keys(sentJson) }); }catch(e){}
         Object.keys(sentJson).forEach(function(recId){ markSent(recId, sentJson[recId]); });
         setMeta({ knownCtx: paathData.list.map(function(p){ return p.id; }) });
         pushRetries = 0;
@@ -5413,6 +5543,7 @@
       if(id === paathData.current && !detour && !playing){
         if(data.glf){
           try{ noteRemoteHead(glf, data.glf); }catch(e){}
+          try{ rlog("info", "sync.apply.live", { id: id, item: data.glf.item, idx: data.glf.idx }); }catch(e){}
           glf = data.glf; lsSet(FOCUS_KEY, JSON.stringify(data.glf));
           /* the live place is re-derived from the head: on this
              device the Paath now resumes AT its focus line */
@@ -5497,6 +5628,50 @@
        factory-default cloud list. Pending-write echoes carry a
        null stamp and are skipped record by record below.
        ---------------------------------------------------------- */
+    /* presence + stop commands (owner, Nov 26): side fields on the
+       same doc, written directly (they are not head records, so
+       they bypass the record engine and its sent/seen guards) */
+    var presSeen = {};        /* last pres map received per Paath, own entry included */
+    var presState = {};       /* per Paath: {at, playing} of our last presence write */
+    var presLastId = null;
+    var stopPrimed = false;   /* the session's first doc delivery only primes stopSeen — a stop that predates this session is history, not a command */
+    function presWrite(remove){
+      if(!user || !db) return;
+      var id = remove ? presLastId : paathData.current;
+      if(!id) return;
+      var now = Date.now();
+      var playing = !remove && !detour && state.mode === "ang" && !!(audio && !audio.paused && !audio.ended);
+      var last = presState[id];
+      if(!remove && last && last.playing === playing && now - last.at < 10000) return;
+      if(!remove && !hydrated) return;
+      presState[id] = { at: now, playing: playing };
+      if(!remove) presLastId = id;
+      var map = {};
+      var seen = presSeen[id] || {};
+      Object.keys(seen).forEach(function(k){ var e = seen[k]; if(e && typeof e.at === "number" && now - e.at < 150000) map[k] = e; });
+      if(remove || detour || state.mode !== "ang") delete map[CID];
+      else map[CID] = { name: sessionName(), playing: playing, at: now };
+      presSeen[id] = map;
+      var upd = {};
+      upd["pres_" + id] = JSON.stringify(map);
+      upd["pres_" + id + "_at"] = firebase.firestore.FieldValue.serverTimestamp();
+      upd["pres_" + id + "_by"] = CID;
+      db.collection("progress").doc(user.uid).set(upd, { merge: true }).then(function(){}, function(e){ syncErr("pres", e); });
+      try{ rlog("info", "pres.write", { id: id, playing: playing, screens: Object.keys(map).length }); }catch(e){}
+      try{ var foreign = {}; Object.keys(map).forEach(function(k){ if(k !== CID) foreign[k] = map[k]; }); notePres(id, foreign); }catch(e){}
+    }
+    function presPingSync(){ presWrite(false); }
+    function presLeaveSync(){ presWrite(true); }
+    function stopPaathSync(id){
+      if(!user || !db || !id) return;
+      var upd = {};
+      upd["stop_" + id] = JSON.stringify({ n: Date.now(), by: CID, name: sessionName() });
+      upd["stop_" + id + "_at"] = firebase.firestore.FieldValue.serverTimestamp();
+      upd["stop_" + id + "_by"] = CID;
+      db.collection("progress").doc(user.uid).set(upd, { merge: true }).then(function(){}, function(e){ syncErr("stop", e); });
+      try{ rlog("warn", "stop.sent", { id: id, from: sessionName() }); }catch(e){}
+    }
+    setInterval(function(){ if(document.visibilityState === "visible") presWrite(false); }, 90000);
     function handleDoc(doc){
       /* cache-only deliveries are this device's own disk state, not
          the cloud: before hydration they settle nothing and apply
@@ -5543,8 +5718,27 @@
           forgetSent(recId); schedulePush(); return;
         }
         if(recId.indexOf("ctx:") === 0){ try{ notePresence(recId, data.live, d[f + "_by"], at); }catch(e){} }
+        try{ rlog("info", "sync.recv", { rec: recId, by: d[f + "_by"], item: data.glf ? data.glf.item : null, idx: data.glf ? data.glf.idx : null }); }catch(e){}
         applyRecord(recId, data, at);
       });
+      /* presence maps + stop commands arriving on the same doc */
+      Object.keys(d).forEach(function(f){
+        if(f.indexOf("pres_") === 0 && !/_(at|by)$/.test(f)){
+          var pid = f.slice(5), pmap = null;
+          try{ pmap = JSON.parse(d[f]); }catch(e){}
+          if(pmap){ presSeen[pid] = pmap; var foreign = {}; Object.keys(pmap).forEach(function(k){ if(k !== CID) foreign[k] = pmap[k]; }); try{ notePres(pid, foreign); }catch(e){} }
+        }
+        if(f.indexOf("stop_") === 0 && !/_(at|by)$/.test(f)){
+          var sid = f.slice(5), scmd = null;
+          try{ scmd = JSON.parse(d[f]); }catch(e){}
+          if(scmd && scmd.by && scmd.by !== CID && typeof scmd.n === "number"){
+            var ss = meta().stopSeen || {};
+            if(!stopPrimed){ if(ss[sid] == null || scmd.n > ss[sid]){ ss[sid] = scmd.n; setMeta({ stopSeen: ss }); } }
+            else if(ss[sid] == null || scmd.n > ss[sid]){ ss[sid] = scmd.n; setMeta({ stopSeen: ss }); try{ onRemoteStop(sid, scmd.name); }catch(e){} }
+          }
+        }
+      });
+      stopPrimed = true;
       maybeClaimWorld(d);
       if(user){
         if(doc.metadata && doc.metadata.hasPendingWrites){

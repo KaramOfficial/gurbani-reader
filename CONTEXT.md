@@ -188,6 +188,35 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   device's position will overwrite the set pankti, and a second
   tap on the same Paath sets it anyway. Without the warning the
   overwrite was silent and looked exactly like broken sync.
+- **Screens on a Paath + remote stop** (owner, Nov 26): every
+  open app keeps a presence entry for the Paath it has open —
+  side field `pres_<id>` on the sync doc, a map of device id →
+  {name, playing, at}, written directly (not through the record
+  engine) on play/pause, popup opens, visibility returns and a
+  90 s interval, and removed on pagehide. A session's name is
+  derived from its browser + platform ("Chrome · Windows").
+  Both Paath lists show, beside the preview, a small badge with
+  the number of OTHER screens on that Paath (● while any is
+  playing, ○ when all are idle; entries count for 150 s,
+  playing for 60 s) and, when the count is non-zero, a small
+  stop button. The stop writes `stop_<id>` {n, by, name}; every
+  other session whose stopSeen is older obeys it exactly once:
+  a session playing that Paath pauses (its pause save keeps its
+  place), and floats at the top "⏸ Paused here — stopped from
+  <name>". The session's first doc delivery only primes
+  stopSeen — a stop that predates the session is history, not
+  a command. Sessions on older builds never write presence and
+  cannot obey a stop until they reload.
+- **App log** (owner, Nov 26): GitHub Pages is static hosting —
+  there is no server log. One structured client logger
+  (`rlog(level, event, fields)`) covers boot, playback,
+  head-landings (jump/assign/switch), every sync push/receive/
+  apply (with the writer's device id and the head it carried),
+  presence writes, stop sent/received, recoveries and errors;
+  entries mirror to the console and persist in a bounded
+  on-device ring buffer (newest 300, `gurbani-reader:log-v1`),
+  readable and copyable in the app under Menu → Account →
+  "View app logs".
 - **Jump history — Undo / Redo** (owner, Nov 25; buttons moved
   Nov 26): Undo and Redo live on the Recenter island, flanking
   the trio in the island's own round icon-button style — Undo
