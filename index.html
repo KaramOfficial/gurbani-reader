@@ -3134,9 +3134,16 @@
   function withV2(ang, data){
     if(ang < 1 || ang > 1430 || !data || !data.lines) return Promise.resolve(data);
     if(v2AngCache[ang]) return Promise.resolve(applyV2(data, v2AngCache[ang]));
-    return fetch(BASE + "/data/ang" + ang + ".v2.json?v=21")
+    /* V3 onset-fixed overlay wins where it exists (same timings-only
+       contract, validated by applyV2); otherwise the V2 overlay. */
+    return fetch(BASE + "/data/ang" + ang + ".v3.json?v=1")
       .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(v2){ v2AngCache[ang] = v2; return applyV2(data, v2); })
+      .then(function(v3){
+        if(v3){ v2AngCache[ang] = v3; return applyV2(data, v3); }
+        return fetch(BASE + "/data/ang" + ang + ".v2.json?v=21")
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(v2){ v2AngCache[ang] = v2; return applyV2(data, v2); });
+      })
       .catch(function(){ return data; });
   }
   /* ---------- infinite Ang stream (only while auto-scroll is on) ---------- */
