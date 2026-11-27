@@ -2977,7 +2977,7 @@
     return merged;
   }
   function withV2(ang, data){
-    if(ang < 1 || ang > 8 || !data || !data.lines) return Promise.resolve(data);
+    if(ang < 1 || ang > 1430 || !data || !data.lines) return Promise.resolve(data);
     if(v2AngCache[ang]) return Promise.resolve(applyV2(data, v2AngCache[ang]));
     return fetch(BASE + "/data/ang" + ang + ".v2.json?v=21")
       .then(function(r){ return r.ok ? r.json() : null; })
