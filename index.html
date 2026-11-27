@@ -3136,7 +3136,7 @@
     if(v2AngCache[ang]) return Promise.resolve(applyV2(data, v2AngCache[ang]));
     /* V3 onset-fixed overlay wins where it exists (same timings-only
        contract, validated by applyV2); otherwise the V2 overlay. */
-    return fetch(BASE + "/data/ang" + ang + ".v3.json?v=1")
+    return fetch(BASE + "/data/ang" + ang + ".v3.json?v=2")
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(v3){
         if(v3){ v2AngCache[ang] = v3; return applyV2(data, v3); }
