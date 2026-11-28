@@ -1768,6 +1768,21 @@
      reading; so does a fresh install; so does choosing Default in the
      Paath popup. mode-v1 remembers which world the reader left in. */
   var MODE_KEY = "gurbani-reader:mode-v1";
+  /* ONE device-local most-recent state (owner, Nov 27): which world,
+     which Bani / Paath / Ang, and the active pankti — the record every
+     resume consults FIRST, ahead of the per-world fragments it used to
+     be reconstructed from. Written by savePlace + writeFocus (the two
+     central saves) so it cannot drift from them. Never synced. */
+  var RECENT_KEY = "gurbani-reader:recent-v1";
+  function readRecent(){ try{ var v = JSON.parse(localStorage.getItem(RECENT_KEY) || "null"); return v && typeof v === "object" && v.world ? v : null; }catch(e){ return null; } }
+  function markRecent(world, mode, id, item, idx, start, tsec){
+    try{
+      var prev = readRecent();
+      var same = !!(prev && prev.world === world && prev.mode === mode && prev.id === (id || null) && prev.item === (item == null ? null : item) && prev.idx === idx);
+      if(same && prev && (Date.now() - (prev.ts || 0)) < 60000) return;
+      localStorage.setItem(RECENT_KEY, JSON.stringify({ world: world, mode: mode, id: id || null, ang: mode === "ang" ? item : null, item: item == null ? null : item, idx: (typeof idx === "number" ? idx : null), start: (typeof start === "number" ? start : null), t: tsec || 0, ts: Date.now() }));
+    }catch(e){}
+  }
   function modeIsFree(){ try{ return localStorage.getItem(MODE_KEY) === "free"; }catch(e){ return false; } }
   function setMode(kind){ try{ localStorage.setItem(MODE_KEY, kind); }catch(e){} }
   var detourGlf = null;
@@ -1822,6 +1837,7 @@
         else { var dsp = readDetourStore() || {}; dsp.place = placeRec; dsp.lastFree = { kind: "ang" }; writeDetourStore(dsp); }
       }
       else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
+      markRecent(detour ? "free" : "paath", state.mode, detour ? (state.mode === "bani" ? state.id : null) : (paathData.current || null), flNow ? flNow.item : (state.mode === "ang" ? state.ang : state.id), flNow ? flNow.idx : null, flNow ? flNow.start : null, placeRec.t);
       if(audio && !audio.paused) saveFocus();
       syncDirty();
     }catch(e){}
@@ -1882,6 +1898,7 @@
     var prevF = detour ? detourGlf : glf;
     var sameF = !!(prevF && prevF.mode === state.mode && prevF.item === item && prevF.idx === idx);
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
+    markRecent(detour ? "free" : "paath", state.mode, detour ? (state.mode === "bani" ? item : null) : (paathData.current || null), item, idx, start, tsec || 0);
     if(detour){ detourGlf = frec;
       if(frec.mode === "bani" && frec.item){ var dsfB = baniSlot(frec.item) || {}; dsfB.glf = frec; writeBaniSlot(frec.item, dsfB); }
       else { var dsf = readDetourStore() || {}; dsf.glf = frec; dsf.lastFree = { kind: "ang" }; writeDetourStore(dsf); }
@@ -2293,6 +2310,9 @@
     detour = { resumed: true };
     var ds = readDetourStore();
     var frE = freeResume();
+    var rcE = readRecent();
+    if(rcE && rcE.world === "free" && rcE.mode === "bani" && rcE.id && baniById(rcE.id)) frE = { place: null, glf: (baniSlot(rcE.id) || {}).glf || null, baniId: rcE.id };
+    if(rcE && rcE.world === "free" && rcE.mode === "ang") frE = { place: (ds && ds.place) || null, glf: (ds && ds.glf) || null, baniId: null };
     detourGlf = frE ? (frE.glf || (frE.place && frE.place.fl ? { mode: frE.place.mode, item: frE.place.fl.item, idx: frE.place.fl.idx, start: frE.place.fl.start, t: frE.place.t || 0, ts: Date.now(), pv: null } : null)) : (ds && ds.glf ? ds.glf : null);
     setMode("free");
     if(frE && frE.baniId){ var eb = baniById(frE.baniId); if(eb){ loadBani(eb); updateRecenter(); try{ paintJumpBtns(); }catch(e){} return; } }
@@ -5414,11 +5434,30 @@
       }
       loadAng(linkAng); return;
     }
+    /* the device's global most-recent state outranks every fragment:
+       a Paath it names is resumed at its snapshot head even when it is
+       not the stored current Paath */
+    var rcBoot = readRecent();
+    if(rcBoot && rcBoot.world === "paath" && rcBoot.id && paathById(rcBoot.id)){
+      if(rcBoot.id !== paathData.current){
+        paathData.current = rcBoot.id; savePaathData();
+        var rsnap = readCtx(rcBoot.id);
+        var rplace = rsnap && rsnap.glf ? placeFromFocus(rsnap.glf) : null;
+        if(rplace){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(rplace)); }catch(e){} }
+        else { try{ localStorage.removeItem(LAST_KEY); }catch(e){} }
+        if(rsnap && rsnap.glf){ glf = rsnap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){} }
+      }
+      setMode("paath");
+      restoreFromPlace(readPlace());
+      return;
+    }
     /* free reading resumes where it left off when it is the remembered
        world — ahead of the Sehaj Paath's saved place, which waits
        untouched underneath */
     var dstore = readDetourStore();
     var frB = modeIsFree() ? freeResume() : null;
+    if(rcBoot && rcBoot.world === "free" && rcBoot.mode === "bani" && rcBoot.id && baniById(rcBoot.id)) frB = { place: null, glf: (baniSlot(rcBoot.id) || {}).glf || null, baniId: rcBoot.id };
+    if(rcBoot && rcBoot.world === "free" && rcBoot.mode === "ang") frB = null;   /* recent says the free Ang — the top-level place chain below is its resume */
     if(frB && frB.baniId){ var bb = baniById(frB.baniId); if(bb){ detour = { resumed: true }; detourGlf = frB.glf || null; pendingRestore = null; loadBani(bb); return; } }
     if(dstore && dstore.place && modeIsFree()){ detour = { resumed: true }; detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null); pendingRestore = null; var saved = dstore.place;
       if(saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){ pendingRestore = saved; loadAng(saved.fl.item); }
@@ -5630,8 +5669,26 @@
       try{ jumpStacks = {}; }catch(e){}
       rehydrateSettings();
       buildPaathLists();
+      var rcRe = readRecent();
+      if(rcRe && rcRe.world === "paath" && rcRe.id && paathById(rcRe.id)){
+        if(rcRe.id !== paathData.current){
+          paathData.current = rcRe.id; savePaathData();
+          var rsnap2 = readCtx(rcRe.id);
+          var rplace2 = rsnap2 && rsnap2.glf ? placeFromFocus(rsnap2.glf) : null;
+          if(rplace2){ try{ localStorage.setItem(LAST_KEY, JSON.stringify(rplace2)); }catch(e){} }
+          if(rsnap2 && rsnap2.glf){ glf = rsnap2.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){} }
+        }
+        exitDetour();
+        var rsv = readPlace();
+        if(rsv) restoreFromPlace(rsv); else loadAng(1);
+        updateRecenter();
+        try{ paintJumpBtns(); }catch(e){}
+        return;
+      }
       var dstore = readDetourStore();
       var frR = modeIsFree() ? freeResume() : null;
+      if(rcRe && rcRe.world === "free" && rcRe.mode === "bani" && rcRe.id && baniById(rcRe.id)) frR = { place: null, glf: (baniSlot(rcRe.id) || {}).glf || null, baniId: rcRe.id };
+      if(rcRe && rcRe.world === "free" && rcRe.mode === "ang") frR = null;
       if(frR && frR.baniId && baniById(frR.baniId)){
         detour = { resumed: true };
         detourGlf = frR.glf || null;
@@ -5680,13 +5737,13 @@
       var out = {};
       Object.keys(keys).sort().forEach(function(k){
         var v = keys[k];
-        if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:focus-v1" || k === "gurbani-reader:detour-v1" || k.indexOf("gurbani-reader:ctx-") === 0){
+        if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:recent-v1" || k === "gurbani-reader:focus-v1" || k === "gurbani-reader:detour-v1" || k.indexOf("gurbani-reader:ctx-") === 0){
           try{
             var o = JSON.parse(v || "null");
             if(o && typeof o === "object"){
               var stripP = function(p){ if(p && typeof p === "object"){ delete p.ts; delete p.y; delete p.t; } };
               var stripF = function(f){ if(f && typeof f === "object"){ delete f.ts; } };
-              if(k === "gurbani-reader:last-v1") stripP(o);
+              if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:recent-v1") stripP(o);
               else if(k === "gurbani-reader:focus-v1") stripF(o);
               else { stripP(o.place); stripF(o.glf); }
               v = o;
@@ -5703,7 +5760,7 @@
       var ts = 0;
       var scan = function(o){ if(!o) return; if(o.ts) ts = Math.max(ts, o.ts); if(o.place) scan(o.place); if(o.glf) scan(o.glf); if(o.fl) scan(o.fl); };
       Object.keys(keys).forEach(function(k){
-        if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:detour-v1" || k === "gurbani-reader:focus-v1" || k.indexOf("gurbani-reader:ctx-") === 0){
+        if(k === "gurbani-reader:last-v1" || k === "gurbani-reader:recent-v1" || k === "gurbani-reader:detour-v1" || k === "gurbani-reader:focus-v1" || k.indexOf("gurbani-reader:ctx-") === 0){
           try{ scan(JSON.parse(keys[k] || "null")); }catch(e){}
         }
       });

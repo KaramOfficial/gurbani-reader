@@ -486,7 +486,8 @@ seed) and is never reset to line 1.
 | `gurbani-reader:ctx-<id>` | One tracker's snapshot: `{ glf }` — the Paath's head (its last focus line) and nothing else; Ang state only, never a Bani's. A Paath never stores a scroll place (owner, Nov 25) |
 | `gurbani-reader:paaths-open` | Sehaj Paath section expanded in switcher/Library |
 | `gurbani-reader:appearance-v1` | Appearance: day / auto / night |
-| `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world; inside it, a `banis` map holds each Nitnem Bani's OWN place + focus slot |
+| `gurbani-reader:detour-v1` | Free (Default) reading's own place + focus — the standing slot of the not-in-a-Paath world; inside it, a `banis` map holds each Nitnem Bani's OWN place + focus slot, plus a `lastFree` pointer to whichever free context was active last |
+| `gurbani-reader:recent-v1` | THE device-local global most-recent state: { world, mode, id, ang, item, idx, start, t, ts } — which world, which Bani/Paath/Ang, the active pankti. Written by savePlace + writeFocus; boot and account re-entry resume from it FIRST (per-world records are the fallback). Never synced; parked/restored per account with the dataset |
 | `gurbani-reader:mode-v1` | Which world the reader left in: `free` (Default reading) or `paath` |
 | `gurbani-reader:sync-v1` | Cloud-sync meta (never itself synced): this device's writer id (`cid`), the account the sync state belongs to (`uid`), and per record only the exact JSON last sent or applied (`sent`) + the newest server stamp applied (`seen`) |
 
