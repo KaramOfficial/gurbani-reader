@@ -1775,12 +1775,16 @@
      central saves) so it cannot drift from them. Never synced. */
   var RECENT_KEY = "gurbani-reader:recent-v1";
   function readRecent(){ try{ var v = JSON.parse(localStorage.getItem(RECENT_KEY) || "null"); return v && typeof v === "object" && v.world ? v : null; }catch(e){ return null; } }
-  function markRecent(world, mode, id, item, idx, start, tsec){
+  /* SECTION level only (owner, Nov 27): the record names the active
+     section — a Nitnem Bani, free reader mode, or a specific Sehaj
+     Paath — never the pankti; each section's own head record already
+     holds its active pankti. Written only when the section changes. */
+  function markRecentSection(world, mode, id){
     try{
+      if(world === undefined){ world = detour ? "free" : "paath"; mode = state.mode; id = detour ? (mode === "bani" ? state.id : null) : (paathData.current || null); }
       var prev = readRecent();
-      var same = !!(prev && prev.world === world && prev.mode === mode && prev.id === (id || null) && prev.item === (item == null ? null : item) && prev.idx === idx);
-      if(same && prev && (Date.now() - (prev.ts || 0)) < 60000) return;
-      localStorage.setItem(RECENT_KEY, JSON.stringify({ world: world, mode: mode, id: id || null, ang: mode === "ang" ? item : null, item: item == null ? null : item, idx: (typeof idx === "number" ? idx : null), start: (typeof start === "number" ? start : null), t: tsec || 0, ts: Date.now() }));
+      if(prev && prev.world === world && prev.mode === mode && prev.id === (id || null)) return;
+      localStorage.setItem(RECENT_KEY, JSON.stringify({ world: world, mode: mode, id: id || null, ts: Date.now() }));
     }catch(e){}
   }
   function modeIsFree(){ try{ return localStorage.getItem(MODE_KEY) === "free"; }catch(e){ return false; } }
@@ -1837,7 +1841,7 @@
         else { var dsp = readDetourStore() || {}; dsp.place = placeRec; dsp.lastFree = { kind: "ang" }; writeDetourStore(dsp); }
       }
       else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
-      markRecent(detour ? "free" : "paath", state.mode, detour ? (state.mode === "bani" ? state.id : null) : (paathData.current || null), flNow ? flNow.item : (state.mode === "ang" ? state.ang : state.id), flNow ? flNow.idx : null, flNow ? flNow.start : null, placeRec.t);
+      markRecentSection();
       if(audio && !audio.paused) saveFocus();
       syncDirty();
     }catch(e){}
@@ -1898,7 +1902,6 @@
     var prevF = detour ? detourGlf : glf;
     var sameF = !!(prevF && prevF.mode === state.mode && prevF.item === item && prevF.idx === idx);
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
-    markRecent(detour ? "free" : "paath", state.mode, detour ? (state.mode === "bani" ? item : null) : (paathData.current || null), item, idx, start, tsec || 0);
     if(detour){ detourGlf = frec;
       if(frec.mode === "bani" && frec.item){ var dsfB = baniSlot(frec.item) || {}; dsfB.glf = frec; writeBaniSlot(frec.item, dsfB); }
       else { var dsf = readDetourStore() || {}; dsf.glf = frec; dsf.lastFree = { kind: "ang" }; writeDetourStore(dsf); }
@@ -2313,6 +2316,7 @@
     var rcE = readRecent();
     if(rcE && rcE.world === "free" && rcE.mode === "bani" && rcE.id && baniById(rcE.id)) frE = { place: null, glf: (baniSlot(rcE.id) || {}).glf || null, baniId: rcE.id };
     if(rcE && rcE.world === "free" && rcE.mode === "ang") frE = { place: (ds && ds.place) || null, glf: (ds && ds.glf) || null, baniId: null };
+    if(frE && frE.baniId) markRecentSection("free", "bani", frE.baniId); else markRecentSection("free", "ang", null);
     detourGlf = frE ? (frE.glf || (frE.place && frE.place.fl ? { mode: frE.place.mode, item: frE.place.fl.item, idx: frE.place.fl.idx, start: frE.place.fl.start, t: frE.place.t || 0, ts: Date.now(), pv: null } : null)) : (ds && ds.glf ? ds.glf : null);
     setMode("free");
     if(frE && frE.baniId){ var eb = baniById(frE.baniId); if(eb){ loadBani(eb); updateRecenter(); try{ paintJumpBtns(); }catch(e){} return; } }
@@ -2937,7 +2941,7 @@
           var cplace = placeFromFocus(csnap.glf);
           try{ localStorage.setItem(LAST_KEY, JSON.stringify(cplace)); }catch(e){}
           glf = csnap.glf; try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
-          exitDetour(); setMode("paath"); restoreFromPlace(cplace); updateRecenter();
+          exitDetour(); setMode("paath"); markRecentSection("paath", "ang", id); restoreFromPlace(cplace); updateRecenter();
           try{ paintJumpBtns(); }catch(e){}
         } else {
           /* no snapshot: the Paath's live place IS the place key */
@@ -2948,7 +2952,7 @@
     }
     try{ savePlace(); }catch(e){}
     snapshotCurrentPaath();
-    paathData.current = id; savePaathData(); setMode("paath");
+    paathData.current = id; savePaathData(); setMode("paath"); markRecentSection("paath", "ang", id);
     var snap = readCtx(id);
     /* the Paath resumes AT its head: the live place is derived from
        the snapshot's focus line, never stored anywhere */
@@ -3523,6 +3527,11 @@
        saved into its own slot first (the scroll saver may not have
        fired since the last move) */
     if(detour && state.mode === "bani" && state.id && state.id !== b.id && state.flatLines && state.flatLines.length){ try{ savePlace(true); }catch(e){} }
+    /* the section gate comes AFTER the outgoing save above: that save
+       still describes the outgoing Bani, and its derived recent-write
+       would otherwise land after this gate and overwrite the new
+       Bani with the old one */
+    markRecentSection("free", "bani", b.id);
     /* the Bani's OWN head + place (owner, Nov 27): seeded from its
        slot, never from the shared free-Ang head — Recenter inside
        this Bani answers to this Bani's pankti. A Bani with a saved
@@ -4022,6 +4031,7 @@
     var swGen = ++audioSwitchGen;
     setTimeout(function(){ if(audioSwitchGen === swGen) audioSwitching = false; }, 5000);
     state.id = id;
+    markRecentSection("free", "bani", id);   /* chain advance is a section change too — savePlace below can be suppressed mid-switch */
     state.titlePa = b.pa; state.titleEn = b.en;
     state.duration = state.baniDur[id] || 0;
     paintBrandSub(); resetView(); updatePager();
