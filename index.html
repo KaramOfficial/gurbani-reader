@@ -925,6 +925,13 @@
     .player{left:60px}
     .float-pair{left:calc(50% + 30px)}
     .ang-unit{left:calc(50% + 30px)}
+    /* the quick cluster is eight buttons: as a right-side column it
+       stands ~424px tall — taller than a landscape phone — and its
+       top buttons leave the screen (owner, Nov 28). Here it lies
+       along the bottom as one row instead; it only ever shows while
+       the bars (the player included) are hidden, so the bottom edge
+       is free, and right-anchored it stays clear of the left rail */
+    .quick{flex-direction:row;align-items:center}
   }
 </style>
 </head>
