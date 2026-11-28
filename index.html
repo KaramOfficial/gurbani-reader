@@ -1301,7 +1301,7 @@
     var playing = false, base = 0, t0 = 0, rate = 1, vol = 1;
     var mode = "wa", pendingSrc = "", gen = 0, wantPlay = false;
     var ticker = null, endedFlag = false, seekToken = 0;
-    var stNode = null, stState = "off", stLinked = false;   /* pitch stretcher: off | loading | ready | dead */
+    var stNode = null, stState = "dead", stLinked = false;   /* pitch stretcher RETIRED 2026-11-27: permanently "dead" — see ensureStretch */
     var srcRate = 1, useEl = false;   /* srcRate: rate the running source was started at; useEl: wa-loaded file handed to the element (off-speed, stretcher dead) */
     var cache = {}, cacheOrder = [];   /* prefetch cache: url -> {ab}, at most 3 */
     var chunkReg = {};   /* srcUrl -> chunk-manifest URL (chunked long tracks) */
@@ -1314,16 +1314,20 @@
     function startTicker(){ if(ticker) return; ticker = setInterval(function(){ emit("timeupdate"); if(trk && playing && buf && trk.idx + 1 < trk.chunks.length && buf.duration - lpos() < 45) ensureChunk(trk.idx + 1); }, 250); }
     function stopTicker(){ if(ticker){ clearInterval(ticker); ticker = null; } }
     function stopSrc(){ if(srcNode){ var n = srcNode; srcNode = null; n.onended = null; try{ n.stop(); }catch(e){} try{ n.disconnect(); }catch(e){} } linkStretch(false); }
-    /* Pitch preservation at off-1x speeds: SoundTouch (WSOLA) in an
-       AudioWorklet, vendored beside this page (soundtouch-processor.js,
-       SoundTouchJS 2.1.1, MPL-2.0), loaded lazily on first off-speed use.
-       The fallback ladder is owner-ruled (2026-11-27): wrong pitch is
-       worse than a wrong seek, so varispeed is NEVER a landing spot —
-       a plain source only ever runs at 1x. While the stretcher loads,
-       playback holds at 1x (the speed lands a beat late, never wrong);
-       if the stretcher cannot run at all, the file is handed to the
-       native element (pitch right, seeks approximate) and handed back
-       to the buffer engine when the speed returns to 1x. */
+    /* Pitch at off-1x speeds (RETIRED stretcher, owner report
+       2026-11-27): the SoundTouch WSOLA AudioWorklet that used to
+       pitch-correct the buffer source underruns on phone CPUs — its
+       processor zero-fills underrun quanta, heard as buffering and
+       skipped words, worst on the chunked long Banis (Sukhmani Sahib
+       at 1.5x). So the stretcher is retired for good: stState stays
+       "dead", and every off-1x speed plays on the native element,
+       which preserves pitch at speed natively and streams the file —
+       the original player's behaviour. The hand-off ladder below is
+       now the only off-speed path: element from the start when a
+       track loads off-speed, handToEl on speed-up (buffer/chunk
+       state kept), handToWa back to the buffer engine at 1x. A plain
+       buffer source only ever runs at 1x, so varispeed is never
+       heard either. */
     function linkStretch(on){
       if(!stNode) return;
       if(on && !stLinked){ try{ stNode.connect(gain); stLinked = true; }catch(e){} }
@@ -1334,6 +1338,7 @@
       if(mode === "wa" && !useEl && (buf || trk) && rate !== 1) handToEl();
     }
     function ensureStretch(){
+      return;   /* stretcher retired — off-speed lives on the native element */
       if(stState !== "off" || !wa) return;
       if(!wa.audioWorklet || typeof AudioWorkletNode === "undefined"){ stretchDead(); return; }
       stState = "loading";

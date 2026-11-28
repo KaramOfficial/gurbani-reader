@@ -161,35 +161,26 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   Bani falls back to its streamed joined mp3 on the element. Prefetch warms the next item's bytes into a small (≤3)
   buffer cache instead of a second streaming element; files over
   ~8MB are not pre-warmed (they belong to the element anyway).
-- **Pitch at off-1× speeds (2026-11-27):** the buffer engine's raw
-  playbackRate is varispeed (pitch shifts with speed), so at any
-  speed ≠ 1× the source is routed through a SoundTouch WSOLA
-  time-stretcher running in an AudioWorklet (SoundTouchJS 2.1.1,
-  MPL-2.0, vendored beside the page as `soundtouch-processor.js` —
-  no build step, no CDN). The source plays at the chosen rate and
-  the stretcher corrects pitch back to the original (verified
-  numerically: a 440Hz tone stays 440Hz at 0.75×/1.5×/2×, where
-  varispeed alone gives 880Hz at 2×). Design rules: 1× never
-  touches the stretcher (plain buffer, zero extra CPU); the
-  worklet loads lazily on the first off-speed use; the facade's
-  position stays source-true (NO delay compensation in `pos()` —
-  the stretcher's ~0.1s output lag is accepted, because
-  compensating would fight the seek auto-correct's 0.09s
-  threshold). FALLBACK LADDER (owner-ruled 2026-11-27: wrong
-  pitch is worse than a wrong seek — varispeed is never a
-  landing spot, and a plain buffer source only ever runs at
-  1×): while the worklet loads, playback holds at 1× (the speed
-  lands a beat late, never wrong); if the stretcher cannot run
-  at all (no AudioWorklet, module load fails, node creation
-  throws, processor errors), the file is handed to the native
-  element at the chosen speed — pitch right, seeks approximate —
-  keeping its decoded buffer/chunk state, and returning to 1×
-  hands it straight back to the buffer engine. A file loaded
-  while already at an off-speed with a dead stretcher goes to
-  the element from the start. Long files on the element keep
-  the element's own native pitch preservation throughout.
-  Related fix in the same change: the speed setter now captures
-  the position at the OLD rate before assigning the new one —
+- **Pitch at off-1× speeds (2026-11-27, stretcher RETIRED same
+  day):** the buffer engine's raw playbackRate is varispeed, so
+  off-1× speeds originally routed through a SoundTouch WSOLA
+  AudioWorklet. The owner then reported buffering and skipped
+  words at 1.5× in Sukhmani Sahib: the worklet underruns on
+  phone CPUs and its processor zero-fills underrun quanta —
+  gaps and lost audio — worst on the chunked long Banis. The
+  stretcher is retired (stState permanently "dead", worklet
+  file removed): EVERY off-1× speed now plays on the native
+  element, which preserves pitch at speed natively and streams
+  — the original player's behaviour, and the old fallback
+  ladder promoted to the only path. A track loaded off-speed
+  goes to the element from the start (no wasted decode);
+  speeding up mid-track hands off via handToEl keeping the
+  decoded buffer/chunk state; returning to 1× hands back via
+  handToWa. A plain buffer source only ever runs at 1×, so
+  varispeed is never heard. Seeks on the element are
+  approximate (the accepted trade: pitch outranks seek).
+  Related earlier fix, kept: the speed setter captures the
+  position at the OLD rate before assigning the new one —
   previously a mid-play speed change teleported the position
   (e.g. ~+11s jumping to 2× after 11s at 1×).
 - Rollover at track end is seamless: the next item's audio is already
