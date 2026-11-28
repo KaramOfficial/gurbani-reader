@@ -2571,14 +2571,39 @@
   /* Fullscreen entry/exit resizes the viewport (the browser chrome
      goes or returns) and on a phone that can cross the layout size
      class — but fullscreen is the browser's, never a layout change:
-     a class flip here would rebuild the whole stream on the settle
-     and blank the page for seconds on a phone (owner, Nov 28, Kiwi:
-     blank screen, then everything shows back up). The settle below
-     therefore never flips the layout on a fullscreen transition,
-     in or out; a genuine rotation/resize after the transition still
-     can. */
+     a class flip here would rebuild the whole stream and blank the
+     page for seconds on a phone (owner, Nov 28, Kiwi: blank screen,
+     then everything shows back up). The flip is therefore decided
+     by flipCheck below, once a resize burst has fully settled —
+     never inside the settle itself. */
   var fsChangeAt = 0;
   document.addEventListener("fullscreenchange", function(){ fsChangeAt = Date.now(); });
+  var flipTimer = null, resizeBurstStart = 0, lastResizeAt = 0;
+  /* The coalesced size-class decision, run ~800ms after the last
+     settle of a resize burst. Deciding at settle time was the hole
+     in the first fullscreen guard: on Android the transition's
+     resize fires BEFORE fullscreenchange lands (hundreds of ms
+     before, on Kiwi), so the settle flipped and rebuilt the stream
+     while fsChangeAt was still unset — the guard never engaged and
+     the blank stayed (owner, Nov 28). By flip-check time the whole
+     transition is over, in either event order, either direction:
+     if a fullscreenchange landed anywhere around the burst, the
+     resize was the browser's fullscreen doing and the applied
+     layout stays (the next genuine resize re-evaluates); if the
+     settled viewport is back in the applied class — the usual
+     exit, which returns to the pre-entry size — there is nothing
+     to flip. Only a burst with no fullscreen in it at all — a
+     rotation, a window resize — flips, exactly as before. */
+  function flipCheck(){
+    flipTimer = null;
+    var wasPara = paraOn + "/" + printOn; computePara();
+    if((paraOn + "/" + printOn) === wasPara) return;   /* settled back into the applied class */
+    if(fsChangeAt >= resizeBurstStart - 1500){
+      var wp = wasPara.split("/"); paraOn = wp[0] === "true"; printOn = wp[1] === "true";
+      return;   /* fullscreen transition — the layout stays what it was */
+    }
+    applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold));   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
+  }
   /* Place the head pankti at the focus anchor in one silent jump —
      the placement every reflow settle uses (rotation, font-size
      change): the reader stays on his pankti, pause or play makes no
@@ -2594,20 +2619,24 @@
     return true;
   }
   window.addEventListener("resize", function(){
-    placeRecenter();
+    var nowR = Date.now();
+    if(nowR - lastResizeAt > 300) resizeBurstStart = nowR;
+    lastResizeAt = nowR;
     resizeSettleUntil = Date.now() + 400;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function(){
+      placeRecenter();   /* once per burst, not per event: its offsetHeight read forced a full layout of the stream on every resize event of a transition */
       var wasPara = paraOn + "/" + printOn; computePara();
       if((paraOn + "/" + printOn) !== wasPara){
-        if(Date.now() - fsChangeAt < 1500){
-          /* this resize belongs to a fullscreen transition — the
-             layout stays what it was (see fsChangeAt above); only
-             the re-anchor below still runs */
-          var wp = wasPara.split("/"); paraOn = wp[0] === "true"; printOn = wp[1] === "true";
-        }
-        else { applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold)); }   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
+        /* the size class crossed — never flip on the spot: restore
+           the applied layout and hand the decision to flipCheck,
+           which runs once the burst has fully settled (a fullscreen
+           transition's late fullscreenchange must land first) */
+        var wp = wasPara.split("/"); paraOn = wp[0] === "true"; printOn = wp[1] === "true";
+        clearTimeout(flipTimer);
+        flipTimer = setTimeout(flipCheck, 800);
       }
+      else { clearTimeout(flipTimer); flipTimer = null; }
       if(!audio.paused && autoScrollOn && !manualHold){
         var found = currentLineEl();
         if(found){
