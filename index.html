@@ -3139,7 +3139,12 @@
       /* during auto-play the bars come back only when the reader calls them —
          a scroll event with no hand behind it (layout settle, a spacer swap)
          must not pop them up on its own */
-      if(audio.paused || !autoScrollOn || Date.now() - lastGestureAt < 400) showBars();
+      if(audio.paused || !autoScrollOn || Date.now() - lastGestureAt < 400){
+        /* latched quick mode owns scroll reveals too: the cluster comes
+           back first — the full bars return only via its controls button */
+        if(quickLatched){ showOrb(); islandHeld = true; islandPing(); }
+        else showBars();
+      }
     }
     lastY = y;
   }, {passive:true});
