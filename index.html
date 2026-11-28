@@ -1978,18 +1978,27 @@
     var fsv = parseInt(fsRaw, 10); if(fsv >= 0 && fsv < FS.length) fsIdx = fsv;
     else if(fsRaw === null && window.innerWidth >= 1280) fsIdx = 3;   /* first run on a big screen starts one step up (26px) — reading distance; any saved choice wins */
   }catch(e){}
-  function applyFs(){
+  function applyFs(user){
     /* a size change reflows every line — without an anchor the
        reader's line drifts off and the view feels lost. Keep the
        line crossing the focus anchor (35% down) exactly where it
        was, the same preservation rotation already had: capture it,
-       change the size, then compensate the scroll by the drift. */
+       change the size, then compensate the scroll by the drift.
+       On a reader's own change (owner, Nov 28) that preservation
+       alone still lost a PAUSED reader his pankti — the kept line
+       is whatever crosses 35%, not his head. So a user change now
+       gets the rotation settle's placement too: the head pankti
+       goes back at the focus anchor, pause or play alike, unless
+       he took the page by hand (manualHold) — then the drift
+       compensation alone keeps his browsed line steady. */
     var aEl = null, aTop = 0;
     var anchorY = Math.round(window.innerHeight * 0.35);
     var ln = contentEl.querySelectorAll(".line");
     for(var li2 = 0; li2 < ln.length; li2++){ var rr = ln[li2].getBoundingClientRect(); if(rr.bottom >= anchorY){ aEl = ln[li2]; aTop = rr.top; break; } }
     document.documentElement.style.setProperty("--reader-fs", FS[fsIdx] + "px");
-    if(aEl){ var drift = aEl.getBoundingClientRect().top - aTop; if(drift) compensateScroll(drift); }
+    var placed = false;
+    if(user && !manualHold){ placed = placeHeadAtAnchor(); if(placed) updateRecenter(); }
+    if(!placed && aEl){ var drift = aEl.getBoundingClientRect().top - aTop; if(drift) compensateScroll(drift); }
     $("fontDown").disabled = fsIdx <= 0;
     $("fontUp").disabled = fsIdx >= FS.length - 1;
     var qfd = $("qcFontDown"), qfu = $("qcFontUp");
@@ -1997,8 +2006,8 @@
     if(qfu) qfu.disabled = fsIdx >= FS.length - 1;
     try{ localStorage.setItem("gurbani-reader:fontsize-v1", String(fsIdx)); }catch(e){}
   }
-  $("fontDown").addEventListener("click", function(){ if(fsIdx>0){ fsIdx--; applyFs(); } });
-  $("fontUp").addEventListener("click", function(){ if(fsIdx<FS.length-1){ fsIdx++; applyFs(); } });
+  $("fontDown").addEventListener("click", function(){ if(fsIdx>0){ fsIdx--; applyFs(true); } });
+  $("fontUp").addEventListener("click", function(){ if(fsIdx<FS.length-1){ fsIdx++; applyFs(true); } });
   applyFs();
 
   /* ---------- library sheet ---------- */
@@ -2559,6 +2568,20 @@
      whatever state they had; fullscreen is the browser's and is never
      touched. */
   var resizeSettleUntil = 0, resizeTimer = null;
+  /* Place the head pankti at the focus anchor in one silent jump —
+     the placement every reflow settle uses (rotation, font-size
+     change): the reader stays on his pankti, pause or play makes no
+     difference. Callers gate on !manualHold — a reader who took the
+     page by hand is left where he is. Returns true when it placed. */
+  function placeHeadAtAnchor(){
+    var fg = effFocus(), el = fg ? focusLineEl(fg) : null;
+    if(!el) return false;
+    autoScrolling = true;
+    zoneRefresh();
+    window.scrollTo(0, Math.max(0, anchorTopOf(el) + window.scrollY - zoneA));
+    setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60);
+    return true;
+  }
   window.addEventListener("resize", function(){
     placeRecenter();
     resizeSettleUntil = Date.now() + 400;
@@ -2584,13 +2607,7 @@
            chase follows. A reader who took the page by hand
            (manualHold) is left where he is, same as in playback,
            and a head that lives on another item is not chased. */
-        var fgR = effFocus(), elR = fgR ? focusLineEl(fgR) : null;
-        if(elR){
-          autoScrolling = true;
-          zoneRefresh();
-          window.scrollTo(0, Math.max(0, anchorTopOf(elR) + window.scrollY - zoneA));
-          setTimeout(function(){ if(!trackMoving) autoScrolling = false; }, 60);
-        }
+        placeHeadAtAnchor();
       }
       updateRecenter();
     }, 170);
