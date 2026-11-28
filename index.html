@@ -74,6 +74,7 @@
     --bg:#000;
     --paper:#000;
     --ink:#39352d;
+    --ink-far:#2b2822;
     --ink-soft:#302e29;
     --muted:#2d2b26;
     --accent:#826226;
@@ -93,6 +94,20 @@
   :root.night .w.large-pause{color:#41343c}
   :root.night .w.medium-pause{color:#3e3928}
   :root.night .w.small-pause{color:#3e3326}
+  /* owner, Nov 28 (the design pass): least light for a fully dark
+     room — a FOCUS FALLOFF on top of the washed base: lines outside
+     the focus section step down again to --ink-far, painted by
+     paintNightFalloff (which see), their vishraam colours dimming in
+     the same proportion so they stay hue-legible without glowing.
+     The colour eases over .55s so lines breathe between levels
+     instead of snapping; the spoken word keeps the accent (.w.now
+     is never recoloured) and stays the brightest thing on the page */
+  :root.night .line{transition:background .4s,box-shadow .4s,color .55s ease}
+  :root.night .line.far{color:var(--ink-far)}
+  :root.night .line.far .w.large-pause{color:#322930}
+  :root.night .line.far .w.medium-pause{color:#2f2b1f}
+  :root.night .line.far .w.small-pause{color:#2f281e}
+  :root.night .line.far.hdr{color:var(--ink-far)}
   :root.night .seg button.active,
   :root.night .retry-btn,
   :root.night .play-btn{color:#0b0906}
@@ -2169,6 +2184,7 @@
      the audio clock alone and popped up at every line change). */
   function updateRecenter(){
     paintBrandSub();
+    paintNightFalloff();
     var btn = $("recenterBtn"); if(!btn) return;
     /* the assign (bookmark) button exists only where assigning means
        something: an Ang pankti can become a Paath's place; a Bani is
@@ -5024,6 +5040,7 @@
     document.documentElement.classList.toggle("day", appearance === "day");
     document.documentElement.classList.toggle("night", appearance === "night");
     paintAppSeg(); paintAppBtn();
+    paintNightFalloff();
   }
   function setAppearance(v){
     appearance = (v === "day" || v === "night") ? v : "auto";
@@ -5194,6 +5211,51 @@
     if(sample) lhKey = Math.round(parseFloat(window.getComputedStyle(sample).lineHeight) || 0);
     var key = window.innerWidth + "x" + window.innerHeight + "|" + FS[fsIdx] + "|" + (paraOn ? "p" : "l") + "|" + (paraHdrOwn ? "h1" : "h0") + "|" + lhKey;
     if(key !== zoneKey){ zoneKey = key; computeZone(); }
+  }
+  /* NIGHT FOCUS FALLOFF (owner, Nov 28): in night mode the screen
+     should give out the least light that stays readable — so lines
+     outside the focus section are painted a step darker (--ink-far)
+     than the lines inside it, and only the section he is reading
+     carries the base night ink. A line counts as IN when it overlaps
+     the section band [zoneT, zoneB]; the current line and the focus
+     mark (the landing wash) are exempt — they are the reading
+     pointer, and the spoken word inside them keeps the accent either
+     way. A small deadband (out past ±14px, back in at ±6px) keeps a
+     line resting on the boundary from fluttering. Runs off
+     updateRecenter, so it follows every scroll frame, every
+     follow-along glide, Recenter, jumps and renders with no
+     machinery of its own. Sections more than a screen from the
+     viewport are simply far: once their first line carries the
+     mark the section is skipped until it nears the viewport again,
+     so a long stream costs a handful of rect reads per frame.
+     Colour changes never touch layout, so the reads and the class
+     writes cannot thrash. Night only: the .far rules live under
+     :root.night, so the class is inert in every other theme. */
+  function paintNightFalloff(){
+    if(appearance !== "night") return;
+    zoneRefresh();
+    var H = window.innerHeight;
+    var kids = contentEl.children;
+    for(var s = 0; s < kids.length; s++){
+      var sec = kids[s];
+      if(!sec.querySelectorAll) continue;
+      var lines = sec.querySelectorAll(".line");
+      if(!lines.length) continue;
+      var sr = sec.getBoundingClientRect();
+      var near = sr.bottom > -H && sr.top < H * 2;
+      if(!near && lines[0].classList.contains("far")) continue;
+      for(var i = 0; i < lines.length; i++){
+        var el = lines[i], far;
+        if(el.classList.contains("current") || el.classList.contains("lite")) far = false;
+        else if(!near) far = true;
+        else {
+          var r = el.getBoundingClientRect();
+          if(el.classList.contains("far")) far = (r.bottom < zoneT + 6 || r.top > zoneB - 6);
+          else far = (r.bottom < zoneT - 14 || r.top > zoneB + 14);
+        }
+        if(far) el.classList.add("far"); else el.classList.remove("far");
+      }
+    }
   }
   function wordElByIndex(wi){
     if(wi < 0 || wi >= state.flatWords.length) return null;

@@ -887,6 +887,22 @@ paint, so a forced mode never flashes the wrong palette. Cook jury:
 Night 8/10, Day 6.5/10 (fixes applied: the night sign-in slab
 washed; day vishraams deepened).
 
+Washed twice more on Nov 28 on the owner's word (still too bright
+for a fully dark room): ink down to #39352d in two steps, everything
+under it in proportion, the near-black surfaces taken to full #000
+— and then the FOCUS FALLOFF, the owner's own idea: in Night only,
+lines outside the focus section step down again to --ink-far
+#2b2822, their vishraam colours dimming in the same proportion,
+painted by paintNightFalloff off updateRecenter, so the falloff
+follows hand scrolls, follow-along, Recenter and jumps with no
+machinery of its own. A line is in when it overlaps the section
+band, with a ±14px / ±6px deadband against flutter; the current
+line and the focus mark are exempt, and the spoken word keeps
+accent-strong — the brightest thing on the page. Colour eases over
+.55s so lines breathe between levels instead of snapping. Only the
+section he is reading carries the base ink; the rest of the screen
+gives out as little light as it can.
+
 **Sehaj Paath trackers.** A Sehaj Paath is one whole read of Sri Guru
 Granth Sahib Ji — days to years — and a reader may keep several going
 at once. Below the Nitnem expandable (in BOTH the Library and the
