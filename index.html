@@ -2194,11 +2194,18 @@
           if(!el){ show = true; arrow = false; }
           else {
             var r = el.getBoundingClientRect(), anchor = Math.round(window.innerHeight * 0.35);
-            /* in place = the pankti overlaps the anchor band (the same 46px
-               deadband the auto-scroll tracker parks it within) */
+            /* in place = the pankti sits within the focus section, widened
+               by ~4–5 line heights on either side: the reader may roam
+               that far past the section by hand (reading along with the
+               audio) before the pill offers the way back — it used to
+               appear the moment the pankti left the section and nagged
+               him mid-read (owner, Nov 28). The slack is measured in the
+               pankti's own line height, so it tracks the font size. */
             zoneRefresh();
             var fwEl = el.querySelector(".w"), fr = fwEl ? fwEl.getBoundingClientRect() : r;
-            if(!(fr.top >= zoneT && fr.bottom <= zoneB)){ show = true; up = fr.bottom <= anchor; }
+            var lhEl = parseFloat(window.getComputedStyle(el).lineHeight) || fr.height || 0;
+            var slack = 4.5 * lhEl;
+            if(!(fr.top >= zoneT - slack && fr.bottom <= zoneB + slack)){ show = true; up = fr.bottom <= anchor; }
           }
         }
       }
