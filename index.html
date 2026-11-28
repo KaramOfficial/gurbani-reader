@@ -72,23 +72,27 @@
      scheme; this block wins over both palettes above. ---------- */
   :root.night{
     --bg:#000;
-    --paper:#060606;
-    --ink:#6e6759;
-    --ink-soft:#59544a;
-    --muted:#47443c;
+    --paper:#000;
+    --ink:#454138;
+    --ink-soft:#38352f;
+    --muted:#35332d;
     --accent:#826226;
     --accent-strong:#997431;
     --accent-soft:rgba(153,116,49,.16);
     --line-hl:rgba(153,116,49,.07);
     --hairline:rgba(220,205,170,.10);
     --bar-bg:rgba(0,0,0,.94);
-    --sheet-bg:#030303;
+    --sheet-bg:#000;
     --shadow:0 12px 32px rgba(0,0,0,.85), 0 2px 8px rgba(0,0,0,.65);
     color-scheme:dark;
   }
-  :root.night .w.large-pause{color:#66525e}
-  :root.night .w.medium-pause{color:#625a3d}
-  :root.night .w.small-pause{color:#62513b}
+  /* owner, Nov 28: the washed text still glowed in a fully dark room —
+     ink and everything under it taken down another step (~⅔), surfaces
+     to full black; the accent/highlight stays where it was so the
+     spoken word and current line still stand clear of the text */
+  :root.night .w.large-pause{color:#504049}
+  :root.night .w.medium-pause{color:#4c4630}
+  :root.night .w.small-pause{color:#4c3f2e}
   :root.night .seg button.active,
   :root.night .retry-btn,
   :root.night .play-btn{color:#0b0906}
@@ -384,7 +388,7 @@
   }
   /* jury: the solid pause glyph read brighter than its washed
      neighbours in night mode — one step down, same volume as the rest */
-  :root.night #qcPlay{color:#6f6656}
+  :root.night #qcPlay{color:#534d41}
   /* ---------- normal-speed preview toast: floats while a held word
      and the next few play at 1x (see the preview module) ---------- */
   .pv-toast{
