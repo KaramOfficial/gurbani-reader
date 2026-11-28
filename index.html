@@ -1280,8 +1280,9 @@
          whose original recording has been chunked offline (~5-min
          pieces cut in the silences between panktis, with a manifest)
          plays as ONE virtual track of chunk buffers — decoded one or
-         two at a time, sample-exact seeks, flat memory (Anand Sahib
-         is the pilot; see registerChunks)
+         two at a time, sample-exact seeks, flat memory (all five long
+         Banis are chunked: Japji, Jaap, Anand, Rehraas, Sukhmani;
+         see registerChunks)
        - a fetch/decode failure: the element plays the file instead,
          and for Angs it tries the original gursevak stream when the
          mirror itself was the failure
@@ -1673,7 +1674,7 @@
   /* Anand Sahib's original recording is chunked (pankti-boundary cuts in
      silences + a manifest, in the Checker data repo): register it so the
      engine plays it as one virtual buffer track instead of streaming */
-  if(audio.registerChunks){ var anandBani = baniById("anand"); if(anandBani) audio.registerChunks(baniAudioUrl(anandBani), BASE + "/data/anand-sahib/chunks/chunks.json"); }
+  if(audio.registerChunks){ ["japji", "jaap", "anand", "rehraas", "sukhmani"].forEach(function(id){ var b = baniById(id); if(b) audio.registerChunks(baniAudioUrl(b), BASE + "/data/" + b.folder + "/chunks/chunks.json"); }); }
   function baniDataUrl(b){ return BASE + "/data/" + b.folder + "/" + b.file + ".json"; }
   function preloadBaniAudio(id){ if(!id) return; var b = baniById(id); if(!b) return; if(audio.prefetch) audio.prefetch(baniAudioUrl(b)); }
 

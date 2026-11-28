@@ -147,10 +147,18 @@ Collections are titled ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ
   gone, and the old seek auto-correct simply never fires (its error
   threshold is never crossed). Per-file guards keep the native
   element as the transport when: the browser has no WebAudio/fetch
-  decode; the file is longer than ~25 min (Japji, Jaap, Anand,
-  Rehraas, Sukhmani — decoding one whole would pin 200MB+ on a
-  phone); or a fetch/decode fails (Angs then try the gursevak origin
-  stream). Prefetch warms the next item's bytes into a small (≤3)
+  decode; the file is longer than ~25 min and has NO chunk
+  manifest (decoding one whole would pin 200MB+ on a phone); or a
+  fetch/decode fails (Angs then try the gursevak origin stream).
+  The five long Banis (Japji, Jaap, Anand, Rehraas, Sukhmani) are
+  exempt from the length guard: each one's original joined
+  recording was chunked offline into ~5-min mp3s cut at pankti
+  boundaries (deepest silence in the inter-line gap) with a
+  manifest in the Checker data repo (`data/<bani>/chunks/`), and
+  the facade plays the manifest as ONE virtual track — chunks
+  decoded one or two at a time, sample-exact seeks across the
+  whole Bani, flat memory. If a chunk fetch/decode fails, the
+  Bani falls back to its streamed joined mp3 on the element. Prefetch warms the next item's bytes into a small (≤3)
   buffer cache instead of a second streaming element; files over
   ~8MB are not pre-warmed (they belong to the element anyway).
 - **Pitch at off-1× speeds (2026-11-27):** the buffer engine's raw
