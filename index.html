@@ -3092,6 +3092,7 @@
   function showBars(){ hideOrb(); document.body.classList.remove("bars-hidden"); scheduleAutoHide(); }
   var orbTimer = null;
   var qcToggleAt = 0;   /* when the cluster's own play/pause was last tapped — its toggles are exempt from the bars' pause/play reflexes */
+  var quickLatched = false;   /* once a tap during reading raises the cluster, the tap cycle belongs to it: taps toggle only the cluster, playing or paused, until the cluster's own controls button calls the full bars back and releases the latch (owner, Nov 28) */
   function showOrb(){
     var b = $("quickCtl"); if(!b) return;
     if(recenterBtn.classList.contains("show")) return; /* Recenter outranks the cluster — never both */
@@ -3108,7 +3109,7 @@
     b.classList.remove("show"); clearTimeout(orbTimer);
     if(islandHeld) islandHide();   /* the unit leaves with the cluster that raised it */
   }
-  $("orbBtn").addEventListener("click", function(){ hideOrb(); showBars(); });
+  $("orbBtn").addEventListener("click", function(){ quickLatched = false; hideOrb(); showBars(); });
   function hideBars(){ if(sheet.classList.contains("open")) return; document.body.classList.add("bars-hidden"); }
   window.addEventListener("scroll", function(){
     var y = window.scrollY;
@@ -3139,9 +3140,13 @@
     /* immersive playback (audio playing, auto-scroll on, bars hidden):
        a tap anywhere — on a word, on a line, on empty space — raises only
        the small floating button, never the whole chrome; a second tap
-       dismisses it. Outside that state, a tap calls the bars as before. */
-    if(!audio.paused && autoScrollOn && document.body.classList.contains("bars-hidden")){
-      if($("quickCtl").classList.contains("show")) hideOrb(); else { showOrb(); islandHeld = true; islandPing(); }
+       dismisses it. Raising it latches the tap cycle to the cluster:
+       taps keep toggling only it even after a pause from the cluster
+       itself — the full chrome returns only via the cluster's controls
+       button, which releases the latch. Outside that state, a tap calls
+       the bars as before. */
+    if(document.body.classList.contains("bars-hidden") && (quickLatched || (!audio.paused && autoScrollOn))){
+      if($("quickCtl").classList.contains("show")) hideOrb(); else { showOrb(); islandHeld = true; islandPing(); quickLatched = true; }
       return;
     }
     /* bars up + a tap ANYWHERE outside the UI itself — on a pankti,
