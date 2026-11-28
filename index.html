@@ -3073,7 +3073,7 @@
   var manualHold = false; /* the reader has taken the page by hand: auto-scroll stays off his back until he returns to the audio's pankti or taps recenter */
   var flashArmed = true; /* one-time line highlight when auto-scroll arrives */
   var flashEl = null, flashTimer = null;
-  function clearFlash(){ if(flashEl){ flashEl.classList.remove("current"); flashEl = null; } clearTimeout(flashTimer); }
+  function clearFlash(){ if(flashEl){ if(hlMode !== "sentence") flashEl.classList.remove("current"); flashEl = null; } clearTimeout(flashTimer); }   /* sentence mode: the follow painter owns .current — the flash only drops its reference, never the class */
   function armFlashClear(ms){ clearTimeout(flashTimer); flashTimer = setTimeout(clearFlash, ms); }
   var barsTimer = null;
   function scheduleAutoHide(){
@@ -5274,11 +5274,20 @@
        killed it mid-glide on long returns, before the line was even on screen.) */
     if(flashArmed){
       flashArmed = false;
-      var prevC = contentEl.querySelector(".line.current");
-      if(prevC && prevC !== lineEl) prevC.classList.remove("current");
-      lineEl.classList.add("current");
-      flashEl = lineEl;
-      if(!needsScroll) armFlashClear(1600);
+      /* Sentence follow mode: the painter owns .current and keeps it
+         on the spoken pankti until the next one begins (owner,
+         Nov 26) — the catch-up flash must not adopt the line here.
+         A hand scroll arms the flash, and its timed clear then
+         stripped the sentence highlight for good: the painter does
+         not repaint a pankti it already considers current, so the
+         highlight stayed off until the next line (owner, Nov 27). */
+      if(hlMode !== "sentence"){
+        var prevC = contentEl.querySelector(".line.current");
+        if(prevC && prevC !== lineEl) prevC.classList.remove("current");
+        lineEl.classList.add("current");
+        flashEl = lineEl;
+        if(!needsScroll) armFlashClear(1600);
+      }
     } else if(flashEl && flashEl !== lineEl && needsScroll){ clearFlash(); }
     if(needsScroll){ trackKick(); }
     else if(flashEl && flashEl !== lineEl){ clearFlash(); }
