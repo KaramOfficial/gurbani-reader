@@ -817,7 +817,15 @@ line becomes its head and the landing places it in the focus zone,
 no Recenter needed — the Ang landing rule (\u00a77) applied to Banis.
 Jump history is likewise keyed per Bani (\u00a75). A legacy shared
 place/head that names a Bani is adopted into that Bani's slot on
-first open. A plain ?ang=N link (no line) keeps
+first open. RESUME RULE (fix, Nov 27 evening): the store also
+carries a `lastFree` pointer — stamped {kind:"bani",id} on every
+Bani slot write and {kind:"ang"} on every free-Ang place/focus
+write — and every free-world resume (boot, account re-entry,
+the popup's Default row) resolves through `freeResume()`:
+pointer first, else the newest-ts place among the top-level
+place and all Bani slots. Before this, the resume paths read
+only the top-level (Ang) place, so a refresh while reading a
+Bani landed back on Default's Ang instead of the Bani. A plain ?ang=N link (no line) keeps
 the older in-world behaviour. In Default reading, Recenter behaves
 NORMALLY — it answers to the free world's own focus (seeded from
 the link pankti when there is one, afterwards moved only by the

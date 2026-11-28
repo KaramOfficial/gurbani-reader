@@ -1731,7 +1731,23 @@
      belong to free ANG reading (Default) alone, so a Bani can never
      borrow Default's pankti, nor Default a Bani's */
   function baniSlot(id){ var ds = readDetourStore(); var s = ds && ds.banis ? ds.banis[id] : null; return s && typeof s === "object" ? s : null; }
-  function writeBaniSlot(id, slot){ var ds = readDetourStore() || {}; if(!ds.banis) ds.banis = {}; ds.banis[id] = slot; writeDetourStore(ds); }
+  function writeBaniSlot(id, slot){ var ds = readDetourStore() || {}; if(!ds.banis) ds.banis = {}; ds.banis[id] = slot; ds.lastFree = { kind: "bani", id: id }; writeDetourStore(ds); }
+  /* where FREE reading last was: the lastFree pointer when it names a
+     slot that still holds a place/head; otherwise (stores written
+     before the pointer existed) the newest-ts place among the
+     top-level Ang place and every Bani slot. Returns
+     { place, glf, baniId } — baniId set when the resume is a Bani. */
+  function freeResume(){
+    var ds = readDetourStore(); if(!ds) return null;
+    var lf = ds.lastFree;
+    if(lf && lf.kind === "bani" && lf.id && ds.banis && ds.banis[lf.id] && (ds.banis[lf.id].place || ds.banis[lf.id].glf)) return { place: ds.banis[lf.id].place || null, glf: ds.banis[lf.id].glf || null, baniId: lf.id };
+    if(lf && lf.kind === "ang" && ds.place) return { place: ds.place, glf: ds.glf || null, baniId: null };
+    var best = null;
+    if(ds.place) best = { place: ds.place, glf: ds.glf || null, baniId: null };
+    if(ds.banis){ for(var id in ds.banis){ var s = ds.banis[id]; if(s && s.place && (!best || (s.place.ts || 0) > (best.place.ts || 0))) best = { place: s.place, glf: s.glf || null, baniId: id }; } }
+    if(!best && lf && lf.kind === "bani" && lf.id && ds.banis && ds.banis[lf.id]) best = { place: null, glf: ds.banis[lf.id].glf || null, baniId: lf.id };
+    return best;
+  }
   /* one-time adoption: a legacy shared place/head that names a Bani
      moves into that Bani's own slot, so existing progress survives */
   function adoptLegacyBaniPlace(){
@@ -1803,7 +1819,7 @@
       };
       if(detour){
         if(inBani){ var dspB = baniSlot(state.id) || {}; dspB.place = placeRec; writeBaniSlot(state.id, dspB); }
-        else { var dsp = readDetourStore() || {}; dsp.place = placeRec; writeDetourStore(dsp); }
+        else { var dsp = readDetourStore() || {}; dsp.place = placeRec; dsp.lastFree = { kind: "ang" }; writeDetourStore(dsp); }
       }
       else localStorage.setItem(LAST_KEY, JSON.stringify(placeRec));
       if(audio && !audio.paused) saveFocus();
@@ -1868,7 +1884,7 @@
     var frec = { mode: state.mode, item: item, idx: idx, start: start, t: tsec || 0, ts: (sameF && prevF.ts) ? prevF.ts : Date.now(), pv: pv };
     if(detour){ detourGlf = frec;
       if(frec.mode === "bani" && frec.item){ var dsfB = baniSlot(frec.item) || {}; dsfB.glf = frec; writeBaniSlot(frec.item, dsfB); }
-      else { var dsf = readDetourStore() || {}; dsf.glf = frec; writeDetourStore(dsf); }
+      else { var dsf = readDetourStore() || {}; dsf.glf = frec; dsf.lastFree = { kind: "ang" }; writeDetourStore(dsf); }
       syncDirty(); paintMedia(); return; }
     glf = frec;
     try{ localStorage.setItem(FOCUS_KEY, JSON.stringify(glf)); }catch(e){}
@@ -2276,9 +2292,11 @@
     snapshotCurrentPaath();
     detour = { resumed: true };
     var ds = readDetourStore();
-    detourGlf = ds && ds.glf ? ds.glf : (ds && ds.place && ds.place.fl ? { mode: ds.place.mode, item: ds.place.fl.item, idx: ds.place.fl.idx, start: ds.place.fl.start, t: ds.place.t || 0, ts: Date.now(), pv: null } : null);
+    var frE = freeResume();
+    detourGlf = frE ? (frE.glf || (frE.place && frE.place.fl ? { mode: frE.place.mode, item: frE.place.fl.item, idx: frE.place.fl.idx, start: frE.place.fl.start, t: frE.place.t || 0, ts: Date.now(), pv: null } : null)) : (ds && ds.glf ? ds.glf : null);
     setMode("free");
-    restoreFromPlace(ds && ds.place);
+    if(frE && frE.baniId){ var eb = baniById(frE.baniId); if(eb){ loadBani(eb); updateRecenter(); try{ paintJumpBtns(); }catch(e){} return; } }
+    restoreFromPlace(frE ? frE.place : (ds && ds.place));
     updateRecenter();
     try{ paintJumpBtns(); }catch(e){}
   }
@@ -5400,6 +5418,8 @@
        world — ahead of the Sehaj Paath's saved place, which waits
        untouched underneath */
     var dstore = readDetourStore();
+    var frB = modeIsFree() ? freeResume() : null;
+    if(frB && frB.baniId){ var bb = baniById(frB.baniId); if(bb){ detour = { resumed: true }; detourGlf = frB.glf || null; pendingRestore = null; loadBani(bb); return; } }
     if(dstore && dstore.place && modeIsFree()){ detour = { resumed: true }; detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null); pendingRestore = null; var saved = dstore.place;
       if(saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){ pendingRestore = saved; loadAng(saved.fl.item); }
       else if(saved.mode === "bani" && saved.fl && saved.fl.src === "view" && saved.fl.item){ var dfb = null; BANIS.forEach(function(x){ if(x.id === saved.fl.item) dfb = x; }); if(dfb){ pendingRestore = saved; loadBani(dfb); } else loadBani(BANIS[0]); }
@@ -5418,6 +5438,7 @@
       loadAng(1);
       return;
     }
+    /* (a Bani-only free resume is handled by frB above) */
     var saved = readPlace();
     if(saved && saved.mode === "ang" && saved.fl && saved.fl.src === "view" && saved.fl.item >= 1 && saved.fl.item <= 1430){
       pendingRestore = saved; loadAng(saved.fl.item);
@@ -5610,7 +5631,12 @@
       rehydrateSettings();
       buildPaathLists();
       var dstore = readDetourStore();
-      if(dstore && dstore.place && modeIsFree()){
+      var frR = modeIsFree() ? freeResume() : null;
+      if(frR && frR.baniId && baniById(frR.baniId)){
+        detour = { resumed: true };
+        detourGlf = frR.glf || null;
+        loadBani(baniById(frR.baniId));
+      } else if(dstore && dstore.place && modeIsFree()){
         detour = { resumed: true };
         detourGlf = dstore.glf || (dstore.place.fl ? { mode: dstore.place.mode, item: dstore.place.fl.item, idx: dstore.place.fl.idx, start: dstore.place.fl.start, t: dstore.place.t || 0 } : null);
         restoreFromPlace(dstore.place);
