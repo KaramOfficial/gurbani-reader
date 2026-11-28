@@ -5034,17 +5034,16 @@
      are instant, the autoScrolling flag covers them exactly, so the bars never
      mistake the Reader's own motion for the reader's hand. */
   /* ---------- the focus section + tracker ----------
-     The tracker keys on the spoken WORD, never on line change (a pankti
-     can wrap to 5-6 rows at large fonts while the section holds 2-3 —
+     The tracker keys on the spoken word's visual ROW (a pankti can
+     wrap to 5-6 rows at large fonts while the section holds 2-3 —
      the sentence wash still paints the full pankti, but the scroll
-     never waits for it). The page rests while the spoken word AND the
-     word after it are both inside the focus section; the glide is
-     ANTICIPATORY — it begins when the spoken word is the last word in
-     the section, landing that word at the section's top so the words
-     that follow flow in beneath it and are already in view when their
-     turn comes. A word's row fragment is always one line tall, so the
-     model holds at any font size, in line mode and paragraph mode,
-     in every orientation. */
+     never waits for it). The page rests while the spoken word stays
+     in its row; the only glide fires in the gap between rows, when
+     the word crosses into the next visual row, landing that row at
+     the section's top (see the camera note at trackStep). A word's
+     row fragment is always one line tall, so the model holds at any
+     font size, in line mode and paragraph mode, in every
+     orientation. */
   /* THE FOCUS SECTION (owner's model, Nov 24): a fixed band of the
      SCREEN — not of the text — sitting in the upper-centre of the
      viewport. Its height is a whole number of text lines (2, 3 or 4),
@@ -5117,36 +5116,29 @@
     return (rs && rs.length) ? rs[0] : el.getBoundingClientRect();
   }
   var trackRAF = 0, trackMoving = false, trackLastTs = 0;
-  /* The camera (Model C — sentence-first, row-safety second; ONE model
-     for every font, layout and highlight mode):
-       G1 sentence glide — when the spoken pankti changes, glide once,
-         landing the new pankti's first row at the section top, in the
-         same frame as the highlight change. This is the only motion
-         whenever the pankti fits inside the section.
-       G2 safety glide — within a pankti, only when the spoken word's
-         own row has actually reached the section's bottom edge, glide
-         landing that row at the section's top — the same anchor as
-         G1, so every follow-along move is the same kind of move
-         (owner, Nov 27: the old minimum shift, which parked the row
-         at the section's bottom edge, alternated with G1's jump to
-         the top and the jumps felt uneven). Fires at most once per
-         (pankti, row), never while a glide is running.
-       G0 reset — on an item load/switch the current pankti is accounted
-         for without a sentence glide; if the spoken row sits outside
-         the section it is landed at the section top. Seeks are covered
-         by G1 (a seek into another pankti) and the G2 recovery branch
-         (a seek within the pankti that leaves the word above the
-         section lands it at the top).
-     The camera never looks ahead to the next word and never resets
-     position mid-pankti — the two faults of the word-anticipatory
-     model this replaces (two jumps inside one pankti, out of sync
-     with the sentence highlight). */
+  /* The camera (screen-line model — owner, Nov 27 late): follow-
+     along works at the level of the SCREEN LINE (a visual row of
+     rendered text), never the pankti. While a row is being spoken
+     the view NEVER moves — the row's last word is spoken with the
+     row exactly where it sits. The only follow-along scroll happens
+     in the gap between rows: when the spoken word crosses into the
+     next visual row, glide once, landing that row's top at the
+     section top (zoneA, the anchor Recenter uses). Every move is
+     therefore exactly one row pitch — a small, uniform nudge —
+     whether the crossing is inside one pankti, across a pankti
+     boundary, or across a sentence boundary; a pankti change that
+     stays within one visual row (paragraph mode's shared rows)
+     moves nothing. The accounted row is keyed by its document-space
+     top, so scrolling itself never changes the key. A row left
+     unaccounted — an item load/switch (generation change) or a seek
+     (the seeked handler clears the key) — is accounted for on the
+     next frame and landed at the section top only if it sits
+     outside the section. A row crossing mid-glide retargets the
+     running glide to the new row. Explicit jumps (seeks, double-
+     tap, Recenter, landings, undo/redo) keep their own paths; this
+     rule is follow-along playback only. */
   var trackLi = -1, glideTargetY = null, glideKind = "", trackRowKey = "", trackGen = "";
   function trackGenNow(){ return state.mode + ":" + (state.mode === "ang" ? state.ang : state.id) + ":" + state.loadToken; }
-  function lineFirstRowTop(el){
-    var rs = el.getClientRects();
-    return (rs && rs.length) ? rs[0].top : el.getBoundingClientRect().top;
-  }
   function startGlide(targetY, kind){
     if(Math.abs(targetY - window.scrollY) <= 2){ glideTargetY = null; trackMoving = false; return false; }
     glideTargetY = targetY; glideKind = kind; trackMoving = true; autoScrolling = true;
@@ -5176,17 +5168,18 @@
     var gen = trackGenNow();
     if(gen !== trackGen){
       trackGen = gen; trackLi = li; trackRowKey = ""; glideTargetY = null; trackMoving = false;
-      if(wordMode && (r.top < zoneT - 2 || r.bottom > zoneB + 2))
-        startGlide(window.scrollY + (r.top - zoneA), "reset");
     }
     if(trackMoving && glideTargetY !== null){
-      /* a sentence glide outranks a running safety/reset glide: if the
-         pankti changed mid-glide, retarget to the new pankti's top */
-      if(wordMode && li !== trackLi && glideKind !== "sentence"){
-        var mTop = lineFirstRowTop(found.el);
-        if(!(paraOn && trackWi > 0 && state.flatWords[trackWi - 1] && state.flatWords[trackWi - 1].line === li - 1 && (function(){ var pe = wordElByIndex(trackWi - 1); var pr = wordRect(pe); return pr && Math.abs(pr.top - r.top) < 4; })()))
-          startGlide(window.scrollY + (mTop - zoneA), "sentence");
-        trackLi = li;
+      /* the spoken word crossed into another visual row mid-
+         glide: retarget to that row at the section top — the camera
+         accounts for one row at a time, so a glide never chases a
+         row playback has already left */
+      if(wordMode){
+        var gKey = Math.round((r.top + window.scrollY) / 4);
+        if(trackRowKey !== "" && gKey !== trackRowKey){
+          trackRowKey = gKey; trackLi = li;
+          if(!startGlide(window.scrollY + (r.top - zoneA), "row")) return;
+        }
       }
       var delta = glideTargetY - window.scrollY;
       if(Math.abs(delta) <= 6){
@@ -5208,46 +5201,26 @@
       startGlide(window.scrollY + (r.top - zoneA), "sentence");
       return;
     }
-    if(li !== trackLi){
-      /* G1 — the spoken pankti changed. Paragraph mode: an entry row
-         shared with the previous pankti cannot be isolated, so G1 is
-         cancelled for this pankti and only the safety rule may move. */
-      var mixed = false;
-      if(paraOn && trackWi > 0){
-        /* "previous word" must mean the last word of the immediately
-           preceding pankti — after a seek, the timestamp-previous word
-           can be a pankti far away whose row coincidentally aligns,
-           and cancelling G1 for that leaves this pankti half-out */
-        var prevRec = state.flatWords[trackWi - 1];
-        if(prevRec && prevRec.line === li - 1){
-          var pEl = wordElByIndex(trackWi - 1), pRect = wordRect(pEl);
-          if(pRect && Math.abs(pRect.top - r.top) < 4) mixed = true;
-        }
-      }
-      trackLi = li;
-      if(!mixed){
-        startGlide(window.scrollY + (lineFirstRowTop(found.el) - zoneA), "sentence");
-        return;   /* G2 is never evaluated on a pankti-change onset */
-      }
+    /* the screen-line rule: one visual row is accounted for at a
+       time. Unaccounted (fresh load, seek, item switch): account
+       for the spoken row, landing it at the section top only if it
+       sits outside the section. Accounted and unchanged: the view
+       never moves — the row's last word is spoken where the row
+       sits. Changed: the speaker has crossed into the next visual
+       row — glide that row to the section top, one row pitch. */
+    var rowKey = Math.round((r.top + window.scrollY) / 4);
+    if(trackRowKey === ""){
+      trackRowKey = rowKey; trackLi = li;
+      if(r.top < zoneT - 2 || r.bottom > zoneB + 2)
+        startGlide(window.scrollY + (r.top - zoneA), "reset");
+      return;
     }
-    /* G2 — safety, same pankti: the spoken word's own row has reached
-       the section's bottom edge → glide it to the section's top, the
-       one anchor every follow-along move lands at (G1 lands the new
-       pankti's first row there; a word left fully above the section
-       by a backward seek lands there too). */
-    if(r.bottom > zoneB + 1){
-      var rowKey = li + "|" + Math.round((r.top + window.scrollY) / 4);
-      if(rowKey !== trackRowKey){
-        trackRowKey = rowKey;
-        startGlide(window.scrollY + (r.top - zoneA), "safety");
-      }
-    } else if(r.bottom < zoneT){
-      var upKey = li + "|up|" + Math.round((r.top + window.scrollY) / 4);
-      if(upKey !== trackRowKey){
-        trackRowKey = upKey;
-        startGlide(window.scrollY + (r.top - zoneA), "safety");
-      }
+    if(rowKey !== trackRowKey){
+      trackRowKey = rowKey; trackLi = li;
+      startGlide(window.scrollY + (r.top - zoneA), "row");
+      return;
     }
+    trackLi = li;
   }
   function trackKick(){ if(!trackRAF) trackRAF = requestAnimationFrame(trackStep); }
   function autoScrollToCurrentLine(){
