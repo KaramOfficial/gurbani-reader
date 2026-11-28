@@ -2568,6 +2568,17 @@
      whatever state they had; fullscreen is the browser's and is never
      touched. */
   var resizeSettleUntil = 0, resizeTimer = null;
+  /* Fullscreen entry/exit resizes the viewport (the browser chrome
+     goes or returns) and on a phone that can cross the layout size
+     class — but fullscreen is the browser's, never a layout change:
+     a class flip here would rebuild the whole stream on the settle
+     and blank the page for seconds on a phone (owner, Nov 28, Kiwi:
+     blank screen, then everything shows back up). The settle below
+     therefore never flips the layout on a fullscreen transition,
+     in or out; a genuine rotation/resize after the transition still
+     can. */
+  var fsChangeAt = 0;
+  document.addEventListener("fullscreenchange", function(){ fsChangeAt = Date.now(); });
   /* Place the head pankti at the focus anchor in one silent jump —
      the placement every reflow settle uses (rotation, font-size
      change): the reader stays on his pankti, pause or play makes no
@@ -2588,7 +2599,15 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function(){
       var wasPara = paraOn + "/" + printOn; computePara();
-      if((paraOn + "/" + printOn) !== wasPara){ applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold)); }   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
+      if((paraOn + "/" + printOn) !== wasPara){
+        if(Date.now() - fsChangeAt < 1500){
+          /* this resize belongs to a fullscreen transition — the
+             layout stays what it was (see fsChangeAt above); only
+             the re-anchor below still runs */
+          var wp = wasPara.split("/"); paraOn = wp[0] === "true"; printOn = wp[1] === "true";
+        }
+        else { applyLayoutClass(); relayoutStream(!(!audio.paused && autoScrollOn && !manualHold)); }   /* rotation / window resize crossed the size class — the other class's layout choice applies; a paused/browsing reader keeps his place (see relayoutStream) */
+      }
       if(!audio.paused && autoScrollOn && !manualHold){
         var found = currentLineEl();
         if(found){
